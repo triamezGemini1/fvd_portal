@@ -1,0 +1,5 @@
+# Protección de carpeta config
+# Denegar acceso web a archivos de configuración
+Require all denied
+
+

@@ -1,0 +1,193 @@
+/**
+ * Inscripción a torneo — UI compacta 13" (FVD).
+ */
+.fvd-insc-wrap {
+    max-width: 52rem;
+}
+.fvd-insc-cupo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--fvd-border, rgba(255, 255, 255, 0.14));
+    background: rgba(0, 0, 0, 0.15);
+    font-size: 0.75rem;
+}
+.fvd-insc-cupo__bar {
+    flex: 1;
+    min-width: 120px;
+    max-width: 220px;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+.fvd-insc-cupo__fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #22c55e, #eab308);
+    transition: width 0.2s ease;
+}
+.fvd-insc-cupo__badge {
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(250, 204, 21, 0.2);
+    color: var(--fvd-amarillo, #facc15);
+}
+.fvd-insc-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-end;
+    margin-bottom: 10px;
+}
+.fvd-insc-search {
+    flex: 1;
+    min-width: 10rem;
+    max-width: 18rem;
+}
+.fvd-insc-results {
+    max-height: 11rem;
+    overflow: auto;
+    border: 1px solid var(--fvd-border, rgba(255, 255, 255, 0.14));
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.8125rem;
+}
+.fvd-insc-results__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.fvd-insc-results__row:last-child {
+    border-bottom: 0;
+}
+.fvd-insc-results__meta {
+    flex: 1;
+    min-width: 0;
+}
+.fvd-insc-pager {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--fvd-muted, #cbd5e1);
+    margin-bottom: 8px;
+}
+.fvd-insc-nomina-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin: 10px 0 6px;
+}
+.fvd-insc-resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.fvd-insc-card {
+    border: 1px solid var(--fvd-border, rgba(255, 255, 255, 0.14));
+    border-radius: 8px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.12);
+    position: relative;
+    font-size: 0.72rem;
+}
+.fvd-insc-card__photo {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    margin-bottom: 6px;
+}
+.fvd-insc-card__ph {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fvd-muted, #94a3b8);
+    font-size: 0.65rem;
+    margin-bottom: 6px;
+}
+.fvd-insc-card__name {
+    font-weight: 600;
+    line-height: 1.2;
+    word-break: break-word;
+}
+.fvd-insc-card__rm {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: rgba(190, 18, 60, 0.85);
+    color: #fff;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+.fvd-insc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+.fvd-insc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+}
+.fvd-insc-btn--inscribir {
+    background: #15803d;
+    color: #fff;
+    border-color: #166534;
+}
+.fvd-insc-btn--inscribir:hover {
+    background: #16a34a;
+}
+.fvd-insc-btn--pendiente {
+    background: rgba(234, 179, 8, 0.25);
+    color: #fde047;
+    border-color: rgba(250, 204, 21, 0.45);
+}
+.fvd-insc-btn--pendiente:hover {
+    background: rgba(234, 179, 8, 0.35);
+}
+.fvd-insc-btn--comprobante {
+    background: rgba(37, 99, 235, 0.35);
+    color: #bfdbfe;
+    border-color: rgba(59, 130, 246, 0.5);
+}
+.fvd-insc-btn--comprobante:hover {
+    background: rgba(37, 99, 235, 0.5);
+}
+.fvd-insc-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.fvd-insc-hint {
+    font-size: 0.7rem;
+    color: var(--fvd-muted, #94a3b8);
+    margin: 0 0 8px;
+    line-height: 1.35;
+}

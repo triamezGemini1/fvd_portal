@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+require_once dirname(__DIR__, 2) . '/_init.php';
+
+fvd_admin_require_roles();
+
+$svc = new FvdAdminService();
+$selfUrl = fvd_master_module_url('torneo_inscripcion/index.php');
+$fvd_page_title = 'Inscribir al torneo';
+$fvd_error = '';
+$fvd_ok = '';
+
+$asocId = AuthService::idAsociacion();
+$esFvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
+if ($esFvd) {
+    $asocId = isset($_GET['asociacion_id']) ? (int) $_GET['asociacion_id'] : (isset($_POST['asociacion_id']) ? (int) $_POST['asociacion_id'] : 0);
+}
+
+$esDelegadoBandera = AuthService::isDelegadoAsociacion();
+$tablasOk = $svc->torneosConvocatoriaTableExists()
+    && ($esDelegadoBandera
+        ? $svc->atletasTieneColumnasInscripcionTorneo()
+        : $svc->torneosInscripcionTorneoTableExists());
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'inscribir_atletas') {
+    try {
+        $tor = (int) ($_POST['torneo_id'] ?? 0);
+        $ids = isset($_POST['atleta_id']) && is_array($_POST['atleta_id']) ? array_map('intval', $_POST['atleta_id']) : [];
+        if ($tor <= 0 || $asocId <= 0) {
+            throw new InvalidArgumentException('Seleccione torneo' . ($esFvd ? ' y asociación' : '') . '.');
+        }
+        if (!$tablasOk) {
+            throw new RuntimeException(
+                $esDelegadoBandera
+                    ? 'Faltan requisitos: convocatoria y columnas inscripcion/torneo_id en atletas.'
+                    : 'Faltan tablas: ejecute install_inscripcion_torneo.sql y install_torneo_convocatoria_y_publicacion.sql'
+            );
+        }
+        if ($esDelegadoBandera) {
+            $n = \FvdPortal\Services\InscripcionService::registrarMultiplesIndividualesBandera(fvd_db(), $tor, $asocId, $ids);
+        } else {
+            $n = $svc->torneosInscribirAtletas($tor, $asocId, $ids);
+        }
+        $fvd_ok = $n > 0 ? "Se inscribieron {$n} atleta(s)." : 'No hubo inscripciones nuevas (p. ej. ya inscritos o cédula inválida).';
+    } catch (Throwable $e) {
+        $fvd_error = $e->getMessage();
+        error_log('[torneo_inscripcion] ' . $fvd_error);
+    }
+}
+
+$torneoSel = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : (isset($_POST['torneo_id']) ? (int) $_POST['torneo_id'] : 0);
+
+if (AuthService::isDelegadoAsociacion()) {
+    $ctxTor = AuthService::delegadoTorneoContextId();
+    if ($ctxTor !== null && $ctxTor > 0) {
+        if ($torneoSel <= 0 || $torneoSel !== $ctxTor) {
+            header('Location: ' . $selfUrl . '?torneo_id=' . $ctxTor);
+            exit;
+        }
+    }
+}
+
+$torneosAbiertos = [];
+$asociacionesSelect = [];
+if ($tablasOk && $asocId > 0) {
+    $torneosAbiertos = $svc->torneosAbiertosInscripcionParaAsociacion($asocId);
+}
+
+if ($esFvd && $tablasOk) {
+    $qAs = $svc->asociacionesPaginateList(1, 500, '');
+    $asociacionesSelect = $qAs['rows'] ?? [];
+}
+
+$atletasDisp = ($tablasOk && $torneoSel > 0 && $asocId > 0)
+    ? $svc->torneosAtletasInscribibles($torneoSel, $asocId)
+    : [];
+
+$appBase = rtrim((string) env('APP_BASE_PATH', ''), '/');
+$inscripcionApiUrl = $appBase . '/fvdmasteradmin/delegado_inscripcion_api.php';
+$uploadsPublicBase = url('crud_atletas/uploads/');
+$torneoMeta = ($tablasOk && $torneoSel > 0 && $asocId > 0)
+    ? $svc->torneoInscripcionMetaParaVista($torneoSel, $asocId, $esDelegadoBandera ? true : null)
+    : null;
+
+$fvd_inscripcion_bandera_modo = $esDelegadoBandera;
+$inscritosBandera = ($esDelegadoBandera && $torneoSel > 0 && $asocId > 0)
+    ? \FvdPortal\Services\InscripcionService::listarInscritosBandera(fvd_db(), $torneoSel, $asocId)
+    : [];
+
+require FVD_MASTER_ROOT . '/includes/layout_header.php';
+include __DIR__ . '/inscribir.view.php';
+require FVD_MASTER_ROOT . '/includes/layout_footer.php';

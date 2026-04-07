@@ -1,0 +1,166 @@
+# ============================================
+# Sistema FVD - Configuración de Producción
+# ============================================
+
+# Deshabilitar listado de directorios
+Options -Indexes -MultiViews
+
+# Seguir enlaces simbólicos
+Options +FollowSymLinks
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # ============================================
+    # Protección de Archivos Sensibles
+    # ============================================
+    
+    # Bloquear acceso a archivos de configuración
+    <FilesMatch "\.(env|env\.production|env\.example|htaccess|htpasswd|ini|log|sh|sql|md|txt)$">
+        Require all denied
+    </FilesMatch>
+    
+    # Proteger archivos específicos
+    <Files ".env">
+        Require all denied
+    </Files>
+    
+    <Files "composer.json">
+        Require all denied
+    </Files>
+    
+    <Files "composer.lock">
+        Require all denied
+    </Files>
+    
+    # Bloquear acceso a archivos de documentación
+    <Files "README.md">
+        Require all denied
+    </Files>
+    
+    # ============================================
+    # Protección contra ataques
+    # ============================================
+    
+    # Bloquear acceso a carpetas del sistema
+    RewriteRule ^vendor/(.*)$ - [F,L]
+    RewriteRule ^config/(.*)$ - [F,L]
+    RewriteRule ^logs/(.*)$ - [F,L]
+    RewriteRule ^tests/(.*)$ - [F,L]
+    RewriteRule ^cli/(.*)$ - [F,L]
+    
+    # Proteger archivos de backup
+    RewriteRule \.(bak|backup|old|save|swp|tmp)$ - [F,L]
+    
+    # Bloquear inyección de código
+    RewriteCond %{QUERY_STRING} (<|%3C)([^s]*s)+cript.*(>|%3E) [NC,OR]
+    RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
+    RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2})
+    RewriteRule .* - [F,L]
+    
+    # Proteger contra SQL injection
+    RewriteCond %{QUERY_STRING} [a-zA-Z0-9_]=http:// [OR]
+    RewriteCond %{QUERY_STRING} [a-zA-Z0-9_]=(\.\.//?)+ [OR]
+    RewriteCond %{QUERY_STRING} [a-zA-Z0-9_]=/([a-z0-9_.]//?)+ [NC]
+    RewriteRule .* - [F,L]
+    
+    # ============================================
+    # Rutas de la aplicación
+    # ============================================
+    
+    # Si el archivo o directorio existe, servirlo directamente
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Mantener compatibilidad con estructura actual
+    # RewriteRule ^(.*)$ app_index.php [QSA,L]
+</IfModule>
+
+# ============================================
+# Configuración de Seguridad HTTP
+# ============================================
+
+<IfModule mod_headers.c>
+    # Protección contra clickjacking
+    Header set X-Frame-Options "SAMEORIGIN"
+    
+    # Prevenir MIME type sniffing
+    Header set X-Content-Type-Options "nosniff"
+    
+    # Protección XSS
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Política de referencia
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content Security Policy (ajustar según necesidades)
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
+    
+    # Política de permisos
+    Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    
+    # Eliminar información del servidor
+    Header unset X-Powered-By
+    Header unset Server
+</IfModule>
+
+# ============================================
+# Configuración PHP
+# ============================================
+
+<IfModule mod_php.c>
+    # Límites de carga
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_value memory_limit 256M
+    
+    # Configuración de sesión
+    php_flag session.cookie_httponly on
+    php_flag session.cookie_secure on
+    php_value session.cookie_samesite Strict
+    
+    # Deshabilitar funciones peligrosas en producción
+    php_value disable_functions "exec,passthru,shell_exec,system,proc_open,popen,curl_exec,curl_multi_exec,parse_ini_file,show_source"
+    
+    # Errores en producción
+    php_flag display_errors off
+    php_flag display_startup_errors off
+    php_value error_reporting 0
+    php_flag log_errors on
+    php_value error_log logs/error.log
+</IfModule>
+
+# ============================================
+# Compresión y Caché
+# ============================================
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+</IfModule>
+
+# ============================================
+# Protección de Uploads
+# ============================================
+
+<IfModule mod_rewrite.c>
+    # Evitar ejecución de PHP en carpeta uploads
+    RewriteRule ^uploads/.*\.php$ - [F,L]
+    RewriteRule ^invitaciones_generadas/.*\.php$ - [F,L]
+    RewriteRule ^crud_atletas/uploads/.*\.php$ - [F,L]
+</IfModule>
+
+
+
+
