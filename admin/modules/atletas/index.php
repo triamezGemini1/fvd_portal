@@ -16,7 +16,7 @@ $fvd_error = '';
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
     $svc->atletasDelete((int) $_GET['id']);
-    header('Location: ' . $selfUrl);
+    header('Location: ' . $selfUrl . '?action=list');
     exit;
 }
 
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'togg
     if ($tid > 0) {
         $svc->atletasToggleActivo($tid);
     }
-    header('Location: ' . $selfUrl);
+    header('Location: ' . $selfUrl . '?action=list');
     exit;
 }
 
@@ -33,7 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
     try {
         $sid = isset($_POST['id']) && $_POST['id'] !== '' ? (int) $_POST['id'] : null;
         $svc->atletasSave($sid, $_POST, $_FILES);
-        header('Location: ' . $selfUrl);
+        if ($sid !== null) {
+            header('Location: ' . $selfUrl . '?action=form&id=' . $sid);
+        } else {
+            header('Location: ' . $selfUrl);
+        }
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();
@@ -64,7 +68,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'tras
 }
 
 $fvd_page_title = 'Atletas';
-$action = $_GET['action'] ?? 'list';
+$rawAction = isset($_GET['action']) ? trim((string) $_GET['action']) : '';
+$impliesAtletasList = isset($_GET['tab']) || isset($_GET['page']) || isset($_GET['cedula'])
+    || (isset($_GET['q']) && trim((string) $_GET['q']) !== '')
+    || (isset($_GET['ficha']) && trim((string) $_GET['ficha']) !== '')
+    || (isset($_GET['revision_delegado']) && (string) $_GET['revision_delegado'] === '1');
+if ($rawAction === '') {
+    $action = $impliesAtletasList ? 'list' : 'form';
+} else {
+    $action = $rawAction;
+}
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 
 if ($action === 'lookup_cedula') {

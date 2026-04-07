@@ -17,8 +17,9 @@ class FilePreview {
      * @param {string} inputId - ID del input file
      * @param {string} previewId - ID del contenedor de vista previa
      * @param {string} fileType - Tipo de archivo esperado: 'image' o 'pdf'
+     * @param {{ previewSize?: number }} [extra] - previewSize: ancho/alto máx. en px (p. ej. 220 para logos)
      */
-    init(inputId, previewId, fileType = 'image') {
+    init(inputId, previewId, fileType = 'image', extra = {}) {
         const input = document.getElementById(inputId);
         const preview = document.getElementById(previewId);
 
@@ -27,17 +28,28 @@ class FilePreview {
             return;
         }
 
+        const initialHtml = preview.innerHTML;
+        const previewSizePx = typeof extra.previewSize === 'number' && extra.previewSize > 0
+            ? extra.previewSize
+            : null;
+
         input.addEventListener('change', (e) => {
-            this.handleFileSelect(e, preview, fileType);
+            const file = e.target.files[0];
+            if (!file) {
+                preview.innerHTML = initialHtml;
+                return;
+            }
+            this.handleFileSelect(e, preview, fileType, previewSizePx);
         });
     }
 
     /**
      * Maneja la selección de archivo
+     * @param {number|null} previewSizePx tamaño máximo en px (opcional)
      */
-    handleFileSelect(event, previewContainer, fileType) {
+    handleFileSelect(event, previewContainer, fileType, previewSizePx = null) {
         const file = event.target.files[0];
-        
+
         if (!file) {
             this.clearPreview(previewContainer);
             return;
@@ -60,7 +72,7 @@ class FilePreview {
 
         // Mostrar vista previa
         if (fileType === 'image') {
-            this.showImagePreview(file, previewContainer);
+            this.showImagePreview(file, previewContainer, previewSizePx);
         } else if (fileType === 'pdf') {
             this.showPdfPreview(file, previewContainer);
         }
@@ -68,26 +80,27 @@ class FilePreview {
 
     /**
      * Muestra vista previa de imagen
+     * @param {number|null} maxPx
      */
-    showImagePreview(file, container) {
+    showImagePreview(file, container, maxPx = null) {
+        const px = maxPx !== null && maxPx > 0 ? maxPx : this.previewSize;
         const reader = new FileReader();
-        
+
         reader.onload = (e) => {
+            const result = (e.target && e.target.result) ? String(e.target.result) : '';
+            const safeName = String(file.name || '').replace(/</g, '&lt;').replace(/&/g, '&amp;');
             container.innerHTML = `
                 <div class="file-preview-wrapper">
-                    <img src="${e.target.result}" 
-                         alt="Vista previa" 
-                         style="max-width: ${this.previewSize}px; max-height: ${this.previewSize}px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                    <div class="file-info mt-2">
-                        <small class="text-muted">
-                            <i class="fas fa-file-image"></i> ${file.name} 
-                            <br><i class="fas fa-weight-hanging"></i> ${this.formatBytes(file.size)}
-                        </small>
+                    <img src="${result}"
+                         alt="Vista previa"
+                         style="max-width: ${px}px; max-height: ${px}px; width: auto; height: auto; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                    <div class="file-info" style="margin-top:8px;font-size:12px;color:#94a3b8;line-height:1.4">
+                        ${safeName}<br>${this.formatBytes(file.size)}
                     </div>
                 </div>
             `;
         };
-        
+
         reader.readAsDataURL(file);
     }
 

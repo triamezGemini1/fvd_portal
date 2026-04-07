@@ -349,19 +349,35 @@ require __DIR__ . '/includes/layout_header.php';
             <label for="foto_input">Foto de perfil (JPG, PNG, GIF, WebP · máx. 5&nbsp;MB)</label>
             <input class="fvd-input" type="file" id="foto_input" name="foto" accept="image/jpeg,image/png,image/gif,image/webp" style="max-width:100%;padding:0.5rem;">
             <p style="margin:0.5rem 0 0.35rem;color:var(--fvd-muted);font-size:0.9em;">Vista previa</p>
-            <div id="foto_preview_new" style="min-height:120px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:10px;background:rgba(0,0,0,.15);color:var(--fvd-muted);font-size:0.85em;margin-bottom:0.75rem;">
-                Elija una imagen para previsualizarla aquí.
+            <div id="foto_preview_new" style="min-height:120px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:10px;background:rgba(0,0,0,.15);color:var(--fvd-muted);font-size:0.85em;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;">
+                <?php if ($fotoUrl !== ''): ?>
+                    <img src="<?= htmlspecialchars($fotoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Foto actual" style="max-width:200px;max-height:200px;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block">
+                <?php else: ?>
+                    Elija una imagen para previsualizarla aquí.
+                <?php endif; ?>
             </div>
         <?php endif; ?>
         <?php if ($hasFotoCarnet): ?>
             <label for="foto_carnet_input">Foto tipo carnet</label>
             <input class="fvd-input" type="file" id="foto_carnet_input" name="foto_carnet" accept="image/jpeg,image/png,image/gif,image/webp" style="max-width:100%;padding:0.5rem;">
-            <div id="foto_carnet_preview" style="min-height:100px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:10px;background:rgba(0,0,0,.12);color:var(--fvd-muted);font-size:0.85em;margin-bottom:0.75rem;">Vista previa foto carnet.</div>
+            <div id="foto_carnet_preview" style="min-height:100px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:10px;background:rgba(0,0,0,.12);color:var(--fvd-muted);font-size:0.85em;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;">
+                <?php if ($fotoCarnetUrl !== ''): ?>
+                    <img src="<?= htmlspecialchars($fotoCarnetUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Foto carnet actual" style="max-width:200px;max-height:200px;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block">
+                <?php else: ?>
+                    Vista previa foto carnet.
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
         <?php if ($hasFotoCedula): ?>
             <label for="foto_cedula_input">Imagen de la cédula (foto o escaneo legible)</label>
             <input class="fvd-input" type="file" id="foto_cedula_input" name="foto_cedula" accept="image/jpeg,image/png,image/gif,image/webp" style="max-width:100%;padding:0.5rem;">
-            <div id="foto_cedula_preview" style="min-height:100px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:10px;background:rgba(0,0,0,.12);color:var(--fvd-muted);font-size:0.85em;margin-bottom:0.75rem;">Vista previa cédula.</div>
+            <div id="foto_cedula_preview" style="min-height:100px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:10px;background:rgba(0,0,0,.12);color:var(--fvd-muted);font-size:0.85em;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:center;">
+                <?php if ($fotoCedulaUrl !== ''): ?>
+                    <img src="<?= htmlspecialchars($fotoCedulaUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cédula actual" style="max-width:100%;max-height:220px;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block">
+                <?php else: ?>
+                    Vista previa cédula.
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
         <?php if (isset($allowedUpdate['nombre'])): ?>
             <label for="nombre">Nombre</label>
@@ -423,14 +439,16 @@ require __DIR__ . '/includes/layout_header.php';
 <script src="<?= htmlspecialchars(url('assets/js/file-preview.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (typeof FilePreview === 'undefined') { return; }
-    var fp = new FilePreview({ previewSize: 200, maxFileSize: 5 * 1024 * 1024 });
-    var i1 = document.getElementById('foto_input');
-    if (i1 && document.getElementById('foto_preview_new')) { fp.init('foto_input', 'foto_preview_new', 'image'); }
-    var i2 = document.getElementById('foto_carnet_input');
-    if (i2 && document.getElementById('foto_carnet_preview')) { fp.init('foto_carnet_input', 'foto_carnet_preview', 'image'); }
-    var i3 = document.getElementById('foto_cedula_input');
-    if (i3 && document.getElementById('foto_cedula_preview')) { fp.init('foto_cedula_input', 'foto_cedula_preview', 'image'); }
+    if (typeof window.filePreview === 'undefined') { return; }
+    if (document.getElementById('foto_input') && document.getElementById('foto_preview_new')) {
+        window.filePreview.init('foto_input', 'foto_preview_new', 'image', { previewSize: 200 });
+    }
+    if (document.getElementById('foto_carnet_input') && document.getElementById('foto_carnet_preview')) {
+        window.filePreview.init('foto_carnet_input', 'foto_carnet_preview', 'image', { previewSize: 200 });
+    }
+    if (document.getElementById('foto_cedula_input') && document.getElementById('foto_cedula_preview')) {
+        window.filePreview.init('foto_cedula_input', 'foto_cedula_preview', 'image', { previewSize: 220 });
+    }
 });
 </script>
 

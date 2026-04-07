@@ -51,16 +51,56 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 
 <style>
 .fvd-atleta-form { max-width: 56rem; margin: 0 auto; }
-.fvd-atleta-form__title {
-    margin: 0 0 1rem;
+.fvd-atleta-form-page {
+    max-width: 56rem;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 0.75rem;
+}
+.fvd-atleta-form-page__title {
+    text-align: center;
+    margin: 0 0 0.65rem;
+    width: 100%;
+}
+.fvd-atleta-form-page .fvd-atleta-form.fvd-atleta-form--framed {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    border: 2px solid var(--fvd-amarillo, var(--fvd-dorado, #fff200));
+    border-radius: 0.75rem;
+    padding: 1rem 1.15rem 0.9rem;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 0 0 1px rgba(255, 242, 0, 0.14);
+}
+.fvd-atleta-form-page--embed {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    width: auto;
+}
+.fvd-atleta-form-page--embed .fvd-atleta-form-page__title {
     text-align: left;
+    margin: 0 0 0.5rem;
+}
+.fvd-atleta-form-page--embed .fvd-atleta-form--framed {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.fvd-atleta-form-page .fvd-atleta-form__actions.fvd-mod-actions {
+    justify-content: center;
 }
 .fvd-atleta-form__top-grid {
     display: grid;
     grid-template-columns: 1fr min(273px, 42vw);
-    gap: 1.25rem;
+    gap: 1rem;
     align-items: start;
-    margin-bottom: 1rem;
+    margin-bottom: 0.65rem;
 }
 .fvd-atleta-form__asoc--grid-full {
     grid-column: 1 / -1;
@@ -79,7 +119,7 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
     align-self: start;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.35rem;
     align-items: stretch;
 }
 .fvd-atleta-form__top-grid--scoped-asoc .fvd-atleta-form__fields-col,
@@ -99,28 +139,48 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 }
 .fvd-atleta-form__foto-file { width: 100%; }
 .fvd-atleta-form__foto-file .fvd-input[type="file"] { width: 100%; font-size: 0.75rem; padding: 4px; }
+.fvd-atleta-form__numfvd-categ-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.45rem;
+    align-items: stretch;
+}
+.fvd-atleta-form__numfvd-categ-row > .fvd-atleta-form__numfvd,
+.fvd-atleta-form__numfvd-categ-row > .fvd-atleta-form__categ-side {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.fvd-atleta-form__row--fechas-fvd > .fvd-atleta-form__numfvd,
+.fvd-atleta-form__row--fechas-fvd > .fvd-atleta-form__categ-side {
+    flex: 1 1 7.5rem;
+    min-width: 5.5rem;
+    max-width: 11rem;
+    align-self: flex-end;
+}
 .fvd-atleta-form__numfvd {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--fvd-muted);
-    text-align: center;
-    padding: 0.35rem 0.5rem;
+    text-align: left;
+    padding: 0.3rem 0.4rem;
     border-radius: 6px;
     background: rgba(0,0,0,0.08);
 }
-.fvd-atleta-form__numfvd strong { color: var(--fvd-amarillo, #fff200); font-size: 1rem; }
+.fvd-atleta-form__numfvd strong { color: var(--fvd-amarillo, #fff200); font-size: 0.9375rem; }
 .fvd-atleta-form__categ-side {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--fvd-muted);
-    text-align: center;
-    padding: 0.35rem 0.5rem;
+    text-align: left;
+    padding: 0.3rem 0.4rem;
     border-radius: 6px;
     background: rgba(0,0,0,0.06);
-    line-height: 1.35;
+    line-height: 1.3;
 }
 .fvd-atleta-form__categ-side .fvd-atleta-form__categ-hint {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--fvd-amarillo, #fff200);
+    line-height: 1.25;
 }
 .fvd-atleta-form__preview {
     min-height: 2.5rem;
@@ -174,7 +234,7 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 }
 .fvd-atleta-form__row--cednom {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
     gap: 0.75rem;
     align-items: start;
 }
@@ -182,7 +242,18 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 .fvd-atleta-form__row--cednom .fvd-atleta-form__nom {
     min-width: 0;
 }
-.fvd-atleta-form__row--cednom .fvd-input { max-width: none; width: 100%; }
+/* Cédula: caja ~40% más estrecha (60% del ancho de su columna) */
+.fvd-atleta-form__row--cednom .fvd-atleta-form__ced .fvd-input {
+    width: 60%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+/* Nombre: todo el ancho de la columna amplia */
+.fvd-atleta-form__row--cednom .fvd-atleta-form__nom .fvd-input {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
 .fvd-atleta-form__row--3 > div {
     flex: 1 1 7rem;
     min-width: 6rem;
@@ -208,16 +279,23 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.65rem;
     align-items: flex-end;
-    margin-bottom: 0.65rem;
+    margin-bottom: 0.45rem;
 }
 .fvd-atleta-form__date-fvd-wrap {
-    flex: 1 1 calc(50% - 0.375rem);
-    min-width: 9rem;
+    flex: 0 1 auto;
+    min-width: 0;
     max-width: none;
 }
-.fvd-atleta-form__date-fvd-wrap .fvd-input { width: 100%; max-width: 100%; }
+/* Fechas FVD/act: +20% respecto al tamaño anterior (72% × max 11.7rem) */
+.fvd-atleta-form__date-fvd-wrap .fvd-input[type="date"] {
+    width: 72%;
+    max-width: 11.7rem;
+    min-width: 8.1rem;
+    box-sizing: border-box;
+}
+.fvd-atleta-form__date-fvd-wrap .fvd-input { max-width: 100%; }
 .fvd-atleta-form__row--5 {
     display: flex;
     flex-wrap: wrap;
@@ -243,18 +321,29 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 .fvd-atleta-form__row--cel-email-est > div:nth-child(3) { flex: 0 0 6.5rem; max-width: 8rem; }
 .fvd-atleta-form__row--cel-email-est .fvd-input { max-width: none; width: 100%; }
 .fvd-atleta-form__edit-block {
-    margin-top: 0.85rem;
-    padding-top: 0.85rem;
+    margin-top: 0.55rem;
+    padding-top: 0.55rem;
     border-top: 1px solid var(--fvd-border, rgba(255,255,255,0.14));
 }
 .fvd-atleta-form__edit-block h2 {
     font-size: var(--fvd-font-h3, 1.05rem);
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.35rem;
     color: var(--fvd-amarillo, #fff200);
 }
+.fvd-atleta-form__actions.fvd-mod-actions {
+    margin-top: 0.35rem;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+.fvd-atleta-form__actions.fvd-mod-actions button,
+.fvd-atleta-form__actions.fvd-mod-actions a {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+}
 .fvd-atleta-form__aprob {
-    margin: 1rem 0;
-    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.65rem;
     border: 1px solid var(--fvd-border, rgba(255,255,255,0.2));
     border-radius: 8px;
     background: rgba(255,242,0,0.06);
@@ -291,9 +380,25 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
         flex: 1 1 100%;
         min-width: 0;
     }
+    .fvd-atleta-form__date-fvd-wrap .fvd-input[type="date"] {
+        width: 100%;
+        max-width: none;
+    }
+    .fvd-atleta-form__row--fechas-fvd > .fvd-atleta-form__numfvd,
+    .fvd-atleta-form__row--fechas-fvd > .fvd-atleta-form__categ-side {
+        max-width: none;
+        flex: 1 1 100%;
+        align-self: stretch;
+    }
+    .fvd-atleta-form__numfvd-categ-row {
+        flex-wrap: wrap;
+    }
 }
 @media (max-width: 640px) {
     .fvd-atleta-form__row--cednom { grid-template-columns: 1fr; }
+    .fvd-atleta-form__row--cednom .fvd-atleta-form__ced .fvd-input {
+        width: 100%;
+    }
     .fvd-atleta-form__row--cel-email-est > div,
     .fvd-atleta-form__row--cel-email-est > div:nth-child(1),
     .fvd-atleta-form__row--cel-email-est > div:nth-child(2),
@@ -310,11 +415,11 @@ if ($fvd_form_embed) {
     $fvdFormAction .= '&embed=1';
 }
 ?>
-<form class="fvd-atleta-form" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($fvdFormAction, ENT_QUOTES, 'UTF-8') ?>"<?= $fvd_form_embed ? ' target="_parent"' : '' ?>>
+<div class="fvd-atleta-form-page<?= !empty($fvd_form_embed) ? ' fvd-atleta-form-page--embed' : '' ?>">
+<h1 class="fvd-atleta-form-page__title"><?= $isEdit ? 'Editar atleta' : 'Nuevo atleta' ?></h1>
+<form class="fvd-atleta-form fvd-atleta-form--framed" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($fvdFormAction, ENT_QUOTES, 'UTF-8') ?>"<?= $fvd_form_embed ? ' target="_parent"' : '' ?>>
     <input type="hidden" name="_action" value="save">
     <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>"><?php endif; ?>
-
-    <h1 class="fvd-atleta-form__title"><?= $isEdit ? 'Editar atleta' : 'Nuevo atleta' ?></h1>
 
     <div class="fvd-atleta-form__top-grid<?= $isFvdAdmin ? '' : ' fvd-atleta-form__top-grid--scoped-asoc' ?>">
         <?php if ($isFvdAdmin): ?>
@@ -351,8 +456,8 @@ if ($fvd_form_embed) {
                 <div>
                     <label for="sexo">Sexo</label>
                     <select class="fvd-input" id="sexo" name="sexo" style="max-width:none">
-                        <?php foreach ([0 => '0', 1 => '1', 2 => '2'] as $k => $lab): ?>
-                            <option value="<?= $k ?>" <?= ((int) ($r['sexo'] ?? 0) === $k) ? 'selected' : '' ?>><?= $lab ?></option>
+                        <?php foreach ([0 => '— No indicado —', 1 => 'Masculino', 2 => 'Femenino'] as $k => $lab): ?>
+                            <option value="<?= $k ?>" <?= ((int) ($r['sexo'] ?? 0) === $k) ? 'selected' : '' ?>><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -417,6 +522,19 @@ if ($fvd_form_embed) {
                         <label for="fechact">Fecha act.</label>
                         <input class="fvd-input" type="date" id="fechact" name="fechact" value="<?= htmlspecialchars($fechact, ENT_QUOTES, 'UTF-8') ?>">
                     </div>
+                    <div class="fvd-atleta-form__numfvd">
+                        <span>Nº FVD</span><br>
+                        <?php if ($numfvdVal > 0): ?>
+                            <strong><?= (int) $numfvdVal ?></strong>
+                        <?php else: ?>
+                            <strong>—</strong>
+                            <div style="font-size:0.6875rem;margin-top:2px;opacity:0.9;line-height:1.2">Pendiente asignación</div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="fvd-atleta-form__categ-side" id="fvd_categ_hint">
+                        <span style="display:block;font-size:0.6875rem;color:var(--fvd-muted);margin-bottom:0.15rem">Categoría (edad)</span>
+                        <p class="fvd-atleta-form__categ-hint"><span id="fvd_categ_hint_txt"><?= htmlspecialchars($categEtiqueta, ENT_QUOTES, 'UTF-8') ?></span></p>
+                    </div>
                 </div>
                 <div class="fvd-atleta-form__row fvd-atleta-form__row--5">
                     <div>
@@ -464,22 +582,28 @@ if ($fvd_form_embed) {
                 <div class="fvd-atleta-form__preview fvd-atleta-form__preview--cedula-full" id="fvd_preview_cedula">
                     <?php if ($isEdit && $cedulaImgUrl !== ''): ?>
                         <img src="<?= htmlspecialchars($cedulaImgUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cédula actual" style="border-radius:6px;object-fit:contain">
+                    <?php else: ?>
+                        <span style="font-size:0.75rem;color:var(--fvd-muted)">Vista previa imagen de cédula</span>
                     <?php endif; ?>
                 </div>
             </div>
-            <div class="fvd-atleta-form__numfvd">
-                <span>Nº FVD</span><br>
-                <?php if ($numfvdVal > 0): ?>
-                    <strong><?= (int) $numfvdVal ?></strong>
-                <?php else: ?>
-                    <strong>—</strong>
-                    <div style="font-size:0.75rem;margin-top:4px;opacity:0.9">Pendiente de asignación</div>
-                <?php endif; ?>
+            <?php if (!$isEdit): ?>
+            <div class="fvd-atleta-form__numfvd-categ-row">
+                <div class="fvd-atleta-form__numfvd">
+                    <span>Nº FVD</span><br>
+                    <?php if ($numfvdVal > 0): ?>
+                        <strong><?= (int) $numfvdVal ?></strong>
+                    <?php else: ?>
+                        <strong>—</strong>
+                        <div style="font-size:0.6875rem;margin-top:2px;opacity:0.9;line-height:1.2">Pendiente asignación</div>
+                    <?php endif; ?>
+                </div>
+                <div class="fvd-atleta-form__categ-side" id="fvd_categ_hint">
+                    <span style="display:block;font-size:0.6875rem;color:var(--fvd-muted);margin-bottom:0.15rem">Categoría (edad)</span>
+                    <p class="fvd-atleta-form__categ-hint"><span id="fvd_categ_hint_txt"><?= htmlspecialchars($categEtiqueta, ENT_QUOTES, 'UTF-8') ?></span></p>
+                </div>
             </div>
-            <div class="fvd-atleta-form__categ-side" id="fvd_categ_hint">
-                <span style="display:block;font-size:0.75rem;color:var(--fvd-muted);margin-bottom:0.2rem">Categoría (según edad)</span>
-                <p class="fvd-atleta-form__categ-hint"><span id="fvd_categ_hint_txt"><?= htmlspecialchars($categEtiqueta, ENT_QUOTES, 'UTF-8') ?></span></p>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -497,18 +621,19 @@ if ($fvd_form_embed) {
     </div>
     <?php endif; ?>
 
-    <div class="fvd-mod-actions">
+    <div class="fvd-mod-actions fvd-atleta-form__actions">
         <button type="submit">Guardar</button>
-        <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al listado</a>
+        <a href="<?= htmlspecialchars($selfUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>">Volver al listado</a>
     </div>
 </form>
+</div>
 
 <script src="<?= htmlspecialchars(url('assets/js/file-preview.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script>
 (function () {
     if (typeof window.filePreview === 'undefined') return;
-    window.filePreview.init('foto', 'fvd_preview_foto', 'image');
-    window.filePreview.init('cedula_img', 'fvd_preview_cedula', 'image');
+    window.filePreview.init('foto', 'fvd_preview_foto', 'image', { previewSize: 180 });
+    window.filePreview.init('cedula_img', 'fvd_preview_cedula', 'image', { previewSize: 280 });
 })();
 
 function fvdCategoriaEtiquetaDesdeFechnac(v) {

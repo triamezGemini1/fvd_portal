@@ -109,11 +109,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
             header('Location: ' . $selfUrl . '?action=evento&id=' . $savedId . '&msg=torneo_creado_invitaciones');
             exit;
         }
-        if (!empty($_POST['invitar_todas_al_guardar']) && AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-            $msg = $svc->torneosConvocatoriaTableExists() ? 'invitadas' : 'sin_tabla_convocatoria';
-            header('Location: ' . $selfUrl . '?action=evento&id=' . $savedId . '&msg=' . $msg);
-            exit;
-        }
         header('Location: ' . $selfUrl);
         exit;
     } catch (Throwable $e) {
@@ -392,6 +387,20 @@ if ($action === 'evento' && $id !== null && $id > 0) {
 if ($action === 'form') {
     $row = $svc->torneosFind($id);
     $asociaciones = $svc->torneosListAsociacionesForSelect();
+    $fvd_torneo_org_id = 0;
+    $fvd_torneo_org_nombre = '';
+    if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+        try {
+            $fvd_torneo_org_id = $svc->torneosOrganizacionFederacionId();
+        } catch (Throwable $e) {
+            $fvd_torneo_org_id = 0;
+            $fvd_error = ($fvd_error !== '' ? $fvd_error . ' ' : '') . $e->getMessage();
+        }
+        $fvd_torneo_org_nombre = 'Federación Venezolana de Dominó';
+    } elseif ($asociaciones !== []) {
+        $fvd_torneo_org_id = (int) ($asociaciones[0]['id'] ?? 0);
+        $fvd_torneo_org_nombre = (string) ($asociaciones[0]['nombre'] ?? 'Asociación');
+    }
     if ($id !== null && $row === null) {
         http_response_code(404);
         $fvd_page_title = 'No encontrado';

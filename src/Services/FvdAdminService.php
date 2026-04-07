@@ -668,6 +668,40 @@ final class FvdAdminService
     /**
      * @return list<array<string,mixed>>
      */
+    /**
+     * ID de la asociación que representa a la Federación Venezolana de Dominó (organizador nacional).
+     */
+    public function torneosOrganizacionFederacionId(): int
+    {
+        $exact = [
+            'Federación Venezolana de Dominó',
+            'FEDERACIÓN VENEZOLANA DE DOMINÓ',
+            'Federación Venezolana del Dominó',
+        ];
+        foreach ($exact as $nom) {
+            $st = $this->pdo->prepare('SELECT id FROM asociaciones WHERE TRIM(nombre) = :n LIMIT 1');
+            $st->execute([':n' => $nom]);
+            $id = $st->fetchColumn();
+            if ($id !== false && (int) $id > 0) {
+                return (int) $id;
+            }
+        }
+        $st = $this->pdo->query(
+            "SELECT id FROM asociaciones WHERE UPPER(TRIM(nombre)) LIKE '%FEDERACI%'
+             AND UPPER(TRIM(nombre)) LIKE '%VENEZOLANA%' AND UPPER(TRIM(nombre)) LIKE '%DOMIN%'
+             ORDER BY id ASC LIMIT 1"
+        );
+        $id = $st ? $st->fetchColumn() : false;
+        if ($id !== false && (int) $id > 0) {
+            return (int) $id;
+        }
+
+        throw new RuntimeException(
+            'No se encontró en la tabla asociaciones un registro para la Federación Venezolana de Dominó. ' .
+            'Cree o renombre la asociación nacional para que coincida con ese nombre.'
+        );
+    }
+
     public function torneosListAsociacionesForSelect(): array
     {
         if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
@@ -723,13 +757,15 @@ final class FvdAdminService
         if ($torneoId === null) {
             $data['publicar_landing'] = 1;
         } elseif (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-            $data['publicar_landing'] = !empty($post['publicar_landing']) ? 1 : 0;
+            $data['publicar_landing'] = 1;
         } else {
             $prevPub = $this->torneosFind($torneoId);
             $data['publicar_landing'] = (int) ($prevPub['publicar_landing'] ?? 0);
         }
 
-        if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
+        if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+            $data['organizacion_id'] = $this->torneosOrganizacionFederacionId();
+        } elseif (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
             $mine = AuthService::idAsociacion();
             if ($mine === null) {
                 throw new RuntimeException('Sin asociación asignada.');
@@ -820,7 +856,7 @@ final class FvdAdminService
      */
     private function torneosPostSaveInvitarTodas(int $torneoId, array $post): void
     {
-        if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN || empty($post['invitar_todas_al_guardar'])) {
+        if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
             return;
         }
         if (!$this->torneosConvocatoriaTableExists()) {

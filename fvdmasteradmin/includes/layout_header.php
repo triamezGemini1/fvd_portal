@@ -33,6 +33,8 @@ $fvdProjRoot = dirname($fvdRoot);
 if (!function_exists('url')) {
     require_once $fvdProjRoot . '/config/paths.php';
 }
+require_once $fvdRoot . '/includes/fvd_brand.php';
+$fvd_brand_logo_url = fvd_brand_logo_public_url();
 $fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
 $fvdNavBase = rtrim((string) env('APP_BASE_PATH', ''), '/') . '/fvdmasteradmin';
 $fvdPanelUrl = $fvdNavBase . '/index.php';
@@ -102,8 +104,16 @@ if (!isset($fvd_sidebar_active)) {
 }
 
 if (str_contains($fvdScript, '/modules/atletas/') || str_contains($fvdScript, '/admin/modules/atletas/')) {
-    if (isset($_GET['action']) && (string) $_GET['action'] === 'form' && (!isset($_GET['id']) || (string) $_GET['id'] === '')) {
+    $rawAtAct = isset($_GET['action']) ? trim((string) $_GET['action']) : '';
+    $atImpliesList = isset($_GET['tab']) || isset($_GET['page']) || isset($_GET['cedula'])
+        || (isset($_GET['q']) && trim((string) $_GET['q']) !== '')
+        || (isset($_GET['ficha']) && trim((string) $_GET['ficha']) !== '')
+        || (isset($_GET['revision_delegado']) && (string) $_GET['revision_delegado'] === '1');
+    $atEff = $rawAtAct === '' ? ($atImpliesList ? 'list' : 'form') : $rawAtAct;
+    if ($atEff === 'form' && (!isset($_GET['id']) || (string) $_GET['id'] === '')) {
         $fvd_sidebar_active = 'atletas_nuevo';
+    } elseif ($atEff === 'list' || ($rawAtAct === '' && $atImpliesList)) {
+        $fvd_sidebar_active = 'atletas';
     }
 }
 if (str_contains($fvdScript, 'solicitudes_delegado')) {
@@ -207,7 +217,7 @@ header('Content-Type: text/html; charset=UTF-8');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($fvd_page_title, ENT_QUOTES, 'UTF-8') ?></title>
+    <title><?= htmlspecialchars($fvd_page_title, ENT_QUOTES, 'UTF-8') ?> · FVD — Federación Venezolana de Dominó</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -351,6 +361,57 @@ header('Content-Type: text/html; charset=UTF-8');
             padding: var(--fvd-nav-y) 14px;
             border-bottom: 1px solid var(--fvd-border);
         }
+        .fvd-sidebar-fvd-identity {
+            text-align: center;
+            margin-bottom: 8px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .fvd-sidebar-fvd-logo {
+            display: block;
+            margin: 0 auto 6px;
+            max-width: 100%;
+            height: auto;
+            max-height: 52px;
+            object-fit: contain;
+        }
+        .fvd-sidebar-fvd-tagline {
+            margin: 4px 0 0;
+            font-size: 0.62rem;
+            line-height: 1.3;
+            color: var(--fvd-muted);
+            font-weight: 500;
+            letter-spacing: 0.04em;
+        }
+        .fvd-shell--sidebar-rail .fvd-sidebar-fvd-logo { max-height: 30px; }
+        .fvd-shell--sidebar-rail .fvd-sidebar-fvd-tagline { display: none; }
+        .fvd-dash-fvd-identity {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 1.25rem 0 2rem;
+            padding: 0 1rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .fvd-dash-fvd-identity__logo {
+            width: 50%;
+            max-width: min(50vw, 28rem);
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+        .fvd-dash-fvd-identity__legend {
+            margin: 0.85rem 0 0;
+            padding: 0 0.5rem;
+            font-size: clamp(1.425rem, 5.25vw, 2.175rem);
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            color: var(--fvd-amarillo);
+            text-align: center;
+            line-height: 1.3;
+        }
         .fvd-sidebar-brand {
             font-weight: 700;
             font-size: var(--fvd-font-h3);
@@ -492,7 +553,45 @@ header('Content-Type: text/html; charset=UTF-8');
             min-height: 48px;
             box-sizing: border-box;
         }
-        .fvd-topbar__brand { justify-self: start; display: flex; align-items: center; min-width: 0; }
+        .fvd-topbar__brand { justify-self: start; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+        .fvd-topbar__fvd-lockup {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            min-width: 0;
+            max-width: 100%;
+            text-decoration: none;
+            color: inherit;
+        }
+        .fvd-topbar__fvd-lockup:hover .fvd-topbar__page-title { color: var(--fvd-amarillo); }
+        .fvd-topbar__fvd-logo {
+            height: 40px;
+            width: auto;
+            max-width: 104px;
+            object-fit: contain;
+            flex-shrink: 0;
+            display: block;
+        }
+        .fvd-topbar__page-title {
+            font-size: clamp(0.72rem, 2.1vw, 0.92rem);
+            font-weight: 600;
+            color: var(--fvd-text);
+            line-height: 1.25;
+            max-width: min(52vw, 19rem);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .fvd-topbar__asoc-badge {
+            height: 36px;
+            width: auto;
+            max-width: 88px;
+            object-fit: contain;
+            border-radius: 4px;
+            flex-shrink: 0;
+            display: block;
+        }
         .fvd-topbar__logo {
             display: block;
             max-height: 44px;
@@ -642,7 +741,13 @@ header('Content-Type: text/html; charset=UTF-8');
     <aside class="fvd-sidebar" id="fvd-sidebar" aria-label="Menú principal">
         <div class="fvd-sidebar-head">
             <button type="button" class="fvd-sidebar-rail-toggle" id="fvd-sidebar-wide-toggle" title="Ampliar o contraer menú lateral">Menú ↔</button>
-            <a class="fvd-sidebar-brand" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="FVD Master Admin">FVD Master Admin</a>
+            <div class="fvd-sidebar-fvd-identity">
+                <a href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Panel — Federación Venezolana de Dominó">
+                    <img class="fvd-sidebar-fvd-logo" src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>" width="160" height="52" alt="Federación Venezolana de Dominó" decoding="async">
+                </a>
+                <a class="fvd-sidebar-brand" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="FVD Master Admin">FVD Master Admin</a>
+                <p class="fvd-sidebar-fvd-tagline">Federación Venezolana de Dominó</p>
+            </div>
             <a class="fvd-sn" href="<?= htmlspecialchars($fvd_public_landing_url, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer" title="Sitio público (inicio)">Sitio público (inicio)</a>
         </div>
         <nav class="fvd-sidebar-nav">
@@ -681,8 +786,8 @@ header('Content-Type: text/html; charset=UTF-8');
                 <details class="fvd-sn-acc"<?= $fvd_acc_adm_atletas_open ? ' open' : '' ?>>
                     <summary class="fvd-sn-acc__summary" title="Atletas">Atletas <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
-                        <a class="fvd-sn<?= $fvd_sn_active('atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Listado general">Listado general</a>
-                        <a class="fvd-sn<?= $fvd_sn_active('atletas_nuevo') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=form'), ENT_QUOTES, 'UTF-8') ?>" title="Formulario de alta">Nuevos atletas (formulario)</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=list'), ENT_QUOTES, 'UTF-8') ?>" title="Listado general">Listado general</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('atletas_nuevo') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Formulario de alta (entrada principal del módulo)">Registro / nuevo atleta</a>
                     </div>
                 </details>
                 <details class="fvd-sn-acc"<?= $fvd_acc_adm_torneos_open ? ' open' : '' ?>>
@@ -724,7 +829,7 @@ header('Content-Type: text/html; charset=UTF-8');
                 <details class="fvd-sn-acc"<?= $fvd_acc_datos_open ? ' open' : '' ?>>
                     <summary class="fvd-sn-acc__summary" title="Datos maestros">Datos <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
-                        <a class="fvd-sn<?= $fvd_sn_active('atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Atletas">Atletas</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=list'), ENT_QUOTES, 'UTF-8') ?>" title="Atletas">Atletas</a>
                     </div>
                 </details>
                 <details class="fvd-sn-acc"<?= $fvd_acc_fin_open ? ' open' : '' ?>>
@@ -759,8 +864,12 @@ header('Content-Type: text/html; charset=UTF-8');
     <header class="fvd-topbar">
         <div class="fvd-topbar__inner">
             <div class="fvd-topbar__brand">
+                <a class="fvd-topbar__fvd-lockup" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Ir al panel — FVD">
+                    <img class="fvd-topbar__fvd-logo" src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>" width="104" height="40" alt="" decoding="async">
+                    <span class="fvd-topbar__page-title"><?= htmlspecialchars($fvd_page_title, ENT_QUOTES, 'UTF-8') ?></span>
+                </a>
                 <?php if ($fvd_topbar_asoc_logo_url !== null && $fvd_topbar_asoc_logo_url !== ''): ?>
-                    <img class="fvd-topbar__logo" src="<?= htmlspecialchars($fvd_topbar_asoc_logo_url, ENT_QUOTES, 'UTF-8') ?>" alt="" width="120" height="44">
+                    <img class="fvd-topbar__asoc-badge" src="<?= htmlspecialchars($fvd_topbar_asoc_logo_url, ENT_QUOTES, 'UTF-8') ?>" alt="" width="88" height="36" decoding="async">
                 <?php endif; ?>
             </div>
             <div class="fvd-topbar__center">

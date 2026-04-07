@@ -100,9 +100,10 @@ function fvd_public_footer(): void
 
 function fvd_public_torneo_tipo_label($tipo): string
 {
-    $m = [1 => 'Masculino', 2 => 'Femenino', 3 => 'Mixto'];
+    $ti = (int) $tipo;
+    $m = [1 => 'Torneo', 2 => 'Campeonato', 3 => 'Mixto (hist.)'];
 
-    return $m[(int) $tipo] ?? '—';
+    return $m[$ti] ?? '—';
 }
 
 function fvd_public_torneo_clase_label($clase): string

@@ -9,7 +9,7 @@
 /** @var string $atletasSearchApiUrl */
 /** @var string $atletasExportUrl */
 /** @var string $atletasReportBaseUrl */
-$atletasFormEmbedUrl = $selfUrl . '?action=form&embed=1';
+$atletasFormNuevoUrl = $selfUrl . '?action=form';
 $fvd_tab_class = ($fvd_atletas_tab ?? 'list') === 'ficha' ? 'fvd-atletas-tab-ficha' : 'fvd-atletas-tab-list';
 $carnetsUrlBase = $selfUrl . '?action=carnets';
 ?>
@@ -50,7 +50,7 @@ $fvdEsSuper = \AuthService::isSuperAdmin();
             <input id="fvd-atleta-q" class="fvd-input" type="search" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Contiene…" style="max-width:12rem">
         </div>
         <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Buscar</button>
-        <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
+        <a href="<?= htmlspecialchars($selfUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
         <?php if ($fvdEsSuper): ?>
             <?php if (!$fvdRevFilt): ?>
                 <a href="<?= htmlspecialchars($selfUrl . '?action=list&revision_delegado=1', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box;font-weight:600;border-color:var(--fvd-amarillo);color:var(--fvd-amarillo)">Altas delegado (pend. FVD)</a>
@@ -95,7 +95,7 @@ $fvdEsSuper = \AuthService::isSuperAdmin();
             <button type="button" class="fvd-input" id="fvd-export-pdf" style="width:auto;padding:6px 12px">PDF</button>
         </div>
     </div>
-    <button type="button" class="fvd-btn-primary no-print" id="fvd-atleta-open-modal">Nuevo atleta</button>
+    <a href="<?= htmlspecialchars($atletasFormNuevoUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary no-print" style="text-decoration:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center">Nuevo atleta</a>
 </div>
 
 <div class="fvd-atletas-view-seg no-print fvd-only-list-tab" role="tablist" aria-label="Vista de columnas">
@@ -157,21 +157,10 @@ $pages = (int) $result['pages'];
 
 </div>
 
-<dialog id="fvd-atleta-modal" class="fvd-atleta-modal" aria-labelledby="fvd-atleta-modal-title">
-    <div class="fvd-atleta-modal__box">
-        <div class="fvd-atleta-modal__head">
-            <h2 id="fvd-atleta-modal-title" class="fvd-atleta-modal__title">Nuevo atleta</h2>
-            <button type="button" class="fvd-atleta-modal__close" id="fvd-atleta-modal-close" aria-label="Cerrar">×</button>
-        </div>
-        <iframe id="fvd-atleta-modal-frame" class="fvd-atleta-modal__frame" title="Formulario atleta" src="about:blank"></iframe>
-    </div>
-</dialog>
-
 <script>
 (function () {
     var apiUrl = <?= json_encode($atletasSearchApiUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var exportUrl = <?= json_encode($atletasExportUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var formEmbedUrl = <?= json_encode($atletasFormEmbedUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var carnetsBase = <?= json_encode($carnetsUrlBase, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var rootEl = document.getElementById('fvd-atletas-root');
     var formTab = document.getElementById('fvd-form-tab');
@@ -183,10 +172,6 @@ $pages = (int) $result['pages'];
     var tbody = table ? table.querySelector('tbody') : null;
     var pager = document.getElementById('fvd-atletas-pager');
     var hint = document.getElementById('fvd-atletas-live-hint');
-    var modal = document.getElementById('fvd-atleta-modal');
-    var modalFrame = document.getElementById('fvd-atleta-modal-frame');
-    var modalClose = document.getElementById('fvd-atleta-modal-close');
-    var openModalBtn = document.getElementById('fvd-atleta-open-modal');
     var btnLote = document.getElementById('fvd-carnets-lote');
     var revisionDelegado = <?= !empty($fvd_revision_delegado_filtro) ? 'true' : 'false' ?>;
     var fetchPage = function () {};
@@ -241,37 +226,6 @@ $pages = (int) $result['pages'];
             setMainTab(btn.getAttribute('data-fvd-atletas-main-tab') || 'list');
         });
     });
-
-    if (openModalBtn && modal && modalFrame && formEmbedUrl) {
-        openModalBtn.addEventListener('click', function () {
-            modalFrame.src = formEmbedUrl;
-            if (typeof modal.showModal === 'function') {
-                modal.showModal();
-            } else {
-                modal.setAttribute('open', '');
-            }
-        });
-    }
-    if (modalClose && modal) {
-        modalClose.addEventListener('click', function () {
-            modalFrame.src = 'about:blank';
-            if (typeof modal.close === 'function') {
-                modal.close();
-            } else {
-                modal.removeAttribute('open');
-            }
-        });
-    }
-    if (modal) {
-        modal.addEventListener('click', function (e) {
-            if (e.target === modal) {
-                modalFrame.src = 'about:blank';
-                if (typeof modal.close === 'function') {
-                    modal.close();
-                }
-            }
-        });
-    }
 
     if (btnLote && tbody) {
         btnLote.addEventListener('click', function () {

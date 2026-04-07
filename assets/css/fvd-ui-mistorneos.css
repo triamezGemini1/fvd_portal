@@ -228,6 +228,94 @@ table.fvd-mod-table {
   box-sizing: border-box;
 }
 
+/* Asociaciones: título y formulario centrados en el área de contenido */
+.fvd-asoc-form-page {
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 0.75rem;
+}
+.fvd-asoc-form-page__title {
+  text-align: center;
+  margin: 0 0 0.85rem;
+  width: 100%;
+}
+.fvd-asoc-form-page .fvd-mod-form--asoc-2col {
+  margin-left: auto;
+  margin-right: auto;
+}
+.fvd-asoc-form-page .fvd-mod-actions {
+  justify-content: center;
+}
+
+/* Formulario asociaciones: borde y logo a la derecha */
+.fvd-mod-form--asoc-bordered {
+  border: 1px solid var(--fvd-border, rgba(255, 255, 255, 0.22));
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.35rem 1.1rem;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.fvd-asoc-form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
+  gap: 1.25rem 1.5rem;
+  align-items: start;
+}
+
+.fvd-asoc-logo-panel {
+  border: 1px solid var(--fvd-border, rgba(255, 255, 255, 0.16));
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.fvd-asoc-logo-panel label {
+  margin-top: 0;
+}
+
+.fvd-asoc-logo-preview {
+  margin-top: 0.5rem;
+  min-height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: 1px dashed var(--fvd-border, rgba(255, 255, 255, 0.2));
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.fvd-asoc-logo-preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.fvd-asoc-logo-preview__placeholder {
+  font-size: 0.8125rem;
+  color: var(--fvd-muted, #94a3b8);
+  text-align: center;
+  line-height: 1.35;
+}
+
+.fvd-asoc-logo-meta {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+@media (max-width: 900px) {
+  .fvd-asoc-form-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .fvd-mod-form--asoc-2col .fvd-asoc-grid {
     grid-template-columns: 1fr;
@@ -286,6 +374,275 @@ table.fvd-mod-table {
   grid-template-columns: 1fr 1fr;
   gap: 0 0.75rem;
   max-width: 44rem;
+}
+
+/* Formulario torneos: federación, título, borde amarillo, adjuntos en 2 columnas */
+.fvd-tf-form-page {
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 0.75rem;
+}
+.fvd-tf-federacion-name {
+  text-align: center;
+  margin: 0 0 0.35rem;
+  width: 100%;
+  font-weight: 700;
+  font-size: calc(1.35rem * 1.5);
+  line-height: 1.25;
+  color: var(--fvd-amarillo, var(--fvd-dorado, #fff200));
+  letter-spacing: 0.02em;
+}
+.fvd-tf-form-title {
+  text-align: center;
+  margin: 0 0 0.85rem;
+  width: 100%;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+.fvd-tf-form-page__err {
+  margin: 0 0 0.75rem;
+}
+.fvd-tf-form {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 0;
+}
+.fvd-tf-form.fvd-tf-form--framed {
+  border: 2px solid var(--fvd-amarillo, var(--fvd-dorado, #fff200));
+  border-radius: 0.75rem;
+  padding: 1rem 1.15rem 0.9rem;
+  background: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1px rgba(255, 242, 0, 0.12);
+}
+.fvd-tf-form__actions {
+  justify-content: center;
+  margin-top: 1rem;
+}
+.fvd-tf-grid.fvd-tf-grid--form {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+}
+.fvd-tf-nombre-fecha-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr minmax(9.5rem, 11.5rem);
+  gap: 0.75rem;
+  align-items: end;
+}
+.fvd-tf-nombre-fecha-row .fvd-input {
+  max-width: none;
+  width: 100%;
+}
+.fvd-tf-checks-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0.15rem 0 0.35rem;
+}
+.fvd-tf-check-readonly {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.8125rem;
+  color: var(--fvd-text, #e2e8f0);
+  line-height: 1.4;
+  cursor: default;
+  margin: 0;
+}
+.fvd-tf-check-readonly input[type="checkbox"] {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.fvd-tf-metrics-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.55rem;
+  align-items: flex-end;
+  margin: 0.25rem 0 0.15rem;
+}
+.fvd-tf-metrics-row .fvd-tf-metric {
+  flex: 0 1 auto;
+  width: 60%;
+  max-width: 5.4rem;
+  min-width: 3.25rem;
+}
+.fvd-tf-metrics-row .fvd-tf-metric .fvd-input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.fvd-tf-files-2col {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.25rem;
+  align-items: start;
+  margin-top: 0.35rem;
+}
+.fvd-tf-file-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.fvd-tf-file-col label {
+  margin-top: 0;
+}
+.fvd-tf-file-input[type="file"] {
+  padding: 4px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 0.8125rem;
+}
+.fvd-tf-file-preview {
+  min-height: 5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed var(--fvd-border, rgba(255, 255, 255, 0.22));
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.fvd-tf-file-preview--afiche {
+  min-height: 7rem;
+  align-items: center;
+}
+.fvd-tf-file-preview__linkwrap {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+.fvd-tf-file-preview__meta {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  word-break: break-all;
+}
+.fvd-tf-file-preview__placeholder {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.fvd-tf-file-preview__img {
+  max-width: 100%;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+}
+@media (max-width: 640px) {
+  .fvd-tf-nombre-fecha-row {
+    grid-template-columns: 1fr;
+  }
+  .fvd-tf-files-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Costos / tarifas — formulario centrado, borde dorado, filas label+input */
+.fvd-costos-form-page {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 0 0.75rem 1.25rem;
+  font-size: calc(var(--fvd-font-body, 0.875rem) * 1.5);
+  line-height: 1.45;
+  text-align: center;
+}
+.fvd-costos-form-page__err {
+  text-align: center;
+  margin: 0 0 0.75rem;
+}
+.fvd-costos-federacion-name {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: var(--fvd-amarillo, #f5c518);
+  font-size: 1.05em;
+  letter-spacing: 0.02em;
+}
+.fvd-costos-form-title {
+  margin: 0 0 0.85rem;
+  font-size: 1.35em;
+  text-align: center;
+}
+.fvd-costos-form.fvd-costos-form--framed {
+  text-align: left;
+  border: 2px solid var(--fvd-dorado, var(--fvd-amarillo, #daa520));
+  border-radius: 10px;
+  padding: 1rem 1.1rem 1.1rem;
+  box-sizing: border-box;
+  background: var(--fvd-bg-card, rgba(255, 255, 255, 0.04));
+}
+.fvd-costos-form.fvd-mod-form .fvd-costos-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 11.25rem) minmax(0, 50%);
+  align-items: center;
+  column-gap: 0.65rem;
+  row-gap: 0.25rem;
+  margin-bottom: 0.55rem;
+}
+.fvd-costos-form.fvd-mod-form .fvd-costos-row label {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-weight: 600;
+  font-size: calc((1em + 0.5rem) * 0.7);
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  text-align: end;
+  align-self: center;
+}
+.fvd-costos-form.fvd-mod-form .fvd-costos-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-size: inherit;
+  align-self: center;
+  margin: 0;
+}
+.fvd-costos-form__actions {
+  margin-top: 0.85rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.fvd-costos-form-footnote {
+  margin: 1rem 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--fvd-border, rgba(15, 23, 42, 0.14));
+  color: var(--fvd-text, #111827);
+  font-weight: 700;
+  font-size: 0.95em;
+  line-height: 1.55;
+  text-align: center;
+  font-family: var(--fvd-main-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  letter-spacing: 0.015em;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+@media (max-width: 520px) {
+  .fvd-costos-form.fvd-mod-form .fvd-costos-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .fvd-costos-form.fvd-mod-form .fvd-costos-row label {
+    text-align: start;
+  }
+  .fvd-costos-form.fvd-mod-form .fvd-costos-input {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 .fvd-df-grid {

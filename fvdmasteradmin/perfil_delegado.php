@@ -216,12 +216,24 @@ require __DIR__ . '/includes/layout_header.php';
         <?php if ($hasFotoCarnet): ?>
         <p><label for="foto_carnet_input">Foto tipo carnet (JPG, PNG, GIF, WebP · máx. 5&nbsp;MB)</label><br>
             <input class="fvd-input" type="file" id="foto_carnet_input" name="foto_carnet" accept="image/jpeg,image/png,image/gif,image/webp"></p>
-        <div id="foto_carnet_preview" style="min-height:80px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:8px;font-size:0.75rem;color:var(--fvd-muted);margin-bottom:0.5rem;">Vista previa</div>
+        <div id="foto_carnet_preview" style="min-height:80px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:8px;font-size:0.75rem;color:var(--fvd-muted);margin-bottom:0.5rem;display:flex;align-items:center;justify-content:center;">
+            <?php if ($fotoCarnetUrl !== ''): ?>
+                <img src="<?= htmlspecialchars($fotoCarnetUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Foto carnet actual" style="max-width:200px;max-height:180px;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block">
+            <?php else: ?>
+                Vista previa
+            <?php endif; ?>
+        </div>
         <?php endif; ?>
         <?php if ($hasFotoCedula): ?>
         <p><label for="foto_cedula_input">Imagen de la cédula</label><br>
             <input class="fvd-input" type="file" id="foto_cedula_input" name="foto_cedula" accept="image/jpeg,image/png,image/gif,image/webp"></p>
-        <div id="foto_cedula_preview" style="min-height:80px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:8px;font-size:0.75rem;color:var(--fvd-muted);margin-bottom:0.5rem;">Vista previa</div>
+        <div id="foto_cedula_preview" style="min-height:80px;padding:0.5rem;border:1px dashed var(--fvd-border);border-radius:8px;font-size:0.75rem;color:var(--fvd-muted);margin-bottom:0.5rem;display:flex;align-items:center;justify-content:center;">
+            <?php if ($fotoCedulaUrl !== ''): ?>
+                <img src="<?= htmlspecialchars($fotoCedulaUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Cédula actual" style="max-width:100%;max-height:200px;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block">
+            <?php else: ?>
+                Vista previa
+            <?php endif; ?>
+        </div>
         <?php endif; ?>
         <p><label for="password_new">Nueva contraseña (opcional)</label><br><input class="fvd-input" id="password_new" name="password_new" type="password" autocomplete="new-password"></p>
         <p><label for="password_new2">Repetir contraseña</label><br><input class="fvd-input" id="password_new2" name="password_new2" type="password" autocomplete="new-password"></p>
@@ -231,10 +243,13 @@ require __DIR__ . '/includes/layout_header.php';
 <script src="<?= htmlspecialchars(url('assets/js/file-preview.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (typeof FilePreview === 'undefined') { return; }
-    var fp = new FilePreview({ previewSize: 160, maxFileSize: 5 * 1024 * 1024 });
-    if (document.getElementById('foto_carnet_input')) { fp.init('foto_carnet_input', 'foto_carnet_preview', 'image'); }
-    if (document.getElementById('foto_cedula_input')) { fp.init('foto_cedula_input', 'foto_cedula_preview', 'image'); }
+    if (typeof window.filePreview === 'undefined') { return; }
+    if (document.getElementById('foto_carnet_input')) {
+        window.filePreview.init('foto_carnet_input', 'foto_carnet_preview', 'image', { previewSize: 180 });
+    }
+    if (document.getElementById('foto_cedula_input')) {
+        window.filePreview.init('foto_cedula_input', 'foto_cedula_preview', 'image', { previewSize: 200 });
+    }
 });
 </script>
 <?php

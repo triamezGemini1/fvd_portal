@@ -12,6 +12,8 @@ $projRoot = dirname(__DIR__);
 if (!function_exists('url')) {
     require_once $projRoot . '/config/paths.php';
 }
+require_once __DIR__ . '/includes/fvd_brand.php';
+$fvd_brand_logo_url = fvd_brand_logo_public_url();
 $fvd_public_landing_url = url('index.php');
 
 AuthService::ensureSession();
@@ -92,7 +94,7 @@ header('Content-Type: text/html; charset=UTF-8');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso — FVD Master Admin</title>
+    <title>Acceso — FVD Master Admin · Federación Venezolana de Dominó</title>
     <style>
         :root {
             --fvd-azul: <?= htmlspecialchars(FVD_UI_COLOR_AZUL, ENT_QUOTES, 'UTF-8') ?>;
@@ -108,10 +110,17 @@ header('Content-Type: text/html; charset=UTF-8');
         button { width: 100%; padding: 8px; font-size: 14px; background: var(--fvd-amarillo); color: var(--fvd-azul); border: 1px solid rgba(46,48,146,0.35); border-radius: 6px; cursor: pointer; font-weight: 600; }
         button:hover { filter: brightness(0.97); }
         .err { color: #fecaca; font-size: 13px; margin-bottom: 0.75rem; border-left: 3px solid var(--fvd-rojo); padding-left: 0.5rem; }
+        .fvd-login-brand { text-align: center; margin-bottom: 1rem; }
+        .fvd-login-brand img { width: 50%; max-width: 200px; height: auto; object-fit: contain; display: block; margin: 0 auto 0.5rem; }
+        .fvd-login-brand .tagline { margin: 0; font-size: clamp(0.75rem, 2.5vw, 0.9rem); font-weight: 600; color: var(--fvd-amarillo); letter-spacing: 0.03em; line-height: 1.3; }
     </style>
 </head>
 <body>
 <div class="box">
+    <div class="fvd-login-brand">
+        <img src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>" width="200" height="64" alt="Federación Venezolana de Dominó" decoding="async">
+        <p class="tagline">Federación Venezolana de Dominó</p>
+    </div>
     <h1>FVD Master Admin</h1>
     <?php if ($error !== ''): ?><div class="err"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
     <form method="post" action="">

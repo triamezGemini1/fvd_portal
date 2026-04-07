@@ -71,7 +71,8 @@ $urlDeudas = fvd_master_module_url('deuda_asociacion/index.php');
 $urlPagos = fvd_master_module_url('relacion_pago/index.php');
 $urlAsoc = fvd_crud_self_url('asociaciones');
 $urlPublicTorneo = url('torneo_publico.php?id=' . $tidTorneo);
-$fvdTipoLab = [1 => 'Masculino', 2 => 'Femenino', 3 => 'Mixto'][(int) ($t['tipo'] ?? 1)] ?? '—';
+$fvdTipoRaw = (int) ($t['tipo'] ?? 1);
+$fvdTipoLab = [1 => 'Torneo', 2 => 'Campeonato', 3 => 'Mixto (hist.)'][$fvdTipoRaw] ?? '—';
 $fvdClaseLab = [1 => 'Individual', 2 => 'Parejas', 3 => 'Equipos'][(int) ($t['clase'] ?? 1)] ?? '—';
 ?>
 

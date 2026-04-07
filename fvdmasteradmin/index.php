@@ -41,7 +41,7 @@ if ($fvdEsDelegadoPanel) {
     $delegNotifs = \FvdPortal\Services\DelegadoTorneoNotifService::listarParaDelegado($pdo, $delegadoUid, 25);
     $delegNotifNoVistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $delegadoUid);
     $delegInscripcionApi = $appBase . '/fvdmasteradmin/delegado_inscripcion_api.php';
-    $urlRegistrarAtleta = $appBase . '/fvdmasteradmin/modules/atletas/index.php?action=form';
+    $urlRegistrarAtleta = $appBase . '/fvdmasteradmin/modules/atletas/index.php';
     $delegCupoInsc = null;
     $tidCtx = (int) ($delegSnap['torneo_id'] ?? 0);
     $myAs = AuthService::idAsociacion();
@@ -74,7 +74,7 @@ require_once __DIR__ . '/services/FvdDashboardStats.php';
 $fvd_page_title = 'Panel general';
 $stats = FvdDashboardStats::counts();
 $urlNuevoTorneo = $appBase . '/fvdmasteradmin/modules/torneos/index.php?action=form';
-$urlRegistrarAtleta = $appBase . '/fvdmasteradmin/modules/atletas/index.php?action=form';
+$urlRegistrarAtleta = $appBase . '/fvdmasteradmin/modules/atletas/index.php';
 
 $fvdPuedeGestionar = AuthService::checkAccess([
     AuthService::ROLE_FVD_ADMIN,
@@ -95,6 +95,10 @@ require __DIR__ . '/includes/layout_header.php';
     <p class="fvd-dash__intro" style="max-width:36rem">
         Todas las operaciones se gestionan desde el <strong>menú lateral</strong>: despliegue cada bloque (Asociaciones, Atletas, Torneos, Traspasos/carnets, Finanzas, Inscripciones e informes) y elija la opción correspondiente.
     </p>
+    <div class="fvd-dash-fvd-identity" aria-label="Identidad institucional FVD">
+        <img class="fvd-dash-fvd-identity__logo" src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>" width="480" height="160" alt="" decoding="async">
+        <p class="fvd-dash-fvd-identity__legend">Federación Venezolana de Dominó</p>
+    </div>
     <?php else: ?>
     <p class="fvd-dash__intro">
         Federación Venezolana de Dominó — vista consolidada según su perfil y ámbito regional.

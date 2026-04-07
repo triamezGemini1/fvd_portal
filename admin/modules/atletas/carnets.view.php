@@ -19,6 +19,8 @@ foreach ($carnetCards as $c) {
     }
 }
 $primerId = $carnetCards !== [] ? (int) $carnetCards[0]['atleta_id'] : 0;
+$carnetFotoPreviewUrl = ($carnetUnSolo && $carnetCards !== [] && !empty($carnetCards[0]['foto_url']))
+    ? (string) $carnetCards[0]['foto_url'] : '';
 header('Content-Type: text/html; charset=UTF-8');
 ?>
 <!DOCTYPE html>
@@ -143,11 +145,25 @@ header('Content-Type: text/html; charset=UTF-8');
         <form id="fvd-carnet-foto-form" enctype="multipart/form-data">
             <input type="hidden" name="atleta_id" value="<?= $primerId ?>">
             <input type="file" id="fvd-carnet-foto-input" name="foto" accept="image/jpeg,image/png,image/webp,image/gif">
+            <div id="fvd_preview_carnet_foto" style="margin-top:12px;min-height:88px;padding:10px;border:1px dashed #64748b;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.5);">
+                <?php if ($carnetFotoPreviewUrl !== ''): ?>
+                    <img src="<?= htmlspecialchars($carnetFotoPreviewUrl, ENT_QUOTES, 'UTF-8') ?>" alt="" width="132" height="132" style="max-width:132px;max-height:132px;width:auto;height:auto;object-fit:cover;border-radius:8px;display:block">
+                <?php else: ?>
+                    <span style="color:#94a3b8;font-size:15px;">Vista previa (foto actual del carnet)</span>
+                <?php endif; ?>
+            </div>
             <div>
                 <button type="submit" class="fvd-carnet-btn--ghost">Subir nueva foto</button>
             </div>
         </form>
     </div>
+    <script src="<?= htmlspecialchars(url('assets/js/file-preview.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
+    <script>
+    (function () {
+        if (typeof window.filePreview === 'undefined') return;
+        window.filePreview.init('fvd-carnet-foto-input', 'fvd_preview_carnet_foto', 'image', { previewSize: 132 });
+    })();
+    </script>
     <?php endif; ?>
 
     <div class="fvd-carnet-page">
