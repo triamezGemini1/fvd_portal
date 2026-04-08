@@ -67,7 +67,7 @@ $fvdTorneoFinalizado = !empty($t['finalizado_en']);
 $urlAtletas = fvd_crud_self_url('atletas');
 $urlInscTorneo = fvd_master_module_url('inscripcion_torneo/index.php?torneo_id=' . $tidTorneo);
 $urlTorneoInsc = admin_module_url('torneo_inscripcion/index.php?torneo_id=' . $tidTorneo);
-$urlInscripciones = fvd_master_module_url('inscripciones/index.php');
+$urlInscripciones = fvd_master_module_url('inscripciones/index.php?torneo_id=' . $tidTorneo);
 $urlDeudas = fvd_master_module_url('deuda_asociacion/index.php');
 $urlPagos = fvd_master_module_url('relacion_pago/index.php');
 $urlAsoc = fvd_crud_self_url('asociaciones');

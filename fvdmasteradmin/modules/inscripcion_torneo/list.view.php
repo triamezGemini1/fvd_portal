@@ -118,5 +118,5 @@ $fvd_error = isset($fvd_error) ? (string) $fvd_error : '';
 <?php endif; ?>
 
 <p class="fvd-actions" style="margin-top:1.5rem;">
-    <a href="<?= htmlspecialchars(fvd_module_url('inscripciones/index.php'), ENT_QUOTES, 'UTF-8') ?>">Módulo Inscripciones (legado)</a>
+    <a href="<?= htmlspecialchars(fvd_module_url('inscripciones/index.php' . ($filterT > 0 ? '?torneo_id=' . $filterT : '')), ENT_QUOTES, 'UTF-8') ?>">Reportes PDF y finanzas (inscripciones)</a>
 </p>

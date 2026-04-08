@@ -66,7 +66,7 @@ if (!$ctrl->tableExists()) {
     <div class="fvd-card">
         <p>La tabla <code>inscripcion_torneo</code> no existe en esta base de datos.</p>
         <p>Ejecute el script: <code>fvdmasteradmin/sql/install_inscripcion_torneo.sql</code></p>
-        <p><a href="<?= htmlspecialchars(fvd_module_url('inscripciones/index.php'), ENT_QUOTES, 'UTF-8') ?>">Volver a Inscripciones</a></p>
+        <p><a href="<?= htmlspecialchars(fvd_module_url('inscripciones/index.php'), ENT_QUOTES, 'UTF-8') ?>">Reportes de inscripciones y finanzas</a></p>
     </div>
     <?php
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';

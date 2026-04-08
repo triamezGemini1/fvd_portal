@@ -183,7 +183,7 @@ final class ReportService
     /**
      * Si existe Dompdf (composer), devuelve binario PDF; si no, null (usar HTML adjunto).
      */
-    public static function renderPdfWithDompdfIfAvailable(string $html): ?string
+    public static function renderPdfWithDompdfIfAvailable(string $html, bool $landscape = true): ?string
     {
         $autoload = dirname(__DIR__, 2) . '/vendor/autoload.php';
         if (!is_file($autoload)) {
@@ -197,7 +197,7 @@ final class ReportService
 
         $dompdf = new \Dompdf\Dompdf();
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->setPaper('A4', $landscape ? 'landscape' : 'portrait');
         $dompdf->render();
 
         return $dompdf->output();

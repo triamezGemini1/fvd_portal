@@ -54,7 +54,7 @@ $urlTorneoInscripcion = fvd_module_url('torneo_inscripcion/index.php') . ($tidIn
 
 $urlInscripcionTorneoTabla = fvd_module_url('inscripcion_torneo/index.php') . ($tidInt > 0 ? '?torneo_id=' . $tidInt : '');
 
-$urlReportesInscripciones = fvd_module_url('inscripciones/index.php');
+$urlReportesInscripciones = fvd_module_url('inscripciones/index.php') . ($tidInt > 0 ? '?torneo_id=' . $tidInt : '');
 
 $urlSolCarnet = $appBase . '/fvdmasteradmin/delegado_carnet_afiliados.php';
 
