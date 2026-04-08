@@ -11,6 +11,8 @@ use RuntimeException;
 use Throwable;
 
 require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
+require_once __DIR__ . '/DeudaAsociacionGeneratorService.php';
+require_once __DIR__ . '/DelegadoTorneoVentanasService.php';
 
 /**
  * Reglas de inscripción por modalidad (torneosact.clase: 1=Ind, 2=Parejas, 3=Equipos).
@@ -23,6 +25,22 @@ final class InscripcionService
     public const CLASE_PAREJAS = 2;
 
     public const CLASE_EQUIPOS = 3;
+
+    /**
+     * Modo bandera: cambios en `atletas.inscripcion` / `torneo_id` sin pasar por FvdAdminService.
+     * Recalcula `deuda_asociaciones` desde conteos; no debe interrumpir el flujo de inscripción.
+     */
+    private static function sincronizarDeudaBandera(PDO $pdo, int $torneoId, int $asociacionId): void
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return;
+        }
+        try {
+            DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion($pdo, $torneoId, $asociacionId);
+        } catch (Throwable $e) {
+            error_log('[InscripcionService] sincronizarDeudaBandera: ' . $e->getMessage());
+        }
+    }
 
     /**
      * @return array<string, mixed>|null
@@ -436,6 +454,9 @@ final class InscripcionService
      */
     public static function registrarInscripcion(PDO $pdo, int $torneoId, int $asociacionId, string $tipo, array $atletaIds): int
     {
+        if (DelegadoTorneoVentanasService::aplicaRestriccionDelegado()) {
+            DelegadoTorneoVentanasService::assertPuedeInscripcionesRetiros($pdo, $torneoId);
+        }
         $tipo = strtolower(trim($tipo));
         if (!in_array($tipo, ['individual', 'pareja', 'equipo'], true)) {
             throw new InvalidArgumentException('Tipo de inscripción no válido.');
@@ -512,6 +533,9 @@ final class InscripcionService
      */
     public static function registrarMultiplesIndividuales(PDO $pdo, int $torneoId, int $asociacionId, array $atletaIds): int
     {
+        if (DelegadoTorneoVentanasService::aplicaRestriccionDelegado()) {
+            DelegadoTorneoVentanasService::assertPuedeInscripcionesRetiros($pdo, $torneoId);
+        }
         if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
@@ -720,6 +744,9 @@ final class InscripcionService
      */
     public static function marcarInscripcionBandera(PDO $pdo, int $torneoId, int $asociacionId, array $atletaIds): int
     {
+        if (DelegadoTorneoVentanasService::aplicaRestriccionDelegado()) {
+            DelegadoTorneoVentanasService::assertPuedeInscripcionesRetiros($pdo, $torneoId);
+        }
         $st = $pdo->prepare(
             'UPDATE atletas SET inscripcion = 1, torneo_id = :t WHERE id = :id AND asociacion = :a'
         );
@@ -733,6 +760,9 @@ final class InscripcionService
             if ($st->rowCount() > 0) {
                 ++$n;
             }
+        }
+        if ($n > 0) {
+            self::sincronizarDeudaBandera($pdo, $torneoId, $asociacionId);
         }
 
         return $n;
@@ -852,6 +882,9 @@ final class InscripcionService
 
     public static function retirarInscripcionBandera(PDO $pdo, int $torneoId, int $asociacionId, int $atletaId): bool
     {
+        if (DelegadoTorneoVentanasService::aplicaRestriccionDelegado()) {
+            DelegadoTorneoVentanasService::assertPuedeInscripcionesRetiros($pdo, $torneoId);
+        }
         if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede retirar inscripciones de otra asociación.');
         }
@@ -860,8 +893,12 @@ final class InscripcionService
              WHERE id = :id AND asociacion = :a AND torneo_id = :t AND COALESCE(inscripcion, 0) = 1'
         );
         $st->execute([':id' => $atletaId, ':a' => $asociacionId, ':t' => $torneoId]);
+        $ok = $st->rowCount() > 0;
+        if ($ok) {
+            self::sincronizarDeudaBandera($pdo, $torneoId, $asociacionId);
+        }
 
-        return $st->rowCount() > 0;
+        return $ok;
     }
 
     /**
@@ -869,6 +906,9 @@ final class InscripcionService
      */
     public static function retirarInscripcionTablaIndividual(PDO $pdo, int $torneoId, int $asociacionId, int $cedulaNum): bool
     {
+        if (DelegadoTorneoVentanasService::aplicaRestriccionDelegado()) {
+            DelegadoTorneoVentanasService::assertPuedeInscripcionesRetiros($pdo, $torneoId);
+        }
         if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede retirar inscripciones de otra asociación.');
         }

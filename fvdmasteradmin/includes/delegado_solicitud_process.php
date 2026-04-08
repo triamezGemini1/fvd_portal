@@ -35,8 +35,18 @@ if ($aidSol === null || (int) $aidSol <= 0) {
 $projRoot = dirname(__DIR__, 2);
 require_once $projRoot . '/fvdmasteradmin/config/db.php';
 require_once $projRoot . '/src/Services/DelegadoSolicitudService.php';
+require_once $projRoot . '/src/Services/DelegadoTorneoVentanasService.php';
 
 try {
+    if (\FvdPortal\Services\DelegadoTorneoVentanasService::aplicaRestriccionDelegado()) {
+        $ctxT = \AuthService::delegadoTorneoContextId();
+        if ($ctxT === null || (int) $ctxT <= 0) {
+            throw new \RuntimeException(
+                'Debe seleccionar el torneo desde el panel (entrada por invitación) para enviar solicitudes según el calendario del evento.'
+            );
+        }
+        \FvdPortal\Services\DelegadoTorneoVentanasService::assertPuedeFase1Administrativa(fvd_db(), (int) $ctxT);
+    }
     \FvdPortal\Services\DelegadoSolicitudService::ensureTable(fvd_db());
     \FvdPortal\Services\DelegadoSolicitudService::crear(
         fvd_db(),

@@ -11,9 +11,57 @@ use RuntimeException;
 /**
  * Genera o actualiza una fila en deuda_asociaciones a partir de atletas del club en un torneo
  * y la última fila de tarifas en costos (productos: cantidad × precio unitario).
+ *
+ * **Actualizar deuda (estado de cuenta):** cada ejecución vuelve a leer la tabla `atletas`
+ * para el par `torneo_id` + `asociacion`, contando filas con marca 1 en cada concepto:
+ * `inscripcion`, `afiliacion`, `carnet`, `traspaso`, `anualidad`. Cualquier alta o baja
+ * (p. ej. marcar/desmarcar conceptos o retirar de la competencia) se refleja al pulsar
+ * actualizar en el módulo de deudas, siempre que exista tarifa en `costos`.
  */
 final class DeudaAsociacionGeneratorService
 {
+    /**
+     * Asegura columnas EUR en `deuda_asociaciones` (migración idempotente).
+     * Sin esto, INSERT/SELECT que usan monto_total_eur fallan en bases sin el ALTER aplicado.
+     */
+    public static function ensureDeudaEurColumns(PDO $pdo): void
+    {
+        try {
+            $pdo->exec(
+                'ALTER TABLE `deuda_asociaciones` ADD COLUMN `monto_total_eur` DECIMAL(14, 6) NULL DEFAULT NULL COMMENT \'Deuda total en EUR\' AFTER `monto_total`'
+            );
+        } catch (PDOException $e) {
+            $msg = $e->getMessage();
+            if (stripos($msg, 'Duplicate column') === false && stripos($msg, '1060') === false) {
+                error_log('[DeudaAsociacionGeneratorService] ensureDeudaEurColumns monto_total_eur: ' . $msg);
+            }
+        }
+        try {
+            $pdo->exec(
+                'ALTER TABLE `deuda_asociaciones` ADD COLUMN `abono_eur` DECIMAL(14, 6) NULL DEFAULT NULL COMMENT \'Suma de pagos en EUR (monto_dolares)\' AFTER `abono`'
+            );
+        } catch (PDOException $e) {
+            $msg = $e->getMessage();
+            if (stripos($msg, 'Duplicate column') === false && stripos($msg, '1060') === false) {
+                error_log('[DeudaAsociacionGeneratorService] ensureDeudaEurColumns abono_eur: ' . $msg);
+            }
+        }
+    }
+
+    /**
+     * Columnas en `atletas` que marcan conceptos facturables (1 = aplica).
+     * Deben coincidir con los precios unitarios en `costos` (misma lógica que el generador).
+     *
+     * @var array<string, string> columna atletas => clave de conteo interna
+     */
+    private const ATLETA_MARCAS_CONCEPTO = [
+        'inscripcion' => 'total_inscritos',
+        'afiliacion' => 'total_afiliados',
+        'carnet' => 'total_carnets',
+        'traspaso' => 'total_traspasos',
+        'anualidad' => 'total_anualidad',
+    ];
+
     /**
      * @return array<string, mixed>|null
      */
@@ -40,43 +88,37 @@ final class DeudaAsociacionGeneratorService
      */
     public static function conteosPorTorneoYAsociacion(PDO $pdo, int $torneoId, int $asociacionId): array
     {
+        $emptyCounts = [
+            'total_inscritos' => 0,
+            'total_afiliados' => 0,
+            'total_carnets' => 0,
+            'total_traspasos' => 0,
+            'total_anualidad' => 0,
+        ];
         if ($torneoId <= 0 || $asociacionId <= 0) {
-            return [
-                'total_inscritos' => 0,
-                'total_afiliados' => 0,
-                'total_carnets' => 0,
-                'total_traspasos' => 0,
-                'total_anualidad' => 0,
-            ];
+            return $emptyCounts;
         }
-        $sql = 'SELECT
-            COALESCE(SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_inscritos,
-            COALESCE(SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_afiliados,
-            COALESCE(SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_carnets,
-            COALESCE(SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_traspasos,
-            COALESCE(SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_anualidad
+
+        $selects = [];
+        foreach (self::ATLETA_MARCAS_CONCEPTO as $colAtleta => $alias) {
+            $selects[] = 'COALESCE(SUM(CASE WHEN COALESCE(a.`' . $colAtleta . '`, 0) = 1 THEN 1 ELSE 0 END), 0) AS `' . $alias . '`';
+        }
+        $sql = 'SELECT ' . implode(",\n            ", $selects) . '
             FROM atletas a
             WHERE a.asociacion = :asoc AND a.torneo_id = :tor';
         $st = $pdo->prepare($sql);
         $st->execute([':asoc' => $asociacionId, ':tor' => $torneoId]);
         $r = $st->fetch(PDO::FETCH_ASSOC);
         if ($r === false) {
-            return [
-                'total_inscritos' => 0,
-                'total_afiliados' => 0,
-                'total_carnets' => 0,
-                'total_traspasos' => 0,
-                'total_anualidad' => 0,
-            ];
+            return $emptyCounts;
         }
 
-        return [
-            'total_inscritos' => (int) ($r['total_inscritos'] ?? 0),
-            'total_afiliados' => (int) ($r['total_afiliados'] ?? 0),
-            'total_carnets'   => (int) ($r['total_carnets'] ?? 0),
-            'total_traspasos' => (int) ($r['total_traspasos'] ?? 0),
-            'total_anualidad' => (int) ($r['total_anualidad'] ?? 0),
-        ];
+        $out = [];
+        foreach (self::ATLETA_MARCAS_CONCEPTO as $aliasResultado) {
+            $out[$aliasResultado] = (int) ($r[$aliasResultado] ?? 0);
+        }
+
+        return $out;
     }
 
     /**
@@ -112,11 +154,16 @@ final class DeudaAsociacionGeneratorService
         ];
     }
 
+    /**
+     * Recalcula totales y montos en `deuda_asociaciones` leyendo de nuevo `atletas` (marcas de concepto)
+     * y precios en `costos`. Sustituye/actualiza la fila del torneo+asociación.
+     */
     public static function generarParaTorneoYAsociacion(PDO $pdo, int $torneoId, int $asociacionId): void
     {
         if ($torneoId <= 0 || $asociacionId <= 0) {
             throw new RuntimeException('Torneo y asociación son obligatorios para generar la deuda.');
         }
+        self::ensureDeudaEurColumns($pdo);
         $costo = self::ultimoCosto($pdo);
         if ($costo === null) {
             throw new RuntimeException('No hay tarifas en la tabla costos. Registre al menos una fila de costos.');

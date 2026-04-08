@@ -11,6 +11,8 @@ require_once __DIR__ . '/InscripcionService.php';
 require_once __DIR__ . '/DelegadoTorneoNotifService.php';
 require_once __DIR__ . '/TorneoDelegadoTarjetaService.php';
 require_once __DIR__ . '/FvdAdminRevisionPendienteService.php';
+require_once __DIR__ . '/DeudaAsociacionGeneratorService.php';
+require_once __DIR__ . '/DelegadoTorneoVentanasService.php';
 
 /**
  * Operaciones de persistencia para el panel admin (/admin/modules).
@@ -302,6 +304,44 @@ final class FvdAdminService
      * @param array<string, mixed> $post
      * @param array<string, mixed> $files
      */
+    /**
+     * Recalcula `deuda_asociaciones` desde `atletas` para el torneo/asociación (no interrumpe el guardado si falla).
+     */
+    private function sincronizarDeudaTrasCambioAtletas(int $torneoId, int $asociacionId): void
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return;
+        }
+        try {
+            \FvdPortal\Services\DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion($this->pdo, $torneoId, $asociacionId);
+        } catch (\Throwable $e) {
+            error_log('[FvdAdminService] sincronizarDeudaTrasCambioAtletas: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Torneo de referencia para ventanas del delegado (post o ficha o contexto de sesión).
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed>|null $prevRow
+     */
+    private function delegadoTorneoIdParaVentana(array $data, ?array $prevRow): int
+    {
+        $t = (int) ($data['torneo_id'] ?? 0);
+        if ($t > 0) {
+            return $t;
+        }
+        if ($prevRow !== null) {
+            $tp = (int) ($prevRow['torneo_id'] ?? 0);
+            if ($tp > 0) {
+                return $tp;
+            }
+        }
+        $ctx = AuthService::delegadoTorneoContextId();
+
+        return $ctx !== null && $ctx > 0 ? $ctx : 0;
+    }
+
     public function atletasSave(?int $id, array $post, array $files): void
     {
         $prevRow = $id !== null ? $this->atletasFind($id) : null;
@@ -349,6 +389,20 @@ final class FvdAdminService
                 throw new RuntimeException('Sin asociación asignada.');
             }
             $data['asociacion'] = $mine;
+        }
+
+        if (AuthService::isDelegadoAsociacion()) {
+            $tidV = $this->delegadoTorneoIdParaVentana($data, $prevRow);
+            if ($tidV <= 0) {
+                throw new RuntimeException(
+                    'Indique el torneo del atleta o acceda desde el panel del evento (invitación) para gestionar fichas según el calendario del torneo.'
+                );
+            }
+            if ($id === null) {
+                \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeAltaAtleta($this->pdo, $tidV);
+            } else {
+                \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeEditarOBorrarAtleta($this->pdo, $tidV);
+            }
         }
 
         $fechnacParaCateg = $data['fechnac'] ?? null;
@@ -414,6 +468,7 @@ final class FvdAdminService
                 if (AuthService::isDelegadoAsociacion()) {
                     \FvdPortal\Services\FvdAdminRevisionPendienteService::marcarAltaDesdeDelegado($this->pdo, (int) $this->pdo->lastInsertId());
                 }
+                $this->sincronizarDeudaTrasCambioAtletas((int) ($data['torneo_id'] ?? 0), (int) ($data['asociacion'] ?? 0));
 
                 return;
             }
@@ -444,11 +499,22 @@ final class FvdAdminService
                     }
                     throw $e;
                 }
+                $this->sincronizarDeudaTrasCambioAtletas((int) ($data['torneo_id'] ?? 0), (int) ($data['asociacion'] ?? 0));
 
                 return;
             }
 
             QueryHelper::update($this->pdo, 'atletas', $data, self::ATLETAS_PERSIST, 'id = :wid', [':wid' => $id]);
+            $tNew = (int) ($data['torneo_id'] ?? 0);
+            $aNew = (int) ($data['asociacion'] ?? 0);
+            $this->sincronizarDeudaTrasCambioAtletas($tNew, $aNew);
+            if ($prevRow !== null) {
+                $tOld = (int) ($prevRow['torneo_id'] ?? 0);
+                $aOld = (int) ($prevRow['asociacion'] ?? 0);
+                if ($tOld !== $tNew || $aOld !== $aNew) {
+                    $this->sincronizarDeudaTrasCambioAtletas($tOld, $aOld);
+                }
+            }
         } catch (\PDOException $e) {
             if (self::atletasIsDuplicateKeyError($e)) {
                 throw new RuntimeException(
@@ -489,6 +555,9 @@ final class FvdAdminService
         $new = $cur === self::ATLETA_ESTATUS_ACTIVO ? self::ATLETA_ESTATUS_PENDIENTE : self::ATLETA_ESTATUS_ACTIVO;
         $st = $this->pdo->prepare('UPDATE atletas SET estatus = :e WHERE id = :id');
         $st->execute([':e' => $new, ':id' => $id]);
+        if ($st->rowCount() > 0) {
+            $this->sincronizarDeudaTrasCambioAtletas((int) ($prev['torneo_id'] ?? 0), (int) ($prev['asociacion'] ?? 0));
+        }
     }
 
     public function atletasDelete(int $id): void
@@ -498,11 +567,25 @@ final class FvdAdminService
             return;
         }
         $this->enforceAsociacionId(isset($prev['asociacion']) ? (int) $prev['asociacion'] : null);
+        if (AuthService::isDelegadoAsociacion()) {
+            $tidV = (int) ($prev['torneo_id'] ?? 0);
+            if ($tidV <= 0) {
+                $ctx = AuthService::delegadoTorneoContextId();
+                $tidV = $ctx !== null && $ctx > 0 ? $ctx : 0;
+            }
+            if ($tidV <= 0) {
+                throw new RuntimeException('No se pudo determinar el torneo para validar el periodo de gestión.');
+            }
+            \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeEditarOBorrarAtleta($this->pdo, $tidV);
+        }
         $params = [':id' => $id];
         $scope = QueryHelper::asociacionScopeSql('a.asociacion', $params);
         $sql = 'DELETE FROM atletas a WHERE a.id = :id ' . $scope;
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
+        if ($st->rowCount() > 0) {
+            $this->sincronizarDeudaTrasCambioAtletas((int) ($prev['torneo_id'] ?? 0), (int) ($prev['asociacion'] ?? 0));
+        }
     }
 
     /**
@@ -518,6 +601,17 @@ final class FvdAdminService
         $prev = $this->atletasFind($id);
         if ($prev === null) {
             throw new RuntimeException('Atleta no encontrado o sin acceso.');
+        }
+        if (AuthService::isDelegadoAsociacion()) {
+            $tidV = (int) ($prev['torneo_id'] ?? 0);
+            if ($tidV <= 0) {
+                $ctx = AuthService::delegadoTorneoContextId();
+                $tidV = $ctx !== null && $ctx > 0 ? $ctx : 0;
+            }
+            if ($tidV <= 0) {
+                throw new RuntimeException('No se pudo determinar el torneo para validar el periodo de gestión.');
+            }
+            \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeEditarOBorrarAtleta($this->pdo, $tidV);
         }
         if (empty($files['foto']['tmp_name']) || (int) ($files['foto']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             throw new RuntimeException('Seleccione un archivo de imagen.');
@@ -1453,12 +1547,22 @@ final class FvdAdminService
             ? \FvdPortal\Services\InscripcionService::integrantesEquipoRequeridos($row)
             : null;
 
+        $ventanaDelegado = null;
+        if (AuthService::isDelegadoAsociacion()) {
+            try {
+                $ventanaDelegado = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo($this->pdo, $torneoId);
+            } catch (\Throwable $e) {
+                $ventanaDelegado = null;
+            }
+        }
+
         return [
             'torneo'              => $row,
             'clase'               => $cl,
             'modo'                => \FvdPortal\Services\InscripcionService::claseEtiqueta($cl),
             'integrantes_equipo'  => $intEq,
             'cupo'                => $cupo,
+            'ventana_delegado'    => $ventanaDelegado,
         ];
     }
 

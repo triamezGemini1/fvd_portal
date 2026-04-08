@@ -27,8 +27,7 @@ if (($_GET['action'] ?? '') === 'bcv_euro' && ($_GET['fmt'] ?? '') === 'json') {
 }
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
-    $ctrl->delete((int) $_GET['id']);
-    header('Location: ' . $selfUrl);
+    header('Location: ' . $selfUrl . '?msg=no_eliminar');
     exit;
 }
 
@@ -36,6 +35,10 @@ $fvd_form_repost = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save') {
     try {
         $sid = isset($_POST['id']) && $_POST['id'] !== '' ? (int) $_POST['id'] : null;
+        if ($sid !== null) {
+            header('Location: ' . $selfUrl . '?action=form&id=' . $sid . '&msg=no_edicion');
+            exit;
+        }
         $ctrl->save($sid, $_POST);
         header('Location: ' . $selfUrl);
         exit;

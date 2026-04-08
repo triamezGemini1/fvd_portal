@@ -282,13 +282,8 @@ class RelacionPagoController extends FvdModuleController
 
     public function save(?int $id, array $post): void
     {
-        $prev = null;
         if ($id !== null) {
-            $prev = $this->find($id);
-            if ($prev === null) {
-                throw new InvalidArgumentException('Pago no encontrado.');
-            }
-            $this->enforceAsociacionId(isset($prev['asociacion_id']) ? (int) $prev['asociacion_id'] : null);
+            throw new RuntimeException('Solo se permiten altas de pago; la consulta de recibos no admite edición.');
         }
 
         $tipoPago = isset($post['tipo_pago']) ? trim((string) $post['tipo_pago']) : '';
@@ -348,16 +343,11 @@ class RelacionPagoController extends FvdModuleController
         $data['monto_dolares'] = round($montoEur, 6);
         $data['moneda'] = self::monedaDesdeTipoPago($tipoPago);
 
-        if ($id === null) {
-            $active = $this->torneoActivoParaRecibo();
-            if ($active === null) {
-                throw new RuntimeException('No hay torneo activo: entre al panel del torneo (delegado) o tenga al menos un torneo con estatus en proceso.');
-            }
-            $data['torneo_id'] = $active['torneo_id'];
-        } else {
-            $tid = (int) ($prev['torneo_id'] ?? 0);
-            $data['torneo_id'] = $tid > 0 ? $tid : null;
+        $active = $this->torneoActivoParaRecibo();
+        if ($active === null) {
+            throw new RuntimeException('No hay torneo activo: entre al panel del torneo (delegado) o tenga al menos un torneo con estatus en proceso.');
         }
+        $data['torneo_id'] = $active['torneo_id'];
 
         if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
             $mine = AuthService::idAsociacion();
@@ -367,37 +357,15 @@ class RelacionPagoController extends FvdModuleController
             $data['asociacion_id'] = $mine;
         }
 
-        if ($id === null) {
-            $data['secuencia'] = $this->nextSecuencia((int) $data['torneo_id'], (int) $data['asociacion_id']);
-        } else {
-            $data['secuencia'] = (int) ($post['secuencia'] ?? $prev['secuencia'] ?? 1);
-        }
+        $data['secuencia'] = $this->nextSecuencia((int) $data['torneo_id'], (int) $data['asociacion_id']);
 
-        if ($id === null) {
-            self::insert($this->pdo, self::TABLE, $data, self::ALLOW_PERSIST);
-        } else {
-            self::update($this->pdo, self::TABLE, $data, self::ALLOW_PERSIST, 'id = :wid', [':wid' => $id]);
-        }
+        self::insert($this->pdo, self::TABLE, $data, self::ALLOW_PERSIST);
 
         $this->sincronizarAbonoDeuda((int) $data['torneo_id'], (int) $data['asociacion_id']);
     }
 
     public function delete(int $id): void
     {
-        $prev = $this->find($id);
-        if ($prev === null) {
-            return;
-        }
-        $this->enforceAsociacionId(isset($prev['asociacion_id']) ? (int) $prev['asociacion_id'] : null);
-        $tid = (int) ($prev['torneo_id'] ?? 0);
-        $aid = (int) ($prev['asociacion_id'] ?? 0);
-        $params = [':id' => $id];
-        $scope = self::asociacionScopeSql(self::SCOPE_COL, $params);
-        $sql = 'DELETE FROM relacion_pagos r WHERE r.id = :id ' . $scope;
-        $st = $this->pdo->prepare($sql);
-        $st->execute($params);
-        if ($tid > 0 && $aid > 0) {
-            $this->sincronizarAbonoDeuda($tid, $aid);
-        }
+        throw new RuntimeException('No está permitido eliminar pagos (recibo #' . $id . ').');
     }
 }

@@ -142,6 +142,12 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
 
             </div>
 
+            <?php
+            $vdVenInscDet = $torneoMeta['ventana_delegado'] ?? null;
+            $fvdDelegadoInscripcionCerradaDet = !empty($fvd_inscripcion_bandera_modo)
+                && is_array($vdVenInscDet)
+                && !($vdVenInscDet['fase2_inscripciones'] ?? false);
+            ?>
             <script>
             window.FVD_INSC = <?= json_encode([
                 'api' => $inscripcionApiUrl,
@@ -153,6 +159,7 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
                 'clase' => (int) ($torneoMeta['clase'] ?? 1),
                 'maxNomina' => $clInsc === 2 ? 2 : ($clInsc === 3 ? (int) ($torneoMeta['integrantes_equipo'] ?? 4) : 80),
                 'banderaMode' => $fvd_inscripcion_bandera_modo,
+                'delegadoInscripcionCerrada' => $fvdDelegadoInscripcionCerradaDet,
             ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             </script>
             <script>
@@ -166,6 +173,7 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
                 var modo = cfg.modo || 'individual';
                 var maxNomina = Math.max(1, cfg.maxNomina | 0);
                 var banderaMode = !!cfg.banderaMode;
+                var delegadoInscripcionCerrada = !!cfg.delegadoInscripcionCerrada;
                 var qEl = document.getElementById('fvd-insc-q');
                 var btnBuscar = document.getElementById('fvd-insc-buscar');
                 var results = document.getElementById('fvd-insc-results');
@@ -362,6 +370,10 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
                 });
 
                 if (btnSub) btnSub.addEventListener('click', function () {
+                    if (banderaMode && delegadoInscripcionCerrada) {
+                        if (msg) msg.textContent = 'Periodo de inscripción cerrado según calendario del torneo.';
+                        return;
+                    }
                     if (!nomina.length) {
                         if (msg) msg.textContent = 'Añada atletas a la nómina.';
                         return;
@@ -401,6 +413,10 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
                     });
                 });
 
+                if (banderaMode && delegadoInscripcionCerrada && btnSub) {
+                    btnSub.disabled = true;
+                    btnSub.style.opacity = '0.45';
+                }
                 renderNomina();
             })();
             </script>

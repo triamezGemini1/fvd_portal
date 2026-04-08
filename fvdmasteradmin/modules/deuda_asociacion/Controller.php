@@ -9,6 +9,7 @@ class DeudaAsociacionController extends FvdModuleController
     public const TABLE = 'deuda_asociaciones';
 
     private const SCOPE_COL = 'd.asociacion_id';
+    private static $tieneMontoTotalEur = null;
 
     /** Clave de concepto (tabla costos / UI) → columna booleana en `atletas`. */
     private const CONCEPTO_ATLETA_COL = [
@@ -35,14 +36,64 @@ class DeudaAsociacionController extends FvdModuleController
         'total_anualidad', 'monto_anualidad', 'monto_total', 'monto_total_eur',
     ];
 
+    private static function parseNonNegativeFloat($value): float
+    {
+        if ($value === '' || $value === null) {
+            return 0.0;
+        }
+        $out = (float) $value;
+        if ($out < 0) {
+            throw new InvalidArgumentException('No se permiten montos negativos.');
+        }
+
+        return $out;
+    }
+
+    private function deudaAsociacionesTieneMontoTotalEur(): bool
+    {
+        if (self::$tieneMontoTotalEur !== null) {
+            return self::$tieneMontoTotalEur;
+        }
+        try {
+            $st = $this->pdo->query("SHOW COLUMNS FROM deuda_asociaciones LIKE 'monto_total_eur'");
+            $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
+            self::$tieneMontoTotalEur = $row !== false;
+        } catch (Throwable $e) {
+            self::$tieneMontoTotalEur = false;
+        }
+
+        return self::$tieneMontoTotalEur;
+    }
+
     public function paginateList(int $page, int $perPage): array
     {
+        $tieneMontoTotalEur = $this->deudaAsociacionesTieneMontoTotalEur();
+        $deudaEurExpr = $tieneMontoTotalEur ? 'COALESCE(d.monto_total_eur, 0)' : 'COALESCE(d.monto_total, 0)';
+        $saldoExpr = $tieneMontoTotalEur
+            ? 'CASE
+                    WHEN COALESCE(d.monto_total_eur, 0) > 0
+                        THEN GREATEST(ROUND(d.monto_total_eur - COALESCE(rp.pagado_eur, 0), 2), 0)
+                    ELSE NULL
+               END'
+            : 'CASE
+                    WHEN COALESCE(d.monto_total, 0) > 0
+                        THEN GREATEST(ROUND(d.monto_total - COALESCE(rp.pagado_eur, 0), 2), 0)
+                    ELSE NULL
+               END';
         $params = [];
         $countSql = 'SELECT COUNT(*) FROM deuda_asociaciones d WHERE 1=1';
-        $dataSql = 'SELECT d.*, t.nombre AS torneo_nombre, a.nombre AS asoc_nombre
+        $dataSql = 'SELECT d.*, t.nombre AS torneo_nombre, a.nombre AS asoc_nombre,
+                ROUND(' . $deudaEurExpr . ', 2) AS monto_total_eur,
+                ROUND(COALESCE(rp.pagado_eur, 0), 2) AS pagado_eur,
+                ' . $saldoExpr . ' AS saldo_eur
             FROM deuda_asociaciones d
             LEFT JOIN torneosact t ON d.torneo_id = t.torneo
             LEFT JOIN asociaciones a ON d.asociacion_id = a.id
+            LEFT JOIN (
+                SELECT torneo_id, asociacion_id, SUM(COALESCE(monto_dolares, 0)) AS pagado_eur
+                FROM relacion_pagos
+                GROUP BY torneo_id, asociacion_id
+            ) rp ON rp.torneo_id = d.torneo_id AND rp.asociacion_id = d.asociacion_id
             WHERE 1=1
             ORDER BY d.fecha_creacion DESC';
 
@@ -150,13 +201,28 @@ class DeudaAsociacionController extends FvdModuleController
                 continue;
             }
             $v = $post[$col] ?? null;
-            $data[$col] = $v === '' || $v === null ? 0 : (float) $v;
+            $data[$col] = self::parseNonNegativeFloat($v);
         }
-        $data['monto_total_eur'] = $data['monto_total'] ?? 0;
+        if ($this->deudaAsociacionesTieneMontoTotalEur()) {
+            $montoTotalEurPost = $post['monto_total_eur'] ?? null;
+            if ($montoTotalEurPost === '' || $montoTotalEurPost === null) {
+                // Compatibilidad: si no llega el campo EUR, conserva el valor previo.
+                $data['monto_total_eur'] = isset($row['monto_total_eur']) ? (float) $row['monto_total_eur'] : 0.0;
+            } else {
+                $data['monto_total_eur'] = round(self::parseNonNegativeFloat($montoTotalEurPost), 2);
+            }
+        }
+        $data['monto_total'] = round((float) ($data['monto_total'] ?? 0), 2);
 
         $where = 'torneo_id = :t AND asociacion_id = :a';
         $wparams = [':t' => $torneoId, ':a' => $asociacionId];
-        self::update($this->pdo, self::TABLE, $data, self::ALLOW_UPDATE, $where, $wparams);
+        $allow = self::ALLOW_UPDATE;
+        if (!$this->deudaAsociacionesTieneMontoTotalEur()) {
+            $allow = array_values(array_filter($allow, static function (string $col): bool {
+                return $col !== 'monto_total_eur';
+            }));
+        }
+        self::update($this->pdo, self::TABLE, $data, $allow, $where, $wparams);
 
         $st = $this->pdo->prepare('UPDATE deuda_asociaciones SET fecha_actualizacion = NOW() WHERE torneo_id = ? AND asociacion_id = ?');
         $st->execute([$torneoId, $asociacionId]);
@@ -173,5 +239,61 @@ class DeudaAsociacionController extends FvdModuleController
         $sql = 'DELETE FROM deuda_asociaciones d WHERE d.torneo_id = :tid AND d.asociacion_id = :aid ' . $scope;
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
+    }
+
+    public function torneoEstaFinalizado(int $torneoId): bool
+    {
+        if ($torneoId <= 0) {
+            return true;
+        }
+        $st = $this->pdo->prepare('SELECT estatus FROM torneosact WHERE torneo = :tid LIMIT 1');
+        $st->execute([':tid' => $torneoId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return true;
+        }
+        $estatus = (int) ($row['estatus'] ?? 0);
+
+        // Convención actual: 1=en proceso, 0=planificado, 2=finalizado.
+        return $estatus === 2;
+    }
+
+    /**
+     * Recalcula la deuda del torneo+asociación desde `atletas`: cuenta marcas en inscripción, afiliación,
+     * carnet, traspaso y anualidad; aplica precios de la última fila de `costos` y persiste en `deuda_asociaciones`.
+     * Así, altas/bajas o cambios de conceptos en atletas se reflejan en el estado de cuenta al ejecutar este procedimiento.
+     */
+    public function actualizarDeudaDesdeAtletas(int $torneoId, int $asociacionId): void
+    {
+        $this->enforceAsociacionId($asociacionId);
+        if ($this->torneoEstaFinalizado($torneoId)) {
+            throw new RuntimeException('No se puede actualizar la deuda porque el torneo ya finalizó.');
+        }
+        require_once $this->projectRoot() . '/src/Services/DeudaAsociacionGeneratorService.php';
+        \FvdPortal\Services\DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion($this->pdo, $torneoId, $asociacionId);
+    }
+
+    /**
+     * Recibos de pago (`relacion_pagos`) del torneo y asociación, orden cronológico descendente.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listPagosRecibos(int $torneoId, int $asociacionId): array
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return [];
+        }
+        $this->enforceAsociacionId($asociacionId);
+        $params = [':tid' => $torneoId, ':aid' => $asociacionId];
+        $scope = self::asociacionScopeSql('r.asociacion_id', $params);
+        $sql = 'SELECT r.id, r.fecha, r.secuencia, r.tipo_pago, r.monto_dolares, r.monto_total, r.tasa_cambio, r.referencia
+            FROM relacion_pagos r
+            WHERE r.torneo_id = :tid AND r.asociacion_id = :aid ' . $scope . '
+            ORDER BY r.fecha DESC, r.secuencia DESC, r.id DESC';
+        $st = $this->pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
     }
 }

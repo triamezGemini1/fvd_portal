@@ -40,6 +40,10 @@ $insC = (int) ($delegSnap['inscripciones_torneo'] ?? 0);
 
 $tidInt = (int) ($tid ?? 0);
 
+$delegVentana = isset($delegVentana) && is_array($delegVentana) ? $delegVentana : null;
+$delegPuedeFase1 = $delegVentana !== null && !empty($delegVentana['fase1_afiliados_carnets_traspasos']);
+$delegPuedeFase2 = $delegVentana !== null && !empty($delegVentana['fase2_inscripciones']);
+
 $carnetSolicitados = (int) ($cr['pendiente'] ?? 0);
 
 $carnetConCarnet = (int) ($cr['solicitado'] ?? 0);
@@ -52,7 +56,7 @@ $urlInscripcionTorneoTabla = fvd_module_url('inscripcion_torneo/index.php') . ($
 
 $urlReportesInscripciones = fvd_module_url('inscripciones/index.php');
 
-$urlSolCarnet = $appBase . '/fvdmasteradmin/solicitud_carnet.php';
+$urlSolCarnet = $appBase . '/fvdmasteradmin/delegado_carnet_afiliados.php';
 
 $urlReportesMovimientos = $appBase . '/modules/atletas/reporte_carnets.php';
 
@@ -300,7 +304,12 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
     </div>
 
-
+    <?php if ($delegVentana !== null): ?>
+    <p class="fvd-mod-msg" style="margin:0 0 1rem;font-size:0.8125rem;border-left:4px solid #f59e0c;padding:8px 12px;background:rgba(245,158,11,0.12)">
+        <strong>Calendario del torneo:</strong> <?= htmlspecialchars((string) ($delegVentana['etiqueta_fase'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+        <?php if (!$delegPuedeFase2): ?> Puede consultar listados; las inscripciones y retiros quedan bloqueados fuera de la fase 2.<?php endif; ?>
+    </p>
+    <?php endif; ?>
 
     <div class="fvd-delegado-torneos__grid">
 
@@ -330,7 +339,11 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
             <p class="fvd-delegado-torneos__card-foot">
 
+                <?php if ($delegPuedeFase1): ?>
                 <a href="<?= htmlspecialchars($urlRegistrarAtleta, ENT_QUOTES, 'UTF-8') ?>">Registrar atleta</a>
+                <?php else: ?>
+                <span style="opacity:0.55;cursor:not-allowed" title="Alta de atletas solo en fase 1 del calendario">Registrar atleta</span>
+                <?php endif; ?>
 
                 · <a href="<?= htmlspecialchars($appBase . '/modules/atletas/index.php?tab=ficha', ENT_QUOTES, 'UTF-8') ?>">Fichas / carnets</a>
 
@@ -356,19 +369,30 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
             <div class="fvd-delegado-torneos__btn-stack">
 
-                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--m1" href="<?= htmlspecialchars($urlSolCarnet, ENT_QUOTES, 'UTF-8') ?>">Solicitud carnets</a>
+                <?php if ($delegPuedeFase1): ?>
+                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--m1" href="<?= htmlspecialchars($urlSolCarnet, ENT_QUOTES, 'UTF-8') ?>">Marcar carnet (afiliados)</a>
+                <?php else: ?>
+                <span class="fvd-delegado-torneos__action fvd-delegado-torneos__action--m1" style="opacity:0.55;cursor:not-allowed" title="Solo en fase 1 del calendario">Marcar carnet (afiliados)</span>
+                <?php endif; ?>
 
                 <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--m2" href="<?= htmlspecialchars($urlReportesMovimientos, ENT_QUOTES, 'UTF-8') ?>">Reportes</a>
 
+                <?php if ($delegPuedeFase1): ?>
                 <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--m3" href="<?= htmlspecialchars($urlRegistrarAtleta, ENT_QUOTES, 'UTF-8') ?>">Afiliaciones · nuevo atleta</a>
+                <?php else: ?>
+                <span class="fvd-delegado-torneos__action fvd-delegado-torneos__action--m3" style="opacity:0.55;cursor:not-allowed" title="Solo en fase 1 del calendario">Afiliaciones · nuevo atleta</span>
+                <?php endif; ?>
 
             </div>
 
             <p class="fvd-delegado-torneos__card-foot">
 
+                <?php if ($delegPuedeFase1): ?>
                 <a href="<?= htmlspecialchars($appBase . '/fvdmasteradmin/solicitud_traspaso.php', ENT_QUOTES, 'UTF-8') ?>">Traspaso</a>
-
-                · <a href="<?= htmlspecialchars($appBase . '/fvdmasteradmin/solicitud_afiliacion.php', ENT_QUOTES, 'UTF-8') ?>">Afiliación</a>
+                · <a href="<?= htmlspecialchars($urlRegistrarAtleta, ENT_QUOTES, 'UTF-8') ?>">Nueva afiliación (alta atleta)</a>
+                <?php else: ?>
+                <span style="opacity:0.55" title="Solo en fase 1 del calendario">Traspaso · Nueva afiliación</span>
+                <?php endif; ?>
 
             </p>
 

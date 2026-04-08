@@ -2,8 +2,27 @@
 /** @var ?array $row */
 /** @var string $selfUrl */
 /** @var ?array $fvdCostoTarifa */
+/** @var bool $fvdPuedeActualizarDeuda */
+/** @var list<array<string,mixed>> $fvdPagosRecibos */
+/** @var float $fvdPagosSubtotalEur */
+/** @var float $fvdPagosSubtotalBs */
+/** @var string $fvdUrlRelacionPago */
+/** @var array<string,string> $fvdTiposPagoOpciones */
 $r = $row ?? [];
 $c = $fvdCostoTarifa ?? [];
+$fvdPuedeActualizarDeuda = isset($fvdPuedeActualizarDeuda) ? (bool) $fvdPuedeActualizarDeuda : false;
+$fvdPagosRecibos = $fvdPagosRecibos ?? [];
+$fvdPagosSubtotalEur = isset($fvdPagosSubtotalEur) ? (float) $fvdPagosSubtotalEur : 0.0;
+$fvdPagosSubtotalBs = isset($fvdPagosSubtotalBs) ? (float) $fvdPagosSubtotalBs : 0.0;
+$fvdUrlRelacionPago = $fvdUrlRelacionPago ?? '';
+$fvdTiposPagoOpciones = $fvdTiposPagoOpciones ?? [];
+$fvdFmtMonto = static function ($v, int $dec = 2): string {
+    if ($v === '' || $v === null) {
+        return '—';
+    }
+
+    return number_format((float) $v, $dec, ',', '.');
+};
 $reporteConceptosUrl = $selfUrl . '?action=reporte_conceptos&tid=' . (int) ($r['torneo_id'] ?? 0) . '&aid=' . (int) ($r['asociacion_id'] ?? 0);
 
 /**
@@ -161,19 +180,53 @@ $renglones = [
         color: #000;
         font-weight: 700;
     }
+    .fvd-deuda-pagos-bloque {
+        margin-top: 1.25rem;
+        padding-top: 1rem;
+        border-top: 2px solid #94a3b8;
+    }
+    .fvd-deuda-pagos-bloque h2 {
+        margin: 0 0 0.5rem;
+        font-size: 1.05rem;
+        color: #000;
+    }
+    .fvd-deuda-pagos-bloque .fvd-deuda-pagos-tabla {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    .fvd-deuda-pagos-bloque .fvd-deuda-pagos-tabla th,
+    .fvd-deuda-pagos-bloque .fvd-deuda-pagos-tabla td {
+        padding: 0.35rem 0.45rem;
+        border-bottom: 1px solid #cbd5e1;
+        text-align: left;
+    }
+    .fvd-deuda-pagos-bloque .fvd-deuda-pagos-tabla th {
+        background: #e2e8f0;
+        font-weight: 700;
+    }
+    .fvd-deuda-pagos-bloque .fvd-deuda-pagos-tabla td.fvd-num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+    .fvd-deuda-pagos-bloque .fvd-deuda-pagos-subtotal td {
+        background: #fef3c7;
+        border-top: 2px solid #b45309;
+        font-weight: 800;
+    }
 </style>
 
 <div class="fvd-deuda-detalle-titulo">
     <h1>Reporte detallado de costos</h1>
     <p>Torneo #<?= (int) ($r['torneo_id'] ?? 0) ?> · Asociación #<?= (int) ($r['asociacion_id'] ?? 0) ?></p>
+    <p style="margin:0.25rem 0 0;font-size:0.86rem">Vista de solo lectura. <strong>Actualizar deuda</strong> vuelve a leer <code>atletas</code> (inscripción, afiliación, carnet, traspaso, anualidad) para este torneo y asociación, aplica tarifas de <code>costos</code> y actualiza el estado de cuenta.</p>
+    <?php if (isset($_GET['msg']) && $_GET['msg'] === 'deuda_actualizada'): ?>
+        <p class="fvd-mod-msg">Deuda actualizada correctamente desde atletas.</p>
+    <?php endif; ?>
 </div>
 
 <div class="fvd-deuda-detalle-wrap">
-    <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=form&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id'], ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="_action" value="save">
-        <input type="hidden" name="torneo_id" value="<?= (int) $r['torneo_id'] ?>">
-        <input type="hidden" name="asociacion_id" value="<?= (int) $r['asociacion_id'] ?>">
-
+    <div>
         <table>
             <thead>
                 <tr>
@@ -190,12 +243,12 @@ $renglones = [
                         <td><?= htmlspecialchars($labConcepto, ENT_QUOTES, 'UTF-8') ?></td>
                         <td>
                             <label class="fvd-atl-muted" style="display:none" for="<?= htmlspecialchars($fkQty, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($labQty, ENT_QUOTES, 'UTF-8') ?></label>
-                            <input class="fvd-input fvd-deuda-qty-input" type="number" step="1" min="0" id="<?= htmlspecialchars($fkQty, ENT_QUOTES, 'UTF-8') ?>" name="<?= htmlspecialchars($fkQty, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) ($r[$fkQty] ?? '0'), ENT_QUOTES, 'UTF-8') ?>">
+                            <input class="fvd-input fvd-deuda-qty-input" type="number" step="1" min="0" id="<?= htmlspecialchars($fkQty, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) ($r[$fkQty] ?? '0'), ENT_QUOTES, 'UTF-8') ?>" readonly disabled>
                         </td>
                         <td class="fvd-deuda-tarifa"><?= $fvdTarifa($c, $costKey) ?></td>
                         <td>
                             <label class="fvd-atl-muted" style="display:none" for="<?= htmlspecialchars($fkMonto, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($labMonto, ENT_QUOTES, 'UTF-8') ?></label>
-                            <input class="fvd-input fvd-deuda-monto-input" type="number" step="0.01" id="<?= htmlspecialchars($fkMonto, ENT_QUOTES, 'UTF-8') ?>" name="<?= htmlspecialchars($fkMonto, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) ($r[$fkMonto] ?? '0'), ENT_QUOTES, 'UTF-8') ?>">
+                            <input class="fvd-input fvd-deuda-monto-input" type="number" step="0.01" id="<?= htmlspecialchars($fkMonto, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) ($r[$fkMonto] ?? '0'), ENT_QUOTES, 'UTF-8') ?>" readonly disabled>
                         </td>
                         <td class="fvd-deuda-row-enlace">
                             <a class="fvd-deuda-btn fvd-deuda-btn--sm fvd-deuda-btn--registros" href="<?= htmlspecialchars($reporteConceptosUrl . '&concepto=' . rawurlencode($costKey), ENT_QUOTES, 'UTF-8') ?>">Ver registros</a>
@@ -207,17 +260,94 @@ $renglones = [
                     <td class="fvd-deuda-tarifa">—</td>
                     <td>
                         <label class="fvd-atl-muted" style="display:none" for="monto_total">Monto total</label>
-                        <input class="fvd-input fvd-deuda-monto-input" type="number" step="0.01" id="monto_total" name="monto_total" value="<?= htmlspecialchars((string) ($r['monto_total'] ?? '0'), ENT_QUOTES, 'UTF-8') ?>">
+                        <input class="fvd-input fvd-deuda-monto-input" type="number" step="0.01" id="monto_total" value="<?= htmlspecialchars((string) ($r['monto_total'] ?? '0'), ENT_QUOTES, 'UTF-8') ?>" readonly disabled>
+                    </td>
+                    <td class="fvd-deuda-row-enlace"></td>
+                </tr>
+                <tr class="fvd-deuda-monto-total-row">
+                    <td colspan="2">Monto total contable</td>
+                    <td class="fvd-deuda-tarifa">EUR</td>
+                    <td>
+                        <label class="fvd-atl-muted" style="display:none" for="monto_total_eur">Monto total EUR</label>
+                        <input class="fvd-input fvd-deuda-monto-input" type="number" step="0.01" min="0" id="monto_total_eur" value="<?= htmlspecialchars((string) ($r['monto_total_eur'] ?? '0'), ENT_QUOTES, 'UTF-8') ?>" readonly disabled>
                     </td>
                     <td class="fvd-deuda-row-enlace"></td>
                 </tr>
             </tbody>
         </table>
+        <p style="margin:0.5rem 0 0;font-size:0.82rem;color:#334155;font-weight:700">
+            El estado de cuenta usa <strong>EUR</strong> (monto total contable). Los Bs se conservan para conciliación y arqueo.
+        </p>
+
+        <?php if ($r !== []): ?>
+            <div class="fvd-deuda-pagos-bloque">
+                <h2>Pagos y recibos (detalle)</h2>
+                <p style="margin:0 0 0.65rem;font-size:0.82rem;color:#334155;font-weight:600">
+                    Recibos registrados para esta asociación en el torneo. Subtotal según suma de recibos.
+                </p>
+                <?php if ($fvdPagosRecibos === []): ?>
+                    <p style="margin:0;font-size:0.88rem">Sin pagos registrados para este torneo y asociación.</p>
+                <?php else: ?>
+                    <table class="fvd-deuda-pagos-tabla">
+                        <thead>
+                            <tr>
+                                <th scope="col">Recibo</th>
+                                <th scope="col">Fecha</th>
+                                <th scope="col">Nº</th>
+                                <th scope="col">Tipo</th>
+                                <th scope="col" class="fvd-num">Pago</th>
+                                <th scope="col" class="fvd-num">Tasa BCV</th>
+                                <th scope="col" class="fvd-num">Bs (ref.)</th>
+                                <th scope="col"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($fvdPagosRecibos as $p): ?>
+                                <?php
+                                $tp = (string) ($p['tipo_pago'] ?? '');
+                                $tipoLbl = $fvdTiposPagoOpciones[$tp] ?? $tp;
+                                ?>
+                                <tr>
+                                    <td><?= (int) ($p['id'] ?? 0) ?></td>
+                                    <td><?= htmlspecialchars((string) ($p['fecha'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><?= (int) ($p['secuencia'] ?? 0) ?></td>
+                                    <td><?= htmlspecialchars($tipoLbl, ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($p['monto_dolares'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($p['tasa_cambio'] ?? null, 4), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($p['monto_total'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td>
+                                        <?php if ($fvdUrlRelacionPago !== ''): ?>
+                                            <a class="fvd-deuda-btn fvd-deuda-btn--sm fvd-deuda-btn--registros" href="<?= htmlspecialchars($fvdUrlRelacionPago . '?action=form&id=' . (int) ($p['id'] ?? 0), ENT_QUOTES, 'UTF-8') ?>">Ver</a>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <tr class="fvd-deuda-pagos-subtotal">
+                                <td colspan="4">Subtotal asociación</td>
+                                <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($fvdPagosSubtotalEur, 2), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="fvd-num">—</td>
+                                <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($fvdPagosSubtotalBs, 2), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
 
         <div class="fvd-deuda-detalle-actions fvd-mod-actions">
-            <button type="submit">Guardar</button>
+            <?php if ($fvdPuedeActualizarDeuda): ?>
+                <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=form&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id'], ENT_QUOTES, 'UTF-8') ?>" style="display:inline-flex">
+                    <input type="hidden" name="_action" value="actualizar_deuda">
+                    <input type="hidden" name="torneo_id" value="<?= (int) ($r['torneo_id'] ?? 0) ?>">
+                    <input type="hidden" name="asociacion_id" value="<?= (int) ($r['asociacion_id'] ?? 0) ?>">
+                    <button type="submit">Actualizar deuda</button>
+                </form>
+            <?php else: ?>
+                <button type="button" disabled style="opacity:0.6;cursor:not-allowed">Actualizar deuda (torneo finalizado)</button>
+            <?php endif; ?>
             <a class="fvd-deuda-btn fvd-deuda-btn--conceptos" href="<?= htmlspecialchars($reporteConceptosUrl, ENT_QUOTES, 'UTF-8') ?>">Todos los conceptos</a>
             <a class="fvd-deuda-btn fvd-deuda-btn--volver" href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver</a>
         </div>
-    </form>
+    </div>
 </div>

@@ -22,6 +22,7 @@ if ($fvd_form_repost !== null && $fvd_form_repost !== []) {
     }
 }
 $isEdit = $rowDb !== null;
+$fvdSoloConsulta = $isEdit;
 
 $legacyTipo = ['efectivo' => 'efectivo_bs', 'transferencia' => 'transferencia_bs', 'pago_movil' => 'pago_movil_bs'];
 $tipoSel = (string) ($r['tipo_pago'] ?? 'efectivo_bs');
@@ -250,10 +251,16 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
 
 <div class="fvd-pf-form-center">
     <div class="fvd-deuda-detalle-titulo">
-        <h1><?= $isEdit ? 'Editar pago' : 'Registrar pago' ?></h1>
+        <h1><?= $fvdSoloConsulta ? 'Consulta de pago' : 'Registrar pago' ?></h1>
+        <?php if ($fvdSoloConsulta): ?>
+            <p style="margin:0.35rem 0 0;font-size:0.88rem;font-weight:600;color:#334155">Solo consulta. Para un movimiento nuevo use <strong>Registrar pago</strong> en el listado.</p>
+        <?php endif; ?>
     </div>
 
     <div class="fvd-deuda-detalle-wrap">
+        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'no_edicion'): ?>
+            <p class="fvd-mod-msg" role="status">No está permitido editar recibos; solo altas nuevas.</p>
+        <?php endif; ?>
         <?php if ($fvd_error !== ''): ?>
             <p class="fvd-mod-msg" role="alert"><?= htmlspecialchars($fvd_error, ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
@@ -263,9 +270,10 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
             <a href="<?= htmlspecialchars($fvdBcvTasasUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Abrir tipo de cambio oficial del BCV (euro y otras monedas)</a>
         </p>
 
-        <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : ''), ENT_QUOTES, 'UTF-8') ?>" id="fvd-form-relacion-pago">
-            <input type="hidden" name="_action" value="save">
-            <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>"><?php endif; ?>
+        <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : ''), ENT_QUOTES, 'UTF-8') ?>" id="fvd-form-relacion-pago"<?= $fvdSoloConsulta ? ' onsubmit="return false"' : '' ?>>
+            <?php if (!$fvdSoloConsulta): ?>
+                <input type="hidden" name="_action" value="save">
+            <?php endif; ?>
 
             <?php if ($pfSinTorneoActivo): ?>
                 <p class="fvd-mod-msg fvd-pf-torneo-info">No hay torneo activo para este recibo. Como delegado, entre al panel del torneo desde la invitación; como administrador, marque al menos un torneo con estatus <strong>en proceso (1)</strong>.</p>
@@ -315,7 +323,7 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
                 </div>
             <?php endif; ?>
 
-            <div class="fvd-pf-grid">
+            <div class="fvd-pf-grid"<?= $fvdSoloConsulta ? ' inert' : '' ?>>
                 <div>
                     <label for="asociacion_id">Asociación</label>
                     <select class="fvd-input" id="asociacion_id" name="asociacion_id" required style="max-width:100%">
@@ -380,7 +388,9 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
             </div>
 
             <div class="fvd-deuda-detalle-actions fvd-mod-actions">
-                <button type="submit"<?= $pfSinTorneoActivo ? ' disabled' : '' ?>>Guardar</button>
+                <?php if (!$fvdSoloConsulta): ?>
+                    <button type="submit"<?= $pfSinTorneoActivo ? ' disabled' : '' ?>>Guardar</button>
+                <?php endif; ?>
                 <a class="fvd-deuda-btn fvd-deuda-btn--volver" href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver</a>
             </div>
         </form>
@@ -389,6 +399,10 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
 
 <script>
 (function () {
+    var fvdSoloConsulta = <?= $fvdSoloConsulta ? 'true' : 'false' ?>;
+    if (fvdSoloConsulta) {
+        return;
+    }
     var url = <?= json_encode($fvdBcvTasasUrl, JSON_UNESCAPED_SLASHES) ?>;
     function tryOpenBcvTasas() {
         var w = window.open(url, '_blank', 'noopener,noreferrer');

@@ -28,14 +28,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'actualizar_deuda') {
+    try {
+        $tidPost = (int) ($_POST['torneo_id'] ?? 0);
+        $aidPost = (int) ($_POST['asociacion_id'] ?? 0);
+        $ctrl->actualizarDeudaDesdeAtletas($tidPost, $aidPost);
+        if (($_POST['redirect'] ?? '') === 'list') {
+            header('Location: ' . $selfUrl . '?msg=deuda_actualizada');
+            exit;
+        }
+        header('Location: ' . $selfUrl . '?action=form&tid=' . $tidPost . '&aid=' . $aidPost . '&msg=deuda_actualizada');
+        exit;
+    } catch (Throwable $e) {
+        $fvd_error = $e->getMessage();
+        error_log('[deuda_asociacion] actualizar_deuda: ' . $fvd_error);
+    }
+}
+
 $fvd_page_title = 'Deudas por asociación';
 $action = $_GET['action'] ?? 'list';
 $tid = isset($_GET['tid']) ? (int) $_GET['tid'] : null;
 $aid = isset($_GET['aid']) ? (int) $_GET['aid'] : null;
 
 if ($action === 'form' && $tid !== null && $aid !== null) {
+    require_once __DIR__ . '/../relacion_pago/Controller.php';
+    $fvdTiposPagoOpciones = RelacionPagoController::TIPOS_PAGO_OPCIONES;
     $row = $ctrl->find($tid, $aid);
     $fvdCostoTarifa = $row !== null ? $ctrl->ultimoCostoTarifa() : null;
+    $fvdPuedeActualizarDeuda = !$ctrl->torneoEstaFinalizado($tid);
+    $fvdPagosRecibos = [];
+    $fvdPagosSubtotalEur = 0.0;
+    $fvdPagosSubtotalBs = 0.0;
+    $fvdUrlRelacionPago = fvd_module_url('relacion_pago/index.php');
+    if ($row !== null) {
+        $fvdPagosRecibos = $ctrl->listPagosRecibos($tid, $aid);
+        foreach ($fvdPagosRecibos as $p) {
+            $fvdPagosSubtotalEur += (float) ($p['monto_dolares'] ?? 0);
+            $fvdPagosSubtotalBs += (float) ($p['monto_total'] ?? 0);
+        }
+    }
     if ($row === null) {
         http_response_code(404);
         $fvd_page_title = 'No encontrado';

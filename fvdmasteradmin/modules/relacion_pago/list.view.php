@@ -1,6 +1,13 @@
 <?php
 /** @var array $result */
 /** @var string $selfUrl */
+$fvdFmtNum = static function ($value, int $decimals): string {
+    if ($value === '' || $value === null) {
+        return '';
+    }
+
+    return number_format((float) $value, $decimals, ',', '.');
+};
 ?>
 
 <h1>Pagos registrados</h1>
@@ -8,6 +15,9 @@
     Los importes en <strong>EUR</strong> son los contables frente a la deuda. Los <strong>Bs</strong> y la <strong>tasa BCV</strong> quedan guardados como referencia del cambio del día, para verificación y arqueo de caja.
 </p>
 <?php if (!empty($fvd_error)): ?><p class="fvd-mod-msg"><?= htmlspecialchars($fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+<?php if (isset($_GET['msg']) && $_GET['msg'] === 'no_eliminar'): ?>
+    <p class="fvd-mod-msg" role="status">No está permitido eliminar pagos; solo consulta o registrar uno nuevo.</p>
+<?php endif; ?>
 
 <div class="fvd-mod-toolbar">
     <a href="<?= htmlspecialchars($selfUrl . '?action=form', ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Registrar pago</a>
@@ -21,11 +31,9 @@
             <th>Fecha</th>
             <th>Asociación</th>
             <th>Torneo</th>
-            <th>Tipo pago</th>
-            <th>EUR (contable)</th>
-            <th>Bs (ref.)</th>
+            <th>Pago</th>
             <th>Tasa BCV</th>
-            <th>Moneda</th>
+            <th>Bs (ref.)</th>
             <th></th>
         </tr>
         </thead>
@@ -36,22 +44,16 @@
                 <td><?= htmlspecialchars((string) ($r['fecha'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars((string) ($r['asoc_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars((string) ($r['torneo_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?php
-                    $tp = (string) ($r['tipo_pago'] ?? '');
-                    echo htmlspecialchars(RelacionPagoController::TIPOS_PAGO_OPCIONES[$tp] ?? $tp, ENT_QUOTES, 'UTF-8');
-                ?></td>
-                <td><?= htmlspecialchars((string) ($r['monto_dolares'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['monto_total'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['tasa_cambio'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['moneda'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($fvdFmtNum($r['monto_dolares'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($fvdFmtNum($r['tasa_cambio'] ?? null, 4), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($fvdFmtNum($r['monto_total'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
                 <td style="white-space:nowrap">
-                    <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
-                    &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar?');">Eliminar</a>
+                    <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>
                 </td>
             </tr>
         <?php endforeach; ?>
         <?php if ($result['rows'] === []): ?>
-            <tr><td colspan="10" style="padding:12px">Sin registros.</td></tr>
+            <tr><td colspan="8" style="padding:12px">Sin registros.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

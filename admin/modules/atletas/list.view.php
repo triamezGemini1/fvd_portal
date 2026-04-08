@@ -12,13 +12,12 @@
 $atletasFormNuevoUrl = $selfUrl . '?action=form';
 $fvd_tab_class = ($fvd_atletas_tab ?? 'list') === 'ficha' ? 'fvd-atletas-tab-ficha' : 'fvd-atletas-tab-list';
 $carnetsUrlBase = $selfUrl . '?action=carnets';
-?>
-
-<h1 class="fvd-atletas-title">Atletas</h1>
-<?php
+$appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+$fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
 $fvdRevFilt = !empty($fvd_revision_delegado_filtro);
 $fvdEsSuper = \AuthService::isSuperAdmin();
 ?>
+<h1 class="fvd-atletas-title">Atletas</h1>
 <?php if ($fvdRevFilt && $fvdEsSuper): ?>
 <p class="fvd-mod-msg no-print" role="status" style="margin:0 0 0.75rem;padding:8px 12px;border-radius:8px;background:rgba(255,242,0,0.12);border:1px solid var(--fvd-amarillo);font-size:0.8125rem">
     Mostrando solo <strong>altas ingresadas por delegados</strong> pendientes de validación FVD (estatus pendiente). Quite el filtro para ver el listado completo.
@@ -115,10 +114,9 @@ $fvdEsSuper = \AuthService::isSuperAdmin();
             <th class="fvd-col-ced">Cédula</th>
             <th class="fvd-col-nom">Nombre</th>
             <th class="fvd-col-contact fvd-col-cel">Celular</th>
-            <th class="fvd-col-contact fvd-col-email">Email</th>
+            <th class="fvd-col-sol-carnet">Solicitar carnet</th>
             <th class="fvd-col-tech fvd-col-sexo">Sexo</th>
             <th class="fvd-col-tech fvd-col-numfvd">Nº FVD</th>
-            <th class="fvd-col-asoc">Asociación</th>
             <th class="fvd-col-tech fvd-col-categ">Categ.</th>
             <th class="fvd-col-tech fvd-col-estatus">Estatus</th>
             <th class="fvd-col-actions"></th>
@@ -132,7 +130,7 @@ $fvdEsSuper = \AuthService::isSuperAdmin();
         endforeach;
         ?>
         <?php if ($result['rows'] === []): ?>
-            <tr><td colspan="13" style="padding:12px">Sin registros con los filtros actuales.</td></tr>
+            <tr><td colspan="12" style="padding:12px">Sin registros con los filtros actuales.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

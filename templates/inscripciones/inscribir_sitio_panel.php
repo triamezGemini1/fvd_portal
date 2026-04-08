@@ -12,11 +12,28 @@ declare(strict_types=1);
 $clSitio = (int) ($torneoMeta['clase'] ?? 1);
 $tnom = htmlspecialchars((string) ($torneoMeta['torneo']['nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
 $esInd = $clSitio === 1;
+$vdDeleg = $torneoMeta['ventana_delegado'] ?? null;
+$fvdDelegadoInscripcionCerrada = !empty($fvd_inscripcion_bandera_modo)
+    && is_array($vdDeleg)
+    && !($vdDeleg['fase2_inscripciones'] ?? false);
+$fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'] ?? '') : '';
 ?>
 <link rel="stylesheet" href="<?= htmlspecialchars(url('assets/css/fvd-inscripcion-sitio.css'), ENT_QUOTES, 'UTF-8') ?>">
+<?php if ($fvdDelegadoInscripcionCerrada): ?>
+<style>
+.fvd-insc-sitio--solo-lectura .fvd-insc-sitio__btn,
+.fvd-insc-sitio--solo-lectura .fvd-insc-sitio__btn--ok,
+.fvd-insc-sitio--solo-lectura .fvd-insc-sitio__btn--sec { opacity: 0.45; pointer-events: none; cursor: not-allowed; }
+</style>
+<?php endif; ?>
 
-<section class="fvd-insc-sitio" aria-label="<?= $tnom ?>">
+<section class="fvd-insc-sitio<?= $fvdDelegadoInscripcionCerrada ? ' fvd-insc-sitio--solo-lectura' : '' ?>" aria-label="<?= $tnom ?>">
     <div class="fvd-insc-sitio__body">
+        <?php if ($fvdDelegadoInscripcionCerrada): ?>
+            <p class="fvd-mod-msg" style="margin:0 0 0.75rem;font-size:0.875rem;border-left:4px solid #f59e0c;padding-left:10px">
+                <strong>Calendario del torneo:</strong> <?= htmlspecialchars($fvdDelegadoVentanaMsg !== '' ? $fvdDelegadoVentanaMsg : 'Fuera del periodo de inscripciones y retiros solo puede consultar listados y registrar pagos.', ENT_QUOTES, 'UTF-8') ?>
+            </p>
+        <?php endif; ?>
         <?php if ($esInd): ?>
         <div class="fvd-insc-sitio__fila" id="fvd-sitio-linea">
             <div class="fvd-insc-sitio__campo fvd-insc-sitio__nac">
@@ -118,6 +135,7 @@ $esInd = $clSitio === 1;
     var esFvd = <?= $esFvd ? 'true' : 'false' ?>;
     var banderaMode = <?= $fvd_inscripcion_bandera_modo ? 'true' : 'false' ?>;
     var esInd = <?= $esInd ? 'true' : 'false' ?>;
+    var delegadoInscripcionCerrada = <?= $fvdDelegadoInscripcionCerrada ? 'true' : 'false' ?>;
     var usuarioEncontrado = null;
 
     function qs(id) { return document.getElementById(id); }
@@ -206,6 +224,9 @@ $esInd = $clSitio === 1;
             .catch(function () { msg('Error de red.', 'err'); });
     }
     function postInscribir(aid) {
+        if (banderaMode && delegadoInscripcionCerrada) {
+            return Promise.resolve({ ok: false, error: 'Periodo de inscripción cerrado para delegados según calendario del torneo.' });
+        }
         var body = { action: 'inscribir', torneo_id: torneoId, tipo: 'individual', atleta_ids: [aid] };
         if (esFvd) body.asociacion_id = asocId;
         return fetch(api, {
@@ -216,6 +237,9 @@ $esInd = $clSitio === 1;
         }).then(function (r) { return r.json(); });
     }
     function postRetirar(aid) {
+        if (banderaMode && delegadoInscripcionCerrada) {
+            return Promise.resolve({ ok: false, error: 'Periodo de retiros cerrado según calendario del torneo.' });
+        }
         return fetch(api, {
             method: 'POST',
             credentials: 'same-origin',

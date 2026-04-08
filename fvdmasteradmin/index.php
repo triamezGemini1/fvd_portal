@@ -35,6 +35,8 @@ if ($fvdEsDelegadoPanel) {
     require_once $projRoot . '/src/Services/StatsService.php';
     require_once $projRoot . '/src/Services/DelegadoTorneoNotifService.php';
     require_once $projRoot . '/src/Services/InscripcionService.php';
+    require_once $projRoot . '/src/Services/DelegadoTorneoVentanasService.php';
+    require_once $projRoot . '/src/Services/DeudaAsociacionGeneratorService.php';
     $pdo = fvd_db();
     $delegSnap = \FvdPortal\Services\StatsService::snapshotDelegadoPanel($pdo);
     $delegadoUid = (int) AuthService::userId();
@@ -48,9 +50,18 @@ if ($fvdEsDelegadoPanel) {
     if ($tidCtx > 0 && $myAs !== null && (int) $myAs > 0) {
         $delegCupoInsc = \FvdPortal\Services\InscripcionService::estadoCupoAsociacionBandera($pdo, $tidCtx, (int) $myAs);
     }
+    $delegVentana = null;
+    if ($tidCtx > 0) {
+        try {
+            $delegVentana = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo($pdo, $tidCtx);
+        } catch (Throwable $e) {
+            $delegVentana = null;
+        }
+    }
     $delegDeuda = null;
     if ($tidCtx > 0 && $myAs !== null && (int) $myAs > 0) {
         try {
+            \FvdPortal\Services\DeudaAsociacionGeneratorService::ensureDeudaEurColumns($pdo);
             $stDeuda = $pdo->prepare(
                 'SELECT monto_inscritos, monto_afiliados, monto_anualidad, monto_carnets, monto_traspasos, monto_total, monto_total_eur,
                     total_inscritos, total_afiliados, total_anualidad, total_carnets, total_traspasos

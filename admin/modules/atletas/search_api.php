@@ -68,13 +68,15 @@ try {
     $selfUrl = fvd_crud_self_url('atletas');
     $atletaRowTpl = FVD_PROJECT_ROOT . '/templates/components/atleta_table_row.php';
     $fvd_puede_traspaso = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
+    $appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+    $fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
 
     ob_start();
     foreach ($paged['registros'] as $r) {
         require $atletaRowTpl;
     }
     if ($paged['registros'] === []) {
-        echo '<tr><td colspan="13" style="padding:12px">Sin registros con los filtros actuales.</td></tr>';
+        echo '<tr><td colspan="12" style="padding:12px">Sin registros con los filtros actuales.</td></tr>';
     }
     $tbodyHtml = ob_get_clean();
 

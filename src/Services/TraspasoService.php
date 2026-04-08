@@ -10,6 +10,7 @@ use RuntimeException;
 use Throwable;
 
 require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
+require_once __DIR__ . '/DeudaAsociacionGeneratorService.php';
 
 /**
  * Traspaso: actualiza `atletas.asociacion` y marca `atletas.traspaso` = 1 para informes.
@@ -69,7 +70,7 @@ SQL;
 
         $paramsFind = [':id' => $atletaId];
         $scope = \QueryHelper::asociacionScopeSql('a.asociacion', $paramsFind);
-        $sqlFind = 'SELECT a.id, a.asociacion FROM atletas a WHERE a.id = :id ' . $scope;
+        $sqlFind = 'SELECT a.id, a.asociacion, a.torneo_id FROM atletas a WHERE a.id = :id ' . $scope;
         $st = $pdo->prepare($sqlFind);
         $st->execute($paramsFind);
         $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -113,6 +114,17 @@ SQL;
                 ':uid'  => $usuarioId,
             ]);
             $pdo->commit();
+            $torneoId = (int) ($row['torneo_id'] ?? 0);
+            if ($torneoId > 0) {
+                try {
+                    if ($origen !== null && $origen > 0) {
+                        DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion($pdo, $torneoId, $origen);
+                    }
+                    DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion($pdo, $torneoId, $asociacionDestinoId);
+                } catch (Throwable $e) {
+                    error_log('[TraspasoService] sync deuda: ' . $e->getMessage());
+                }
+            }
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
