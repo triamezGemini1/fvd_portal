@@ -69,7 +69,8 @@ $result = [
 ];
 
 $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
-$invitacionesSearchApiUrl = strpos($sn, '/fvdmasteradmin/modules/invitaciones/') !== false
+$invitacionesSearchApiUrl = (str_contains($sn, '/fvdmasteradmin/modules/invitaciones/')
+        || (str_contains($sn, '/modules/invitaciones/') && !str_contains($sn, '/admin/modules/')))
     ? fvd_master_module_url('invitaciones/search_api.php')
     : admin_module_url('invitaciones/search_api.php');
 

@@ -57,6 +57,20 @@ class AuthService
     public static function ensureSession(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
+            $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+            if ($base !== '') {
+                $path = $base . '/';
+                if (PHP_VERSION_ID >= 70300) {
+                    session_set_cookie_params([
+                        'lifetime' => 0,
+                        'path' => $path,
+                        'httponly' => true,
+                        'samesite' => 'Lax',
+                    ]);
+                } else {
+                    session_set_cookie_params(0, $path, '', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off', true);
+                }
+            }
             session_start();
         }
     }

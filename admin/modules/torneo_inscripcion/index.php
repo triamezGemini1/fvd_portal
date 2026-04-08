@@ -171,7 +171,7 @@ if ($tablasOk && $torneoSel > 0 && $asocId > 0) {
     }
 }
 
-$fvdSitioNuevoAtletaUrl = rtrim($appBase, '/') . '/fvdmasteradmin/modules/atletas/index.php?action=form';
+$fvdSitioNuevoAtletaUrl = rtrim($appBase, '/') . '/modules/atletas/index.php?action=form';
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/inscribir.view.php';

@@ -71,6 +71,9 @@ Options +FollowSymLinks
     # Si el archivo o directorio existe, servirlo directamente
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Módulos FVD: URL pública /modules/... → fvdmasteradmin/modules/... (sin "fvdmasteradmin" en el navegador)
+    RewriteRule ^modules/(.*)$ fvdmasteradmin/modules/$1 [L]
     
     # Mantener compatibilidad con estructura actual
     # RewriteRule ^(.*)$ app_index.php [QSA,L]

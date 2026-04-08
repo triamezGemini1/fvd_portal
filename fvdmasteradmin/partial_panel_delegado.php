@@ -54,7 +54,7 @@ $urlReportesInscripciones = fvd_module_url('inscripciones/index.php');
 
 $urlSolCarnet = $appBase . '/fvdmasteradmin/solicitud_carnet.php';
 
-$urlReportesMovimientos = $appBase . '/fvdmasteradmin/modules/atletas/reporte_carnets.php';
+$urlReportesMovimientos = $appBase . '/modules/atletas/reporte_carnets.php';
 
 $urlDeudaLista = fvd_module_url('deuda_asociacion/index.php');
 
@@ -332,7 +332,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
                 <a href="<?= htmlspecialchars($urlRegistrarAtleta, ENT_QUOTES, 'UTF-8') ?>">Registrar atleta</a>
 
-                · <a href="<?= htmlspecialchars($appBase . '/fvdmasteradmin/modules/atletas/index.php?tab=ficha', ENT_QUOTES, 'UTF-8') ?>">Fichas / carnets</a>
+                · <a href="<?= htmlspecialchars($appBase . '/modules/atletas/index.php?tab=ficha', ENT_QUOTES, 'UTF-8') ?>">Fichas / carnets</a>
 
             </p>
 
@@ -395,6 +395,12 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
             <div class="fvd-delegado-torneos__deuda-box">
 
                 <h3 class="fvd-delegado-torneos__deuda-h">Deuda detallada<?= $tidInt > 0 ? ' (torneo actual)' : '' ?></h3>
+
+                <?php if (is_array($delegDeuda ?? null) && $delegDeuda !== [] && isset($delegDeuda['monto_total_eur']) && $delegDeuda['monto_total_eur'] !== null && (float) $delegDeuda['monto_total_eur'] > 0): ?>
+
+                    <p class="fvd-delegado-torneos__deuda-empty" style="margin:0 0 8px;font-size:0.875rem">Montos en <strong>EUR</strong> (deuda canónica; los pagos descuentan en EUR a tasa BCV por recibo).</p>
+
+                <?php endif; ?>
 
                 <?php if (is_array($delegDeuda ?? null) && $delegDeuda !== []): ?>
 

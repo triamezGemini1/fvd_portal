@@ -132,11 +132,11 @@ final class DeudaAsociacionGeneratorService
             total_carnets, monto_carnets,
             monto_anualidad, total_anualidad,
             total_traspasos, monto_traspasos,
-            monto_total,
+            monto_total, monto_total_eur,
             fecha_creacion, fecha_actualizacion
         ) VALUES (
             :tid, :aid,
-            :ti, :mi, :ta, :ma, :tc, :mc, :man, :tan, :tt, :mtt, :mtot,
+            :ti, :mi, :ta, :ma, :tc, :mc, :man, :tan, :tt, :mtt, :mtot, :mtot_eur,
             NOW(), NOW()
         )
         ON DUPLICATE KEY UPDATE
@@ -151,6 +151,7 @@ final class DeudaAsociacionGeneratorService
             total_traspasos = VALUES(total_traspasos),
             monto_traspasos = VALUES(monto_traspasos),
             monto_total = VALUES(monto_total),
+            monto_total_eur = VALUES(monto_total_eur),
             fecha_actualizacion = NOW()';
 
         $st = $pdo->prepare($sql);
@@ -168,6 +169,7 @@ final class DeudaAsociacionGeneratorService
             ':tt' => $c['total_traspasos'],
             ':mtt' => $m['monto_traspasos'],
             ':mtot' => $m['monto_total'],
+            ':mtot_eur' => $m['monto_total'],
         ]);
     }
 }

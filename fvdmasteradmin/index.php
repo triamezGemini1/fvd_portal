@@ -41,7 +41,7 @@ if ($fvdEsDelegadoPanel) {
     $delegNotifs = \FvdPortal\Services\DelegadoTorneoNotifService::listarParaDelegado($pdo, $delegadoUid, 25);
     $delegNotifNoVistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $delegadoUid);
     $delegInscripcionApi = $appBase . '/fvdmasteradmin/delegado_inscripcion_api.php';
-    $urlRegistrarAtleta = $appBase . '/fvdmasteradmin/modules/atletas/index.php';
+    $urlRegistrarAtleta = $appBase . '/modules/atletas/index.php';
     $delegCupoInsc = null;
     $tidCtx = (int) ($delegSnap['torneo_id'] ?? 0);
     $myAs = AuthService::idAsociacion();
@@ -52,7 +52,7 @@ if ($fvdEsDelegadoPanel) {
     if ($tidCtx > 0 && $myAs !== null && (int) $myAs > 0) {
         try {
             $stDeuda = $pdo->prepare(
-                'SELECT monto_inscritos, monto_afiliados, monto_anualidad, monto_carnets, monto_traspasos, monto_total,
+                'SELECT monto_inscritos, monto_afiliados, monto_anualidad, monto_carnets, monto_traspasos, monto_total, monto_total_eur,
                     total_inscritos, total_afiliados, total_anualidad, total_carnets, total_traspasos
                  FROM deuda_asociaciones WHERE torneo_id = :t AND asociacion_id = :a LIMIT 1'
             );
@@ -73,8 +73,8 @@ require_once __DIR__ . '/services/FvdDashboardStats.php';
 
 $fvd_page_title = 'Panel general';
 $stats = FvdDashboardStats::counts();
-$urlNuevoTorneo = $appBase . '/fvdmasteradmin/modules/torneos/index.php?action=form';
-$urlRegistrarAtleta = $appBase . '/fvdmasteradmin/modules/atletas/index.php';
+$urlNuevoTorneo = $appBase . '/modules/torneos/index.php?action=form';
+$urlRegistrarAtleta = $appBase . '/modules/atletas/index.php';
 
 $fvdPuedeGestionar = AuthService::checkAccess([
     AuthService::ROLE_FVD_ADMIN,

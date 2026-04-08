@@ -7,6 +7,7 @@
 // Cargar variables de entorno
 require_once __DIR__ . '/env.php';
 Env::load();
+require_once __DIR__ . '/php_polyfills.php';
 
 // Definir rutas base
 if (!defined('BASE_PATH')) {
@@ -43,21 +44,21 @@ function admin_module_url(string $path = ''): string {
 }
 
 /**
- * URL bajo fvdmasteradmin/modules/ (ruta pública habitual: /fvd_portal/fvdmasteradmin/modules/...).
+ * URL pública hacia módulos FVD bajo /modules/ (sin "fvdmasteradmin"; rewrite interno).
  */
 function fvd_master_module_url(string $path = ''): string {
     $path = ltrim($path, '/');
-    return BASE_URL . '/fvdmasteradmin/modules/' . $path;
+    return BASE_URL . '/modules/' . $path;
 }
 
 /**
- * Base del CRUD FvdAdminService: si la petición entró por fvdmasteradmin/modules/{mod}/, redirecciones y formularios siguen esa ruta.
+ * Base del CRUD FvdAdminService: si la petición entró por /modules/{mod}/ (o legado fvdmasteradmin/modules/), redirecciones siguen esa ruta.
  *
  * @param 'asociaciones'|'atletas'|'torneos'|'invitaciones'|'solicitudes_delegado' $module
  */
 function fvd_crud_self_url(string $module): string {
     $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
-    if (str_contains($sn, '/fvdmasteradmin/modules/' . $module . '/')) {
+    if (str_contains($sn, '/modules/' . $module . '/') || str_contains($sn, '/fvdmasteradmin/modules/' . $module . '/')) {
         return fvd_master_module_url($module . '/index.php');
     }
 

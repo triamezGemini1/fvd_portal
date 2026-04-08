@@ -32,7 +32,7 @@ class DeudaAsociacionController extends FvdModuleController
     public const ALLOW_UPDATE = [
         'total_inscritos', 'monto_inscritos', 'total_afiliados', 'monto_afiliados',
         'total_carnets', 'monto_carnets', 'total_traspasos', 'monto_traspasos',
-        'total_anualidad', 'monto_anualidad', 'monto_total',
+        'total_anualidad', 'monto_anualidad', 'monto_total', 'monto_total_eur',
     ];
 
     public function paginateList(int $page, int $perPage): array
@@ -146,9 +146,13 @@ class DeudaAsociacionController extends FvdModuleController
 
         $data = [];
         foreach (self::ALLOW_UPDATE as $col) {
+            if ($col === 'monto_total_eur') {
+                continue;
+            }
             $v = $post[$col] ?? null;
             $data[$col] = $v === '' || $v === null ? 0 : (float) $v;
         }
+        $data['monto_total_eur'] = $data['monto_total'] ?? 0;
 
         $where = 'torneo_id = :t AND asociacion_id = :a';
         $wparams = [':t' => $torneoId, ':a' => $asociacionId];

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Bootstrap común para módulos bajo fvdmasteradmin/modules/
+ * Bootstrap común para módulos (físicamente en fvdmasteradmin/modules/; URL pública /modules/ vía .htaccess).
  */
 if (!defined('FVD_MASTER_ROOT')) {
     define('FVD_MASTER_ROOT', dirname(__DIR__));
@@ -20,13 +20,13 @@ if (!function_exists('env')) {
 
 if (!function_exists('fvd_module_url')) {
     /**
-     * URL pública hacia un script bajo modules/ (ej. asociaciones/index.php).
+     * URL pública hacia un script bajo /modules/ (sin "fvdmasteradmin" en la ruta; rewrite → fvdmasteradmin/modules/).
      */
     function fvd_module_url(string $path): string
     {
         $base = rtrim((string) env('APP_BASE_PATH', ''), '/');
 
-        return $base . '/fvdmasteradmin/modules/' . ltrim($path, '/');
+        return $base . '/modules/' . ltrim($path, '/');
     }
 }
 

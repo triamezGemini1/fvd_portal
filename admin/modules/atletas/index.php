@@ -153,7 +153,9 @@ if ($action === 'traspaso') {
         $asocMap[(string) (int) ($a['id'] ?? 0)] = trim((string) ($a['nombre'] ?? ''));
     }
     $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
-    $carnetFotoApiUrl = strpos($sn, '/fvdmasteradmin/modules/atletas/') !== false
+    $fvdAtletasSite = str_contains($sn, '/fvdmasteradmin/modules/atletas/')
+        || (str_contains($sn, '/modules/atletas/') && !str_contains($sn, '/admin/modules/'));
+    $carnetFotoApiUrl = $fvdAtletasSite
         ? fvd_master_module_url('atletas/carnet_foto_api.php')
         : admin_module_url('atletas/carnet_foto_api.php');
     $atletasListUrl = $selfUrl . '?tab=ficha';
@@ -191,10 +193,12 @@ if ($action === 'carnets') {
         }
     }
     $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
-    $carnetMarcarApiUrl = strpos($sn, '/fvdmasteradmin/modules/atletas/') !== false
+    $fvdAtletasSite = str_contains($sn, '/fvdmasteradmin/modules/atletas/')
+        || (str_contains($sn, '/modules/atletas/') && !str_contains($sn, '/admin/modules/'));
+    $carnetMarcarApiUrl = $fvdAtletasSite
         ? fvd_master_module_url('atletas/carnet_marcar_api.php')
         : admin_module_url('atletas/carnet_marcar_api.php');
-    $carnetFotoApiUrl = strpos($sn, '/fvdmasteradmin/modules/atletas/') !== false
+    $carnetFotoApiUrl = $fvdAtletasSite
         ? fvd_master_module_url('atletas/carnet_foto_api.php')
         : admin_module_url('atletas/carnet_foto_api.php');
     $atletasListUrl = $selfUrl . '?tab=ficha';
@@ -288,13 +292,15 @@ $result = [
 ];
 
 $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
-$atletasSearchApiUrl = strpos($sn, '/fvdmasteradmin/modules/atletas/') !== false
+$fvdAtletasSite = str_contains($sn, '/fvdmasteradmin/modules/atletas/')
+    || (str_contains($sn, '/modules/atletas/') && !str_contains($sn, '/admin/modules/'));
+$atletasSearchApiUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/search_api.php')
     : admin_module_url('atletas/search_api.php');
-$atletasExportUrl = strpos($sn, '/fvdmasteradmin/modules/atletas/') !== false
+$atletasExportUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/export.php')
     : admin_module_url('atletas/export.php');
-$atletasReportBaseUrl = strpos($sn, '/fvdmasteradmin/modules/atletas/') !== false
+$atletasReportBaseUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/')
     : admin_module_url('atletas/');
 require FVD_MASTER_ROOT . '/includes/layout_header.php';

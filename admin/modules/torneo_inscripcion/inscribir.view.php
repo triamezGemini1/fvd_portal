@@ -21,7 +21,7 @@
 $fvd_inscripcion_bandera_modo = !empty($fvd_inscripcion_bandera_modo);
 $fvdSitioDisponibles = $fvdSitioDisponibles ?? [];
 $fvdSitioInscritos = $fvdSitioInscritos ?? [];
-$fvdSitioNuevoAtletaUrl = $fvdSitioNuevoAtletaUrl ?? (rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/') . '/fvdmasteradmin/modules/atletas/index.php?action=form');
+$fvdSitioNuevoAtletaUrl = $fvdSitioNuevoAtletaUrl ?? (rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/') . '/modules/atletas/index.php?action=form');
 $inscritosBandera = $inscritosBandera ?? [];
 $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
 ?>

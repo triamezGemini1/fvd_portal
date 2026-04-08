@@ -11,6 +11,10 @@ if (!function_exists('env')) {
         require_once $envBootstrap;
     }
 }
+$polyfills = dirname(__DIR__, 2) . '/config/php_polyfills.php';
+if (is_file($polyfills)) {
+    require_once $polyfills;
+}
 
 if (!function_exists('env')) {
     /**
