@@ -36,13 +36,11 @@ if ($fvdEsDelegadoPanel) {
     require_once $projRoot . '/src/Services/DelegadoTorneoNotifService.php';
     require_once $projRoot . '/src/Services/InscripcionService.php';
     require_once $projRoot . '/src/Services/DelegadoTorneoVentanasService.php';
-    require_once $projRoot . '/src/Services/DeudaAsociacionGeneratorService.php';
     $pdo = fvd_db();
     $delegSnap = \FvdPortal\Services\StatsService::snapshotDelegadoPanel($pdo);
     $delegadoUid = (int) AuthService::userId();
     $delegNotifs = \FvdPortal\Services\DelegadoTorneoNotifService::listarParaDelegado($pdo, $delegadoUid, 25);
     $delegNotifNoVistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $delegadoUid);
-    $delegInscripcionApi = $appBase . '/fvdmasteradmin/delegado_inscripcion_api.php';
     $urlRegistrarAtleta = $appBase . '/modules/atletas/index.php';
     $delegCupoInsc = null;
     $tidCtx = (int) ($delegSnap['torneo_id'] ?? 0);
@@ -56,21 +54,6 @@ if ($fvdEsDelegadoPanel) {
             $delegVentana = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo($pdo, $tidCtx);
         } catch (Throwable $e) {
             $delegVentana = null;
-        }
-    }
-    $delegDeuda = null;
-    if ($tidCtx > 0 && $myAs !== null && (int) $myAs > 0) {
-        try {
-            \FvdPortal\Services\DeudaAsociacionGeneratorService::ensureDeudaEurColumns($pdo);
-            $stDeuda = $pdo->prepare(
-                'SELECT monto_inscritos, monto_afiliados, monto_anualidad, monto_carnets, monto_traspasos, monto_total, monto_total_eur,
-                    total_inscritos, total_afiliados, total_anualidad, total_carnets, total_traspasos
-                 FROM deuda_asociaciones WHERE torneo_id = :t AND asociacion_id = :a LIMIT 1'
-            );
-            $stDeuda->execute([':t' => $tidCtx, ':a' => (int) $myAs]);
-            $delegDeuda = $stDeuda->fetch(PDO::FETCH_ASSOC) ?: null;
-        } catch (Throwable $e) {
-            $delegDeuda = null;
         }
     }
     $fvd_page_title = 'Panel de administración de torneos';

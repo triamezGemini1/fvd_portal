@@ -264,6 +264,123 @@ final class StatsService
     }
 
     /**
+     * Inscripciones (bandera en atletas) por género y torneo en un año civil.
+     * Torneos: año según fechator; si no hay fecha válida, año de created_at en torneosact.
+     * Género: M / F; el resto (incl. vacío) cuenta como «otros».
+     *
+     * @return array{
+     *   torneos: list<array{id:int,nombre:string,fecha:?string,m:int,f:int,otros:int,total:int}>,
+     *   total_anual: array{m:int,f:int,otros:int,total:int}
+     * }
+     */
+    public static function inscripcionesPorGeneroPorTorneoAno(PDO $pdo, int $year): array
+    {
+        $year = max(2000, min(2100, $year));
+        $empty = [
+            'torneos'     => [],
+            'total_anual' => ['m' => 0, 'f' => 0, 'otros' => 0, 'total' => 0],
+        ];
+
+        $params = [':y' => $year];
+        $onScope = self::scopeAtletasJoinOn($params);
+
+        $sql = 'SELECT
+                t.torneo AS id,
+                COALESCE(NULLIF(TRIM(t.nombre), \'\'), CONCAT(\'Torneo #\', t.torneo)) AS nombre,
+                t.fechator AS fecha,
+                SUM(CASE WHEN a.id IS NOT NULL AND UPPER(TRIM(COALESCE(a.sexo, \'\'))) = \'M\' THEN 1 ELSE 0 END) AS m,
+                SUM(CASE WHEN a.id IS NOT NULL AND UPPER(TRIM(COALESCE(a.sexo, \'\'))) = \'F\' THEN 1 ELSE 0 END) AS f,
+                SUM(CASE WHEN a.id IS NOT NULL AND UPPER(TRIM(COALESCE(a.sexo, \'\'))) NOT IN (\'M\', \'F\') THEN 1 ELSE 0 END) AS otros
+            FROM torneosact t
+            LEFT JOIN atletas a ON a.torneo_id = t.torneo
+                AND COALESCE(a.inscripcion, 0) = 1' . $onScope . '
+            WHERE YEAR(COALESCE(NULLIF(t.fechator, \'0000-00-00\'), DATE(t.created_at))) = :y
+            GROUP BY t.torneo, t.nombre, t.fechator
+            ORDER BY t.fechator IS NULL, t.fechator DESC, t.torneo DESC';
+
+        try {
+            $st = $pdo->prepare($sql);
+            self::executeNamed($st, $params);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('[StatsService] inscripcionesPorGeneroPorTorneoAno: ' . $e->getMessage());
+
+            return $empty;
+        }
+
+        $torneos = [];
+        $sumM = 0;
+        $sumF = 0;
+        $sumO = 0;
+
+        foreach ($rows as $r) {
+            $m = (int) ($r['m'] ?? 0);
+            $f = (int) ($r['f'] ?? 0);
+            $otros = (int) ($r['otros'] ?? 0);
+            $total = $m + $f + $otros;
+            $sumM += $m;
+            $sumF += $f;
+            $sumO += $otros;
+            $fechaRaw = $r['fecha'] ?? null;
+            $fechaStr = null;
+            if ($fechaRaw !== null && $fechaRaw !== '' && (string) $fechaRaw !== '0000-00-00') {
+                $fechaStr = (string) $fechaRaw;
+            }
+            $torneos[] = [
+                'id'     => (int) ($r['id'] ?? 0),
+                'nombre' => (string) ($r['nombre'] ?? ''),
+                'fecha'  => $fechaStr,
+                'm'      => $m,
+                'f'      => $f,
+                'otros'  => $otros,
+                'total'  => $total,
+            ];
+        }
+
+        return [
+            'torneos' => $torneos,
+            'total_anual' => [
+                'm'     => $sumM,
+                'f'     => $sumF,
+                'otros' => $sumO,
+                'total' => $sumM + $sumF + $sumO,
+            ],
+        ];
+    }
+
+    /**
+     * Fragmento para ON de JOIN atletas (mismo criterio regional que scopeAtletas).
+     *
+     * @param array<string, mixed> $params
+     */
+    private static function scopeAtletasJoinOn(array &$params): string
+    {
+        $qh = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
+        if (!\class_exists('QueryHelper', false)) {
+            require_once $qh;
+        }
+
+        if (!\class_exists('AuthService', false)) {
+            require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
+        }
+        \AuthService::ensureSession();
+
+        if (!\AuthService::isAuthenticated()) {
+            return ' AND 1=0 ';
+        }
+        if (\AuthService::isSuperAdmin()) {
+            return '';
+        }
+        $id = \AuthService::idAsociacion();
+        if ($id === null) {
+            return ' AND 1=0 ';
+        }
+        $params[':fvd_asoc_scope'] = $id;
+
+        return ' AND a.asociacion = :fvd_asoc_scope ';
+    }
+
+    /**
      * Carnet pendiente (0) vs solicitado (1) en el ámbito regional actual.
      *
      * @return array{pendiente: int, solicitado: int}

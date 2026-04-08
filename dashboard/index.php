@@ -25,6 +25,12 @@ $pdo = fvd_db();
 $dash = StatsService::snapshotDashboard($pdo);
 $ai = $dash['activos_inactivos'];
 
+$dashYearRaw = isset($_GET['year']) ? (int) preg_replace('/\D/', '', (string) $_GET['year']) : (int) date('Y');
+$dashYear = ($dashYearRaw >= 2000 && $dashYearRaw <= 2100) ? $dashYearRaw : (int) date('Y');
+$inscGen = StatsService::inscripcionesPorGeneroPorTorneoAno($pdo, $dashYear);
+$inscGenTorneos = $inscGen['torneos'];
+$inscGenAnual = $inscGen['total_anual'];
+
 $urlAtletas = fvd_crud_self_url('atletas');
 if (!function_exists('admin_module_url')) {
     require_once dirname(__DIR__) . '/config/paths.php';
@@ -112,6 +118,83 @@ require $fvdMaster . '/includes/layout_header.php';
             <h2 class="fvd-chart-panel__title">Crecimiento mensual</h2>
             <div class="fvd-chart-panel__canvas-wrap">
                 <canvas id="fvd-chart-linea" aria-label="Gráfico de líneas"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <section class="fvd-dash-gen" aria-labelledby="fvd-dash-gen-heading">
+        <div class="fvd-dash-gen__head">
+            <h2 id="fvd-dash-gen-heading" class="fvd-dash-gen__title">Inscripciones por género</h2>
+            <form class="fvd-dash-gen__year-form" method="get" action="">
+                <label for="fvd-dash-year">Año</label>
+                <select id="fvd-dash-year" name="year" class="fvd-dash-gen__year-select" onchange="this.form.submit()">
+                    <?php
+                    $yCur = (int) date('Y');
+                    for ($yy = $yCur - 6; $yy <= $yCur + 1; ++$yy):
+                    ?>
+                        <option value="<?= $yy ?>"<?= $yy === $dashYear ? ' selected' : '' ?>><?= $yy ?></option>
+                    <?php endfor; ?>
+                </select>
+            </form>
+        </div>
+        <p class="fvd-dash-gen__hint">
+            Torneos del año según fecha del torneo (<code>fechator</code> o, si falta, alta en sistema). Inscritos: atletas con <code>inscripcion = 1</code> y <code>torneo_id</code> coincidente. Género según ficha: M, F; resto u omitido en «Otros».
+        </p>
+        <div class="fvd-dash-gen__grid">
+            <div class="fvd-chart-panel fvd-chart-panel--compact">
+                <h3 class="fvd-chart-panel__title">Total <?= (int) $dashYear ?> (todos los torneos del año)</h3>
+                <?php if ((int) $inscGenAnual['total'] > 0): ?>
+                <div class="fvd-chart-panel__canvas-wrap fvd-chart-panel__canvas-wrap--sm">
+                    <canvas id="fvd-chart-gen-ano" aria-label="Inscripciones por género, total anual"></canvas>
+                </div>
+                <?php else: ?>
+                <p class="fvd-dash-gen__no-data">Sin inscripciones con desglose por género en este año (en su ámbito).</p>
+                <?php endif; ?>
+            </div>
+            <div class="fvd-dash-gen__table-panel">
+                <h3 class="fvd-dash-gen__table-h">Por torneo</h3>
+                <div class="fvd-dash-gen__table-scroll">
+                    <table class="fvd-dash-gen__table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Torneo</th>
+                                <th scope="col">Fecha</th>
+                                <th scope="col" class="fvd-dash-gen__num">M</th>
+                                <th scope="col" class="fvd-dash-gen__num">F</th>
+                                <th scope="col" class="fvd-dash-gen__num">Otros</th>
+                                <th scope="col" class="fvd-dash-gen__num">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($inscGenTorneos as $tg): ?>
+                                <tr>
+                                    <td class="fvd-dash-gen__torneo"><?= htmlspecialchars($tg['nombre'], ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><?= $tg['fecha'] !== null ? htmlspecialchars($tg['fecha'], ENT_QUOTES, 'UTF-8') : '—' ?></td>
+                                    <td class="fvd-dash-gen__num"><?= (int) $tg['m'] ?></td>
+                                    <td class="fvd-dash-gen__num"><?= (int) $tg['f'] ?></td>
+                                    <td class="fvd-dash-gen__num"><?= (int) $tg['otros'] ?></td>
+                                    <td class="fvd-dash-gen__num fvd-dash-gen__num--strong"><?= (int) $tg['total'] ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if ($inscGenTorneos === []): ?>
+                                <tr>
+                                    <td colspan="6" class="fvd-dash-gen__empty">No hay torneos con año <?= (int) $dashYear ?> en el calendario.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                        <?php if ($inscGenTorneos !== []): ?>
+                            <tfoot>
+                                <tr>
+                                    <th scope="row" colspan="2">Total año</th>
+                                    <td class="fvd-dash-gen__num"><?= (int) $inscGenAnual['m'] ?></td>
+                                    <td class="fvd-dash-gen__num"><?= (int) $inscGenAnual['f'] ?></td>
+                                    <td class="fvd-dash-gen__num"><?= (int) $inscGenAnual['otros'] ?></td>
+                                    <td class="fvd-dash-gen__num fvd-dash-gen__num--strong"><?= (int) $inscGenAnual['total'] ?></td>
+                                </tr>
+                            </tfoot>
+                        <?php endif; ?>
+                    </table>
+                </div>
             </div>
         </div>
     </section>
@@ -275,6 +358,41 @@ require $fvdMaster . '/includes/layout_header.php';
                 }
             }
         });
+    }
+
+    var genAno = <?= json_encode([
+        'm'     => (int) $inscGenAnual['m'],
+        'f'     => (int) $inscGenAnual['f'],
+        'otros' => (int) $inscGenAnual['otros'],
+    ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var elGen = document.getElementById('fvd-chart-gen-ano');
+    if (elGen && typeof Chart !== 'undefined') {
+        var gm = genAno.m | 0;
+        var gf = genAno.f | 0;
+        var go = genAno.otros | 0;
+        if (gm + gf + go > 0) {
+            new Chart(elGen, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Masculino', 'Femenino', 'Otros'],
+                    datasets: [{
+                        data: [gm, gf, go],
+                        backgroundColor: ['#2563eb', '#e11d48', '#64748b'],
+                        borderColor: 'rgba(15,23,42,0.35)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e2e8f0', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
     }
 })();
 </script>

@@ -6,8 +6,6 @@ declare(strict_types=1);
 
 /** @var string $appBase */
 
-/** @var string $delegInscripcionApi */
-
 /** @var string $urlRegistrarAtleta */
 
 /** @var array{usado:int,max:?int,restante:?int}|null $delegCupoInsc */
@@ -15,16 +13,6 @@ declare(strict_types=1);
 /** @var list<array<string,mixed>> $delegNotifs */
 
 /** @var int $delegNotifNoVistas */
-
-/** @var array<string,mixed>|null $delegDeuda */
-
-
-
-$fvdDelegMoney = static function (mixed $v): string {
-
-    return number_format((float) ($v ?? 0), 2, ',', '.');
-
-};
 
 
 
@@ -416,44 +404,6 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 
 
-            <div class="fvd-delegado-torneos__deuda-box">
-
-                <h3 class="fvd-delegado-torneos__deuda-h">Deuda detallada<?= $tidInt > 0 ? ' (torneo actual)' : '' ?></h3>
-
-                <?php if (is_array($delegDeuda ?? null) && $delegDeuda !== [] && isset($delegDeuda['monto_total_eur']) && $delegDeuda['monto_total_eur'] !== null && (float) $delegDeuda['monto_total_eur'] > 0): ?>
-
-                    <p class="fvd-delegado-torneos__deuda-empty" style="margin:0 0 8px;font-size:0.875rem">Montos en <strong>EUR</strong> (deuda canónica; los pagos descuentan en EUR a tasa BCV por recibo).</p>
-
-                <?php endif; ?>
-
-                <?php if (is_array($delegDeuda ?? null) && $delegDeuda !== []): ?>
-
-                    <dl class="fvd-delegado-torneos__deuda-dl">
-
-                        <div><dt>Inscritos</dt><dd><?= $fvdDelegMoney($delegDeuda['monto_inscritos'] ?? 0) ?> <span class="fvd-delegado-torneos__deuda-n">(<?= (int) ($delegDeuda['total_inscritos'] ?? 0) ?>)</span></dd></div>
-
-                        <div><dt>Afiliaciones</dt><dd><?= $fvdDelegMoney($delegDeuda['monto_afiliados'] ?? 0) ?> <span class="fvd-delegado-torneos__deuda-n">(<?= (int) ($delegDeuda['total_afiliados'] ?? 0) ?>)</span></dd></div>
-
-                        <div><dt>Anualidad</dt><dd><?= $fvdDelegMoney($delegDeuda['monto_anualidad'] ?? 0) ?> <span class="fvd-delegado-torneos__deuda-n">(<?= (int) ($delegDeuda['total_anualidad'] ?? 0) ?>)</span></dd></div>
-
-                        <div><dt>Carnets</dt><dd><?= $fvdDelegMoney($delegDeuda['monto_carnets'] ?? 0) ?> <span class="fvd-delegado-torneos__deuda-n">(<?= (int) ($delegDeuda['total_carnets'] ?? 0) ?>)</span></dd></div>
-
-                        <div><dt>Traspasos</dt><dd><?= $fvdDelegMoney($delegDeuda['monto_traspasos'] ?? 0) ?> <span class="fvd-delegado-torneos__deuda-n">(<?= (int) ($delegDeuda['total_traspasos'] ?? 0) ?>)</span></dd></div>
-
-                        <div class="fvd-delegado-torneos__deuda-total"><dt>Total</dt><dd><?= $fvdDelegMoney($delegDeuda['monto_total'] ?? 0) ?></dd></div>
-
-                    </dl>
-
-                <?php else: ?>
-
-                    <p class="fvd-delegado-torneos__deuda-empty">No hay fila de deuda para su asociación y el torneo en contexto. Consulte el listado general o solicite el alta en la FVD.</p>
-
-                <?php endif; ?>
-
-            </div>
-
-
-
             <div class="fvd-delegado-torneos__btn-stack">
 
                 <?php if ($tidInt > 0 && $myAid !== null && (int) $myAid > 0): ?>
@@ -472,7 +422,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
                 <button type="button" class="fvd-delegado-torneos__action fvd-delegado-torneos__action--f0 fvd-delegado-torneos__action--disabled" disabled style="width:100%;opacity:0.55;cursor:not-allowed">Generar deuda torneo</button>
 
-                <p class="fvd-delegado-torneos__deuda-empty" style="margin:0 0 4px">Requiere torneo en contexto.</p>
+                <p style="margin:0 0 4px;font-size:0.75rem;color:var(--dt-muted)">Requiere torneo en contexto.</p>
 
                 <?php endif; ?>
 
@@ -487,162 +437,6 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
         </article>
 
     </div>
-
-
-
-    <?php if ($tid !== null && $tid > 0): ?>
-
-    <section class="fvd-delegado-torneos__ajax">
-
-        <h2 class="fvd-delegado-torneos__ajax-h">Inscripción rápida al torneo</h2>
-
-        <p class="fvd-delegado-torneos__ajax-p">Torneo #<?= (int) $tid ?> — <?= htmlspecialchars($tnom, ENT_QUOTES, 'UTF-8') ?></p>
-
-        <label class="fvd-delegado-torneos__ajax-l" for="fvd-del-insc-q">Buscar atleta del club</label>
-
-        <div class="fvd-delegado-torneos__ajax-row">
-
-            <input type="search" id="fvd-del-insc-q" class="fvd-delegado-torneos__ajax-input" placeholder="Nombre o cédula" autocomplete="off">
-
-            <button type="button" class="fvd-delegado-torneos__ajax-btn" id="fvd-del-insc-buscar">Buscar</button>
-
-        </div>
-
-        <ul id="fvd-del-insc-res" class="fvd-delegado-torneos__ajax-ul"></ul>
-
-        <p id="fvd-del-insc-msg" class="fvd-delegado-torneos__ajax-msg" aria-live="polite"></p>
-
-    </section>
-
-    <script>
-
-    (function () {
-
-        var api = <?= json_encode($delegInscripcionApi, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-
-        var torneoId = <?= (int) $tid ?>;
-
-        var qEl = document.getElementById('fvd-del-insc-q');
-
-        var btn = document.getElementById('fvd-del-insc-buscar');
-
-        var list = document.getElementById('fvd-del-insc-res');
-
-        var msg = document.getElementById('fvd-del-insc-msg');
-
-        function render(rows) {
-
-            list.innerHTML = '';
-
-            if (!rows || !rows.length) {
-
-                list.innerHTML = '<li class="fvd-delegado-torneos__ajax-li">Sin resultados.</li>';
-
-                return;
-
-            }
-
-            rows.forEach(function (r) {
-
-                var li = document.createElement('li');
-
-                li.className = 'fvd-delegado-torneos__ajax-li';
-
-                li.textContent = (r.nombre || '') + ' · CI ' + (r.cedula || '') + ' ';
-
-                var b = document.createElement('button');
-
-                b.type = 'button';
-
-                b.textContent = 'Inscribir';
-
-                b.className = 'fvd-delegado-torneos__ajax-inscribir';
-
-                b.onclick = function () {
-
-                    msg.textContent = 'Inscribiendo…';
-
-                    fetch(api, {
-
-                        method: 'POST',
-
-                        credentials: 'same-origin',
-
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-
-                        body: JSON.stringify({ action: 'inscribir', torneo_id: torneoId, atleta_id: parseInt(r.id, 10) })
-
-                    }).then(function (x) { return x.json(); }).then(function (d) {
-
-                        if (d && d.ok) {
-
-                            msg.textContent = d.inscritos ? 'Inscrito.' : 'Ya estaba inscrito o no se pudo.';
-
-                        } else {
-
-                            msg.textContent = (d && d.error) ? d.error : 'Error.';
-
-                        }
-
-                    }).catch(function () { msg.textContent = 'Error de red.'; });
-
-                };
-
-                li.appendChild(b);
-
-                list.appendChild(li);
-
-            });
-
-        }
-
-        function buscar() {
-
-            var q = qEl ? qEl.value.trim() : '';
-
-            if (q.length < 2) {
-
-                if (msg) { msg.textContent = 'Escriba al menos 2 caracteres.'; }
-
-                return;
-
-            }
-
-            if (msg) { msg.textContent = 'Buscando…'; }
-
-            fetch(api + (api.indexOf('?') >= 0 ? '&' : '?') + 'action=buscar&q=' + encodeURIComponent(q) + (torneoId > 0 ? '&torneo_id=' + encodeURIComponent(String(torneoId)) : ''), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
-
-                .then(function (r) { return r.json(); })
-
-                .then(function (d) {
-
-                    if (d && d.ok) {
-
-                        if (msg) { msg.textContent = ''; }
-
-                        render(d.rows || []);
-
-                    } else {
-
-                        if (msg) { msg.textContent = (d && d.error) ? d.error : 'Error.'; }
-
-                    }
-
-                })
-
-                .catch(function () { if (msg) { msg.textContent = 'Error de red.'; } });
-
-        }
-
-        if (btn) { btn.addEventListener('click', buscar); }
-
-        if (qEl) { qEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); buscar(); } }); }
-
-    })();
-
-    </script>
-
-    <?php endif; ?>
 
 </div>
 
@@ -1079,164 +873,6 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 }
 
 .fvd-delegado-torneos__card-foot a { color: #2563eb; font-weight: 600; }
-
-.fvd-delegado-torneos__deuda-box {
-
-    background: #f8fafc;
-
-    border: 1px solid var(--dt-border);
-
-    border-radius: 10px;
-
-    padding: 0.65rem 0.75rem;
-
-    margin-bottom: 0.65rem;
-
-}
-
-.fvd-delegado-torneos__deuda-h {
-
-    font-size: 0.78rem;
-
-    font-weight: 700;
-
-    text-transform: uppercase;
-
-    letter-spacing: 0.04em;
-
-    color: var(--dt-muted);
-
-    margin: 0 0 0.5rem;
-
-}
-
-.fvd-delegado-torneos__deuda-dl {
-
-    margin: 0;
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 0.35rem;
-
-}
-
-.fvd-delegado-torneos__deuda-dl > div {
-
-    display: flex;
-
-    justify-content: space-between;
-
-    align-items: baseline;
-
-    gap: 0.5rem;
-
-    font-size: 0.78rem;
-
-    border-bottom: 1px dashed var(--dt-border);
-
-    padding-bottom: 0.3rem;
-
-}
-
-.fvd-delegado-torneos__deuda-dl > div:last-child { border-bottom: none; }
-
-.fvd-delegado-torneos__deuda-dl dt { margin: 0; color: #475569; font-weight: 600; }
-
-.fvd-delegado-torneos__deuda-dl dd { margin: 0; font-weight: 700; color: #0f172a; text-align: right; }
-
-.fvd-delegado-torneos__deuda-n { font-weight: 500; color: var(--dt-muted); font-size: 0.7rem; }
-
-.fvd-delegado-torneos__deuda-total dt, .fvd-delegado-torneos__deuda-total dd { font-size: 0.88rem; color: #0f172a; }
-
-.fvd-delegado-torneos__deuda-empty { margin: 0; font-size: 0.75rem; color: var(--dt-muted); line-height: 1.4; }
-
-.fvd-delegado-torneos__ajax {
-
-    margin-top: 1.1rem;
-
-    padding: 0.85rem 1rem;
-
-    background: var(--dt-card);
-
-    border: 1px solid var(--dt-border);
-
-    border-radius: 12px;
-
-}
-
-.fvd-delegado-torneos__ajax-h { font-size: 0.95rem; margin: 0 0 0.35rem; }
-
-.fvd-delegado-torneos__ajax-p { font-size: 0.75rem; color: var(--dt-muted); margin: 0 0 0.5rem; }
-
-.fvd-delegado-torneos__ajax-l { font-size: 0.7rem; color: var(--dt-muted); display: block; margin-bottom: 0.25rem; }
-
-.fvd-delegado-torneos__ajax-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.35rem; }
-
-.fvd-delegado-torneos__ajax-input {
-
-    padding: 0.4rem 0.55rem;
-
-    font-size: 0.8125rem;
-
-    border: 1px solid var(--dt-border);
-
-    border-radius: 6px;
-
-    max-width: 16rem;
-
-    background: #fff;
-
-    color: #0f172a;
-
-}
-
-.fvd-delegado-torneos__ajax-btn {
-
-    padding: 0.4rem 0.75rem;
-
-    font-size: 0.8125rem;
-
-    border-radius: 6px;
-
-    border: 1px solid #cbd5e1;
-
-    background: #e2e8f0;
-
-    cursor: pointer;
-
-    font-weight: 600;
-
-    color: #1e293b;
-
-}
-
-.fvd-delegado-torneos__ajax-ul { list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; max-height: 10rem; overflow: auto; }
-
-.fvd-delegado-torneos__ajax-li { padding: 0.35rem 0; border-bottom: 1px solid var(--dt-border); display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
-
-.fvd-delegado-torneos__ajax-inscribir {
-
-    padding: 0.2rem 0.5rem;
-
-    font-size: 0.72rem;
-
-    border-radius: 4px;
-
-    border: 1px solid #94a3b8;
-
-    background: #f1f5f9;
-
-    cursor: pointer;
-
-    font-weight: 600;
-
-    color: #1e293b;
-
-}
-
-.fvd-delegado-torneos__ajax-msg { font-size: 0.75rem; color: var(--dt-muted); min-height: 1rem; margin: 0.35rem 0 0; }
 
 </style>
 

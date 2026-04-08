@@ -93,7 +93,157 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
     color: var(--fvd-fg, #e5e5e5);
     border: 1px solid var(--fvd-border, rgba(255,255,255,.2));
 }
+.fvd-rep-stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
+    margin: 0 0 12px;
+}
+.fvd-rep-stat {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--fvd-border, rgba(255,255,255,.15));
+    background: rgba(0,0,0,.12);
+    font-size: 0.75rem;
+    line-height: 1.25;
+}
+.fvd-rep-stat__k {
+    color: var(--fvd-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 2px;
+}
+.fvd-rep-stat__v {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--fvd-fg, #f5f5f5);
+}
+.fvd-rep-stat--club {
+    flex: 1 1 12rem;
+    border-color: var(--fvd-amarillo, rgba(251,191,36,.45));
+    background: rgba(251,191,36,.08);
+}
+.fvd-rep-gestion {
+    font-size: 0.8125rem;
+    color: var(--fvd-muted);
+    margin: 0 0 14px;
+}
+.fvd-rep-gestion a { color: inherit; text-decoration: underline; }
+.fvd-rep-stats--deuda { margin-top: 10px; }
+.fvd-rep-deuda-note {
+    font-size: 0.75rem;
+    color: var(--fvd-muted);
+    margin: 0 0 8px;
+    max-width: 48rem;
+}
+.fvd-rep-deuda-empty {
+    font-size: 0.8125rem;
+    color: var(--fvd-muted);
+    margin: 10px 0 0;
+    max-width: 48rem;
+}
+.fvd-rep-stat__n { font-weight: 600; color: var(--fvd-muted); font-size: 0.8rem; }
+.fvd-rep-stat--total {
+    border-color: var(--fvd-amarillo, rgba(251,191,36,.45));
+    background: rgba(251,191,36,.1);
+}
 </style>
+
+<?php
+$fvdRepStats = $fvdRepStats ?? null;
+$fmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
+?>
+<?php if (is_array($fvdRepStats)): ?>
+<div class="fvd-rep-stats" aria-label="Estadísticas de la asociación en este torneo">
+    <div class="fvd-rep-stat fvd-rep-stat--club">
+        <span class="fvd-rep-stat__k">Asociación</span>
+        <span class="fvd-rep-stat__v"><?= htmlspecialchars($fvdRepStats['asoc_nombre'] !== '' ? $fvdRepStats['asoc_nombre'] : ('#' . (int) ($fvdRepStats['asociacion_id'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></span>
+    </div>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Inscritos</span>
+        <span class="fvd-rep-stat__v"><?= (int) ($fvdRepStats['n_inscritos'] ?? 0) ?></span>
+    </div>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Carnet</span>
+        <span class="fvd-rep-stat__v"><?= (int) ($fvdRepStats['n_carnets'] ?? 0) ?></span>
+    </div>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Afiliación</span>
+        <span class="fvd-rep-stat__v"><?= (int) ($fvdRepStats['n_afiliados'] ?? 0) ?></span>
+    </div>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Deuda (Bs ref.)</span>
+        <span class="fvd-rep-stat__v"><?= $fmtN((float) ($fvdRepStats['monto_total_bs'] ?? 0)) ?></span>
+    </div>
+    <?php if (($fvdRepStats['monto_total_eur'] ?? null) !== null && (float) $fvdRepStats['monto_total_eur'] > 0): ?>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Deuda (EUR)</span>
+        <span class="fvd-rep-stat__v"><?= $fmtN((float) $fvdRepStats['monto_total_eur']) ?> €</span>
+    </div>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Pagado (EUR)</span>
+        <span class="fvd-rep-stat__v"><?= $fmtN((float) ($fvdRepStats['pagado_eur'] ?? 0)) ?> €</span>
+    </div>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Saldo (EUR)</span>
+        <span class="fvd-rep-stat__v"><?= $fmtN((float) ($fvdRepStats['saldo_eur'] ?? 0)) ?> €</span>
+    </div>
+    <?php else: ?>
+    <div class="fvd-rep-stat">
+        <span class="fvd-rep-stat__k">Pagado (EUR cont.)</span>
+        <span class="fvd-rep-stat__v"><?= $fmtN((float) ($fvdRepStats['pagado_eur'] ?? 0)) ?> €</span>
+    </div>
+    <?php endif; ?>
+</div>
+<?php
+$dRow = $fvdRepStats['deuda'] ?? null;
+if (is_array($dRow)):
+?>
+    <?php if (($fvdRepStats['monto_total_eur'] ?? null) !== null && (float) $fvdRepStats['monto_total_eur'] > 0): ?>
+    <p class="fvd-rep-deuda-note">Montos por concepto en referencia de <strong>deuda</strong> (si <code>monto_total_eur</code> &gt; 0, la deuda canónica es en <strong>EUR</strong>; los pagos descuentan en EUR según recibos).</p>
+    <?php endif; ?>
+    <div class="fvd-rep-stats fvd-rep-stats--deuda" aria-label="Deuda detallada por concepto">
+        <div class="fvd-rep-stat">
+            <span class="fvd-rep-stat__k">Inscritos</span>
+            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_inscritos'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_inscritos'] ?? 0) ?>)</span></span>
+        </div>
+        <div class="fvd-rep-stat">
+            <span class="fvd-rep-stat__k">Afiliaciones</span>
+            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_afiliados'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_afiliados'] ?? 0) ?>)</span></span>
+        </div>
+        <div class="fvd-rep-stat">
+            <span class="fvd-rep-stat__k">Anualidad</span>
+            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_anualidad'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_anualidad'] ?? 0) ?>)</span></span>
+        </div>
+        <div class="fvd-rep-stat">
+            <span class="fvd-rep-stat__k">Carnets</span>
+            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_carnets'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_carnets'] ?? 0) ?>)</span></span>
+        </div>
+        <div class="fvd-rep-stat">
+            <span class="fvd-rep-stat__k">Traspasos</span>
+            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_traspasos'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_traspasos'] ?? 0) ?>)</span></span>
+        </div>
+        <div class="fvd-rep-stat fvd-rep-stat--total">
+            <span class="fvd-rep-stat__k">Total</span>
+            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_total'] ?? 0)) ?></span>
+        </div>
+    </div>
+<?php else: ?>
+    <p class="fvd-rep-deuda-empty">No hay fila de deuda para este torneo y asociación en <code>deuda_asociaciones</code>. Puede generarla desde el panel del delegado o desde el módulo de deudas.</p>
+<?php endif; ?>
+<?php endif; ?>
+
+<p class="fvd-rep-gestion">
+    Gestión:
+    <a href="<?= htmlspecialchars($fvdUrlDeuda . '?action=form&tid=' . $tSel . '&aid=' . $aSel, ENT_QUOTES, 'UTF-8') ?>">Deuda / actualizar desde atletas</a>
+    · <a href="<?= htmlspecialchars($fvdUrlPagos, ENT_QUOTES, 'UTF-8') ?>">Relación de pagos</a>
+</p>
 
 <div class="fvd-rep-two-col">
     <section class="fvd-card" style="padding:14px;margin:0;display:flex;flex-direction:column;height:100%">
@@ -129,7 +279,7 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
 
     <section class="fvd-card" style="padding:14px;margin:0;display:flex;flex-direction:column;height:100%">
         <h2 style="margin:0 0 6px;font-size:1.05rem">Finanzas</h2>
-        <p style="margin:0 0 12px;font-size:0.8125rem;color:var(--fvd-muted);flex-shrink:0">Deuda, pagos y estado de cuenta para esta asociación.</p>
+        <p style="margin:0 0 12px;font-size:0.8125rem;color:var(--fvd-muted);flex-shrink:0">Deuda, pagos y estado de cuenta (los totales arriba son de esta asociación y torneo).</p>
         <div style="flex:1;display:flex;flex-direction:column;gap:0">
             <div class="fvd-rep-opt">
                 <p class="fvd-rep-opt__title">Deuda generada detallada por concepto</p>
@@ -156,11 +306,6 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
                 </div>
             </div>
         </div>
-        <p style="font-size:0.8125rem;color:var(--fvd-muted);margin:14px 0 0;padding-top:10px;border-top:1px solid var(--fvd-border, rgba(255,255,255,.1))">
-            Gestión:
-            <a href="<?= htmlspecialchars($fvdUrlDeuda . '?action=form&tid=' . $tSel . '&aid=' . $aSel, ENT_QUOTES, 'UTF-8') ?>">Deuda / actualizar desde atletas</a>
-            · <a href="<?= htmlspecialchars($fvdUrlPagos, ENT_QUOTES, 'UTF-8') ?>">Relación de pagos</a>
-        </p>
     </section>
 </div>
 
