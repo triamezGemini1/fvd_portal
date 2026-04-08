@@ -257,7 +257,7 @@ final class InscripcionService
 
     public static function validarIndividual(PDO $pdo, int $atletaId, int $torneoId, int $asociacionId): void
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         $torneo = self::torneoReglas($pdo, $torneoId);
@@ -276,7 +276,7 @@ final class InscripcionService
 
     public static function validarPareja(PDO $pdo, int $atleta1Id, int $atleta2Id, int $torneoId, int $asociacionId): void
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         if ($atleta1Id === $atleta2Id) {
@@ -323,7 +323,7 @@ final class InscripcionService
      */
     public static function validarEquipo(PDO $pdo, array $atletasIds, int $torneoId, int $asociacionId): void
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         $torneo = self::torneoReglas($pdo, $torneoId);
@@ -512,7 +512,7 @@ final class InscripcionService
      */
     public static function registrarMultiplesIndividuales(PDO $pdo, int $torneoId, int $asociacionId, array $atletaIds): int
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         $atletaIds = array_values(array_unique(array_filter(array_map('intval', $atletaIds), static function (int $x): bool {
@@ -607,7 +607,14 @@ final class InscripcionService
         }
     }
 
+    private static function delegadoInscripcionRelajada(): bool
+    {
+        return \AuthService::isDelegadoAsociacion();
+    }
+
     /**
+     * Solo evita duplicado en el mismo torneo. Si venía inscrito en otro, el UPDATE de bandera reasigna torneo_id.
+     *
      * @param array<string, mixed> $atletaRow
      */
     public static function assertAtletaDisponibleParaTorneoBandera(array $atletaRow, int $torneoId): void
@@ -617,14 +624,11 @@ final class InscripcionService
         if ($insc === 1 && $tid === $torneoId) {
             throw new InvalidArgumentException('El atleta ya figura inscrito en este torneo.');
         }
-        if ($insc === 1 && $tid !== 0 && $tid !== $torneoId) {
-            throw new InvalidArgumentException('El atleta ya figura inscrito en otro torneo; retire esa inscripción primero.');
-        }
     }
 
     public static function validarIndividualBandera(PDO $pdo, int $atletaId, int $torneoId, int $asociacionId): void
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         $torneo = self::torneoReglas($pdo, $torneoId);
@@ -637,13 +641,15 @@ final class InscripcionService
         }
         self::assertConvocatoria($pdo, $torneoId, $asociacionId);
         $row = self::atletaEnAsociacion($pdo, $atletaId, $asociacionId);
-        self::assertSolvenciaYActivo($row);
+        if (!self::delegadoInscripcionRelajada()) {
+            self::assertSolvenciaYActivo($row);
+        }
         self::assertAtletaDisponibleParaTorneoBandera($row, $torneoId);
     }
 
     public static function validarParejaBandera(PDO $pdo, int $atleta1Id, int $atleta2Id, int $torneoId, int $asociacionId): void
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         if ($atleta1Id === $atleta2Id) {
@@ -660,8 +666,10 @@ final class InscripcionService
         self::assertConvocatoria($pdo, $torneoId, $asociacionId);
         $r1 = self::atletaEnAsociacion($pdo, $atleta1Id, $asociacionId);
         $r2 = self::atletaEnAsociacion($pdo, $atleta2Id, $asociacionId);
-        self::assertSolvenciaYActivo($r1);
-        self::assertSolvenciaYActivo($r2);
+        if (!self::delegadoInscripcionRelajada()) {
+            self::assertSolvenciaYActivo($r1);
+            self::assertSolvenciaYActivo($r2);
+        }
         self::assertAtletaDisponibleParaTorneoBandera($r1, $torneoId);
         self::assertAtletaDisponibleParaTorneoBandera($r2, $torneoId);
     }
@@ -671,7 +679,7 @@ final class InscripcionService
      */
     public static function validarEquipoBandera(PDO $pdo, array $atletasIds, int $torneoId, int $asociacionId): void
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         $torneo = self::torneoReglas($pdo, $torneoId);
@@ -700,7 +708,9 @@ final class InscripcionService
         self::assertConvocatoria($pdo, $torneoId, $asociacionId);
         foreach (array_keys($uniq) as $aid) {
             $row = self::atletaEnAsociacion($pdo, (int) $aid, $asociacionId);
-            self::assertSolvenciaYActivo($row);
+            if (!self::delegadoInscripcionRelajada()) {
+                self::assertSolvenciaYActivo($row);
+            }
             self::assertAtletaDisponibleParaTorneoBandera($row, $torneoId);
         }
     }
@@ -746,7 +756,9 @@ final class InscripcionService
                 throw new InvalidArgumentException('Modalidad individual: seleccione exactamente un atleta.');
             }
             self::validarIndividualBandera($pdo, $atletaIds[0], $torneoId, $asociacionId);
-            self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, 1);
+            if (!self::delegadoInscripcionRelajada()) {
+                self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, 1);
+            }
 
             return self::marcarInscripcionBandera($pdo, $torneoId, $asociacionId, $atletaIds);
         }
@@ -756,7 +768,9 @@ final class InscripcionService
                 throw new InvalidArgumentException('Modalidad parejas: seleccione exactamente dos atletas.');
             }
             self::validarParejaBandera($pdo, $atletaIds[0], $atletaIds[1], $torneoId, $asociacionId);
-            self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, 2);
+            if (!self::delegadoInscripcionRelajada()) {
+                self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, 2);
+            }
             $pdo->beginTransaction();
             try {
                 $n = self::marcarInscripcionBandera($pdo, $torneoId, $asociacionId, $atletaIds);
@@ -778,7 +792,9 @@ final class InscripcionService
             throw new InvalidArgumentException("Modalidad equipos: se requieren {$need} integrantes.");
         }
         self::validarEquipoBandera($pdo, $atletaIds, $torneoId, $asociacionId);
-        self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, count($atletaIds));
+        if (!self::delegadoInscripcionRelajada()) {
+            self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, count($atletaIds));
+        }
         $pdo->beginTransaction();
         try {
             $n = self::marcarInscripcionBandera($pdo, $torneoId, $asociacionId, $atletaIds);
@@ -796,7 +812,7 @@ final class InscripcionService
      */
     public static function registrarMultiplesIndividualesBandera(PDO $pdo, int $torneoId, int $asociacionId, array $atletaIds): int
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede inscribir para otra asociación.');
         }
         $atletaIds = array_values(array_unique(array_filter(array_map('intval', $atletaIds), static function (int $x): bool {
@@ -819,7 +835,9 @@ final class InscripcionService
         foreach ($atletaIds as $id) {
             self::validarIndividualBandera($pdo, (int) $id, $torneoId, $asociacionId);
         }
-        self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, count($atletaIds));
+        if (!self::delegadoInscripcionRelajada()) {
+            self::assertCupoParaNuevasPlazasBandera($pdo, $torneoId, $asociacionId, count($atletaIds));
+        }
         $pdo->beginTransaction();
         try {
             $n = self::marcarInscripcionBandera($pdo, $torneoId, $asociacionId, $atletaIds);
@@ -834,7 +852,7 @@ final class InscripcionService
 
     public static function retirarInscripcionBandera(PDO $pdo, int $torneoId, int $asociacionId, int $atletaId): bool
     {
-        if (!AuthService::canManageAsociacion($asociacionId)) {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('No puede retirar inscripciones de otra asociación.');
         }
         $st = $pdo->prepare(
@@ -842,6 +860,26 @@ final class InscripcionService
              WHERE id = :id AND asociacion = :a AND torneo_id = :t AND COALESCE(inscripcion, 0) = 1'
         );
         $st->execute([':id' => $atletaId, ':a' => $asociacionId, ':t' => $torneoId]);
+
+        return $st->rowCount() > 0;
+    }
+
+    /**
+     * Quita una fila de inscripción individual (equipo = 0) en `inscripcion_torneo`.
+     */
+    public static function retirarInscripcionTablaIndividual(PDO $pdo, int $torneoId, int $asociacionId, int $cedulaNum): bool
+    {
+        if (!\AuthService::canManageAsociacion($asociacionId)) {
+            throw new RuntimeException('No puede retirar inscripciones de otra asociación.');
+        }
+        if ($cedulaNum <= 0) {
+            throw new InvalidArgumentException('Cédula no válida.');
+        }
+        $st = $pdo->prepare(
+            'DELETE FROM inscripcion_torneo
+             WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c AND equipo = 0 LIMIT 1'
+        );
+        $st->execute([':t' => $torneoId, ':a' => $asociacionId, ':c' => $cedulaNum]);
 
         return $st->rowCount() > 0;
     }
@@ -861,5 +899,106 @@ final class InscripcionService
         $st->execute([':a' => $asociacionId, ':t' => $torneoId]);
 
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public static function normalizarSexoAtletaParaSelect(mixed $sx): string
+    {
+        $u = strtoupper(trim((string) $sx));
+        if ($u === 'F' || $u === '2' || str_contains($u, 'MUJ')) {
+            return 'F';
+        }
+        if ($u === 'M' || $u === '1' || str_contains($u, 'HOM')) {
+            return 'M';
+        }
+
+        return 'O';
+    }
+
+    /**
+     * Búsqueda por cédula para flujo tipo «inscripción en sitio» (MisTorneos).
+     *
+     * @return array{
+     *   resultado: 'ya_inscrito'|'atleta'|'no_encontrado'|'error',
+     *   mensaje?: string,
+     *   atleta?: array{id:int,nombre:string,cedula:string,numfvd:int,sexo:string,foto:string}
+     * }
+     */
+    public static function buscarCedulaInscripcionSitio(
+        PDO $pdo,
+        int $torneoId,
+        int $asociacionId,
+        string $nacionalidad,
+        string $cedulaDigitos,
+        bool $modoBandera
+    ): array {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return ['resultado' => 'error', 'mensaje' => 'Torneo o asociación no válidos.'];
+        }
+        $nac = strtoupper(trim($nacionalidad));
+        if (!in_array($nac, ['V', 'E', 'J', 'P'], true)) {
+            $nac = 'V';
+        }
+        $dig = preg_replace('/\D+/', '', $cedulaDigitos);
+        if (strlen($dig) < 4) {
+            return ['resultado' => 'error', 'mensaje' => 'Indique al menos 4 dígitos de cédula.'];
+        }
+        $cedInt = (int) $dig;
+        if ($cedInt <= 0) {
+            return ['resultado' => 'error', 'mensaje' => 'Cédula no válida.'];
+        }
+
+        if ($modoBandera) {
+            $stY = $pdo->prepare(
+                'SELECT 1 FROM atletas WHERE asociacion = :a AND torneo_id = :t AND COALESCE(inscripcion, 0) = 1
+                 AND REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(cedula)), \'V\', \'\'), \'E\', \'\'), \'J\', \'\'), \'P\', \'\') = :d
+                 LIMIT 1'
+            );
+            $stY->execute([':a' => $asociacionId, ':t' => $torneoId, ':d' => $dig]);
+            if ($stY->fetchColumn()) {
+                return ['resultado' => 'ya_inscrito', 'mensaje' => 'Esta cédula ya está inscrita en este torneo.'];
+            }
+        } else {
+            $stY = $pdo->prepare(
+                'SELECT 1 FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c LIMIT 1'
+            );
+            $stY->execute([':t' => $torneoId, ':a' => $asociacionId, ':c' => $cedInt]);
+            if ($stY->fetchColumn()) {
+                return ['resultado' => 'ya_inscrito', 'mensaje' => 'Esta cédula ya está inscrita en este torneo.'];
+            }
+        }
+
+        $nacDig = $nac . $dig;
+        $st = $pdo->prepare(
+            'SELECT id, cedula, nombre, numfvd, sexo, foto FROM atletas WHERE asociacion = :a
+             AND (
+                REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(cedula)), \'V\', \'\'), \'E\', \'\'), \'J\', \'\'), \'P\', \'\') = :d
+                OR TRIM(cedula) = :digOnly
+                OR TRIM(cedula) = :nacDig
+             )'
+        );
+        $st->execute([':a' => $asociacionId, ':d' => $dig, ':digOnly' => $dig, ':nacDig' => $nacDig]);
+        $found = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (count($found) > 1) {
+            return ['resultado' => 'error', 'mensaje' => 'Hay más de un atleta con esa cédula en el club. Corrija el maestro de atletas.'];
+        }
+        if ($found === []) {
+            return [
+                'resultado' => 'no_encontrado',
+                'mensaje' => 'No hay atleta con esa cédula en su asociación. Regístrelo en Atletas y vuelva a buscar.',
+            ];
+        }
+        $a = $found[0];
+
+        return [
+            'resultado' => 'atleta',
+            'atleta' => [
+                'id' => (int) ($a['id'] ?? 0),
+                'nombre' => (string) ($a['nombre'] ?? ''),
+                'cedula' => (string) ($a['cedula'] ?? ''),
+                'numfvd' => (int) ($a['numfvd'] ?? 0),
+                'sexo' => self::normalizarSexoAtletaParaSelect($a['sexo'] ?? 'M'),
+                'foto' => isset($a['foto']) ? (string) $a['foto'] : '',
+            ],
+        ];
     }
 }

@@ -15,9 +15,11 @@ require_once __DIR__ . '/ReportService.php';
 final class TorneoDelegadoTarjetaService
 {
     /**
+     * @param list<int>|null $soloAsociacionIds Si no es null, solo tarjetas para notificaciones de esas asociaciones.
+     *
      * @return array{generados: int, sin_dompdf: bool}
      */
-    public static function generarTarjetasParaTorneo(PDO $pdo, int $torneoId, string $projectRoot): array
+    public static function generarTarjetasParaTorneo(PDO $pdo, int $torneoId, string $projectRoot, ?array $soloAsociacionIds = null): array
     {
         if ($torneoId <= 0) {
             return ['generados' => 0, 'sin_dompdf' => false];
@@ -39,15 +41,36 @@ final class TorneoDelegadoTarjetaService
             return ['generados' => 0, 'sin_dompdf' => false];
         }
 
-        $stN = $pdo->prepare(
-            'SELECT n.id, n.access_token, n.asociacion_id, n.tarjeta_pdf, d.asociacion_id AS d_asoc, d.email_acceso, d.nombre_contacto,
+        $sqlN = 'SELECT n.id, n.access_token, n.asociacion_id, n.tarjeta_pdf, d.asociacion_id AS d_asoc, d.email_acceso, d.nombre_contacto,
                     a.nombre AS asoc_nombre
              FROM fvd_delegado_notif_torneo n
              INNER JOIN delegados d ON d.id = n.delegado_id
              LEFT JOIN asociaciones a ON a.id = COALESCE(n.asociacion_id, d.asociacion_id)
-             WHERE n.torneo_id = :t AND n.access_token IS NOT NULL AND TRIM(n.access_token) <> \'\''
-        );
-        $stN->execute([':t' => $torneoId]);
+             WHERE n.torneo_id = :t AND n.access_token IS NOT NULL AND TRIM(n.access_token) <> \'\'';
+        $paramsN = [':t' => $torneoId];
+        if ($soloAsociacionIds !== null) {
+            $ids = [];
+            foreach ($soloAsociacionIds as $v) {
+                $i = (int) $v;
+                if ($i > 0) {
+                    $ids[$i] = true;
+                }
+            }
+            $ids = array_keys($ids);
+            if ($ids === []) {
+                return ['generados' => 0, 'sin_dompdf' => false];
+            }
+            sort($ids, SORT_NUMERIC);
+            $ph = [];
+            foreach ($ids as $k => $ida) {
+                $p = ':asoc' . $k;
+                $ph[] = $p;
+                $paramsN[$p] = $ida;
+            }
+            $sqlN .= ' AND COALESCE(n.asociacion_id, d.asociacion_id) IN (' . implode(', ', $ph) . ')';
+        }
+        $stN = $pdo->prepare($sqlN);
+        $stN->execute($paramsN);
         $rows = $stN->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         $uploadDir = $projectRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;

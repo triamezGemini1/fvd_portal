@@ -72,9 +72,44 @@ try {
         $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
         $perPage = isset($_GET['per_page']) ? max(1, min(24, (int) $_GET['per_page'])) : 8;
         $tidBus = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : 0;
+        if (AuthService::isDelegadoAsociacion() && $tidBus > 0 && !$svc->delegadoTorneoInscripcionPermitido($asoc, $tidBus)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Torneo no permitido en su evento actual.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $omitirTor = (AuthService::isDelegadoAsociacion() && $tidBus > 0) ? $tidBus : null;
         $pack = $svc->atletasBuscarInscripcionPaginado($asoc, $q, $page, $perPage, $omitirTor);
         echo json_encode(['ok' => true] + $pack, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($method === 'GET' && ($_GET['action'] ?? '') === 'buscar_cedula_sitio') {
+        $tid = (int) ($_GET['torneo_id'] ?? 0);
+        $nac = (string) ($_GET['nacionalidad'] ?? 'V');
+        $ced = (string) ($_GET['cedula'] ?? '');
+        if ($tid <= 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'torneo_id requerido.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (AuthService::isDelegadoAsociacion() && !$svc->delegadoTorneoInscripcionPermitido($asoc, $tid)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Torneo no permitido en su evento actual.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $modoBandera = AuthService::isDelegadoAsociacion();
+        if (!$modoBandera && !$svc->torneosInscripcionTorneoTableExists()) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Falta la tabla inscripcion_torneo para este modo.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $r = InscripcionService::buscarCedulaInscripcionSitio($pdo, $tid, $asoc, $nac, $ced, $modoBandera);
+        if (($r['resultado'] ?? '') === 'error') {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => $r['mensaje'] ?? 'Error'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        echo json_encode(['ok' => true] + $r, JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -85,13 +120,10 @@ try {
             echo json_encode(['ok' => false, 'error' => 'torneo_id requerido.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        if (AuthService::isDelegadoAsociacion()) {
-            $ctx = AuthService::delegadoTorneoContextId();
-            if ($ctx !== null && $ctx > 0 && $ctx !== $tid) {
-                http_response_code(403);
-                echo json_encode(['ok' => false, 'error' => 'En modo torneo solo el evento activo.'], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
+        if (AuthService::isDelegadoAsociacion() && !$svc->delegadoTorneoInscripcionPermitido($asoc, $tid)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Torneo no permitido en su evento actual.'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
         $meta = $svc->torneoInscripcionMetaParaVista($tid, $asoc);
         if ($meta === null) {
@@ -123,13 +155,10 @@ try {
             exit;
         }
 
-        if (AuthService::isDelegadoAsociacion()) {
-            $ctx = AuthService::delegadoTorneoContextId();
-            if ($ctx !== null && $ctx > 0 && $ctx !== $torneoId) {
-                http_response_code(403);
-                echo json_encode(['ok' => false, 'error' => 'En modo torneo solo puede inscribir en el evento activo.'], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
+        if (AuthService::isDelegadoAsociacion() && !$svc->delegadoTorneoInscripcionPermitido($asoc, $torneoId)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Torneo no permitido en su evento actual.'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
         if ($action === 'inscribir' && isset($data['atleta_id']) && !isset($data['atleta_ids'])) {
@@ -177,6 +206,28 @@ try {
                 exit;
             }
             $ok = InscripcionService::retirarInscripcionBandera($pdo, $torneoId, $asoc, $aid);
+            echo json_encode(['ok' => true, 'retirado' => $ok], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($action === 'retirar_tabla') {
+            if (AuthService::isDelegadoAsociacion()) {
+                http_response_code(403);
+                echo json_encode(['ok' => false, 'error' => 'Los delegados retiran con la acción retirar (bandera en atletas).'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            if (!$svc->torneosInscripcionTorneoTableExists()) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'La tabla inscripcion_torneo no está disponible.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $ced = (int) ($data['cedula'] ?? 0);
+            if ($ced <= 0) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'cedula (numérica) requerida.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $ok = InscripcionService::retirarInscripcionTablaIndividual($pdo, $torneoId, $asoc, $ced);
             echo json_encode(['ok' => true, 'retirado' => $ok], JSON_UNESCAPED_UNICODE);
             exit;
         }

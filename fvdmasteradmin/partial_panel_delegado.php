@@ -74,6 +74,20 @@ $asocNombre = isset($fvd_topbar_asoc_nombre) ? (string) $fvd_topbar_asoc_nombre 
 
 $asocLogo = isset($fvd_topbar_asoc_logo_url) ? $fvd_topbar_asoc_logo_url : null;
 
+if (!function_exists('fvd_asoc_hero_h2_linea')) {
+
+    require_once __DIR__ . '/includes/fvd_asociacion_helpers.php';
+
+}
+
+$delegHeroH2 = fvd_asoc_hero_h2_linea(
+
+    isset($fvd_topbar_asoc_nombre_raw) ? (string) $fvd_topbar_asoc_nombre_raw : '',
+
+    $asocNombre
+
+);
+
 $fvdDelegDeudaGenErr = '';
 
 if (isset($_SESSION['fvd_delegado_deuda_err'])) {
@@ -124,9 +138,19 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 <?php endif; ?>
 
+<?php if (($delegNotifNoVistas ?? 0) > 0): ?>
+
+<div class="fvd-deleg-alert-invites" role="status" aria-live="polite">
+
+    <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene <?= (int) $delegNotifNoVistas ?> notificación(es) sin abrir. Revise el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones a torneos</a> o el enlace <strong>Invitaciones</strong> en la barra superior.</span>
+
+</div>
+
+<?php endif; ?>
+
 <?php if (($delegNotifs ?? []) !== []): ?>
 
-<section class="fvd-deleg-notif-wrap">
+<section id="fvd-deleg-torneos-invites" class="fvd-deleg-notif-wrap" aria-label="Invitaciones a torneos">
 
     <h2 class="fvd-deleg-notif-wrap__h">Invitaciones a torneos <?= ($delegNotifNoVistas ?? 0) > 0 ? ' (' . (int) $delegNotifNoVistas . ' sin abrir)' : '' ?></h2>
 
@@ -198,13 +222,9 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
         <div class="fvd-delegado-torneos__hero-text">
 
-            <h1 class="fvd-delegado-torneos__title">Panel de administración de torneos</h1>
+            <h2 class="fvd-delegado-torneos__title"><?= htmlspecialchars($delegHeroH2, ENT_QUOTES, 'UTF-8') ?></h2>
 
-            <?php if ($asocNombre !== ''): ?>
-
-                <p class="fvd-delegado-torneos__asoc"><?= htmlspecialchars($asocNombre, ENT_QUOTES, 'UTF-8') ?></p>
-
-            <?php endif; ?>
+            <h3 class="fvd-delegado-torneos__subtitle">Panel de administración de torneos</h3>
 
             <?php if ($tidInt > 0 && $tnom !== ''): ?>
 
@@ -600,6 +620,46 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 <style>
 
+.fvd-deleg-alert-invites {
+
+    margin: 0 auto 0.85rem;
+
+    max-width: 72rem;
+
+    padding: 0.65rem 0.85rem;
+
+    border-radius: 10px;
+
+    border: 1px solid rgba(245, 158, 11, 0.55);
+
+    background: linear-gradient(135deg, rgba(254, 243, 199, 0.95), rgba(253, 230, 138, 0.88));
+
+    color: #78350f;
+
+    font-size: 0.8125rem;
+
+    line-height: 1.45;
+
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+
+}
+
+.fvd-deleg-alert-invites__text a {
+
+    color: #b45309;
+
+    font-weight: 700;
+
+    text-decoration: underline;
+
+}
+
+#fvd-deleg-torneos-invites {
+
+    scroll-margin-top: 4.5rem;
+
+}
+
 .fvd-deleg-notif-wrap {
 
     margin-bottom: 1rem;
@@ -732,33 +792,35 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 .fvd-delegado-torneos__title {
 
-    font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+    font-size: clamp(1.2rem, 2.6vw, 1.55rem);
 
     font-weight: 700;
 
-    margin: 0 0 0.25rem;
+    margin: 0 0 0.35rem;
 
     color: var(--dt-text);
 
-    line-height: 1.2;
+    line-height: 1.25;
 
 }
 
-.fvd-delegado-torneos__asoc {
+.fvd-delegado-torneos__subtitle {
 
-    margin: 0;
-
-    font-size: 1rem;
+    font-size: clamp(0.95rem, 2vw, 1.12rem);
 
     font-weight: 600;
 
+    margin: 0 0 0.15rem;
+
     color: #334155;
+
+    line-height: 1.3;
 
 }
 
 .fvd-delegado-torneos__ctx {
 
-    margin: 0.35rem 0 0;
+    margin: 0.5rem 0 0;
 
     font-size: 0.8125rem;
 

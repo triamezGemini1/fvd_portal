@@ -8,7 +8,7 @@ fvd_admin_require_roles();
 
 $svc = new FvdAdminService();
 $selfUrl = fvd_master_module_url('torneo_inscripcion/index.php');
-$fvd_page_title = 'Inscribir al torneo';
+$fvd_page_title = 'Inscripción';
 $fvd_error = '';
 $fvd_ok = '';
 
@@ -38,6 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'insc
                     : 'Faltan tablas: ejecute install_inscripcion_torneo.sql y install_torneo_convocatoria_y_publicacion.sql'
             );
         }
+        if ($esDelegadoBandera && !$svc->delegadoTorneoInscripcionPermitido($asocId, $tor)) {
+            throw new InvalidArgumentException('Torneo no permitido para su evento actual.');
+        }
         if ($esDelegadoBandera) {
             $n = \FvdPortal\Services\InscripcionService::registrarMultiplesIndividualesBandera(fvd_db(), $tor, $asocId, $ids);
         } else {
@@ -52,9 +55,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'insc
 
 $torneoSel = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : (isset($_POST['torneo_id']) ? (int) $_POST['torneo_id'] : 0);
 
+$torneosAbiertos = [];
+$asociacionesSelect = [];
+$fvdDelegadoGrupoTorneos = [];
+if ($tablasOk && $asocId > 0) {
+    $torneosAbiertos = $svc->torneosAbiertosInscripcionParaAsociacion($asocId);
+}
+
 if (AuthService::isDelegadoAsociacion()) {
     $ctxTor = AuthService::delegadoTorneoContextId();
-    if ($ctxTor !== null && $ctxTor > 0) {
+    if ($ctxTor !== null && $ctxTor > 0 && $tablasOk && $asocId > 0) {
+        $fvdDelegadoGrupoTorneos = $svc->torneosDelegadoGrupoInscripcion($asocId, $ctxTor);
+        $allowedIds = [];
+        foreach ($fvdDelegadoGrupoTorneos as $r) {
+            $tid = (int) ($r['torneo'] ?? 0);
+            if ($tid > 0) {
+                $allowedIds[$tid] = true;
+            }
+        }
+        if ($torneoSel > 0 && $allowedIds !== [] && !isset($allowedIds[$torneoSel])) {
+            header('Location: ' . $selfUrl . '?torneo_id=' . $ctxTor);
+            exit;
+        }
+        if ($torneoSel > 0 && isset($allowedIds[$torneoSel])) {
+            AuthService::setDelegadoTorneoContext($torneoSel);
+        }
+        if ($torneoSel <= 0 && $fvdDelegadoGrupoTorneos !== []) {
+            $first = (int) ($fvdDelegadoGrupoTorneos[0]['torneo'] ?? 0);
+            if ($first > 0) {
+                header('Location: ' . $selfUrl . '?torneo_id=' . $first);
+                exit;
+            }
+        }
+    } elseif ($ctxTor !== null && $ctxTor > 0) {
         if ($torneoSel <= 0 || $torneoSel !== $ctxTor) {
             header('Location: ' . $selfUrl . '?torneo_id=' . $ctxTor);
             exit;
@@ -62,10 +95,16 @@ if (AuthService::isDelegadoAsociacion()) {
     }
 }
 
-$torneosAbiertos = [];
-$asociacionesSelect = [];
-if ($tablasOk && $asocId > 0) {
-    $torneosAbiertos = $svc->torneosAbiertosInscripcionParaAsociacion($asocId);
+if (!$esDelegadoBandera && $tablasOk && $asocId > 0 && $torneoSel <= 0 && $torneosAbiertos !== []) {
+    $firstTid = (int) ($torneosAbiertos[0]['torneo'] ?? 0);
+    if ($firstTid > 0) {
+        $params = ['torneo_id' => $firstTid];
+        if ($esFvd) {
+            $params['asociacion_id'] = $asocId;
+        }
+        header('Location: ' . $selfUrl . '?' . http_build_query($params));
+        exit;
+    }
 }
 
 if ($esFvd && $tablasOk) {
@@ -84,10 +123,55 @@ $torneoMeta = ($tablasOk && $torneoSel > 0 && $asocId > 0)
     ? $svc->torneoInscripcionMetaParaVista($torneoSel, $asocId, $esDelegadoBandera ? true : null)
     : null;
 
+if ($torneoMeta !== null && ($torneoMeta['torneo']['nombre'] ?? '') !== '') {
+    $fvd_page_title = (string) $torneoMeta['torneo']['nombre'];
+}
+
 $fvd_inscripcion_bandera_modo = $esDelegadoBandera;
 $inscritosBandera = ($esDelegadoBandera && $torneoSel > 0 && $asocId > 0)
     ? \FvdPortal\Services\InscripcionService::listarInscritosBandera(fvd_db(), $torneoSel, $asocId)
     : [];
+
+$fvdSitioDisponibles = [];
+$fvdSitioInscritos = [];
+if ($tablasOk && $torneoSel > 0 && $asocId > 0) {
+    foreach ($atletasDisp as $row) {
+        $fvdSitioDisponibles[] = [
+            'atleta_id' => (int) ($row['id'] ?? 0),
+            'nombre' => (string) ($row['nombre'] ?? ''),
+            'cedula' => (string) ($row['cedula'] ?? ''),
+            'numfvd' => (int) ($row['numfvd'] ?? 0),
+            'cedula_num' => (int) ($row['_cedula_num'] ?? 0),
+        ];
+    }
+    if ($esDelegadoBandera) {
+        foreach ($inscritosBandera as $ib) {
+            $cedN = (int) preg_replace('/\D+/', '', (string) ($ib['cedula'] ?? ''));
+            $fvdSitioInscritos[] = [
+                'atleta_id' => (int) ($ib['id'] ?? 0),
+                'nombre' => (string) ($ib['nombre'] ?? ''),
+                'cedula' => (string) ($ib['cedula'] ?? ''),
+                'numfvd' => (int) ($ib['numfvd'] ?? 0),
+                'cedula_num' => $cedN,
+                'equipo' => 0,
+            ];
+        }
+    } elseif ($svc->torneosInscripcionTorneoTableExists()) {
+        foreach ($svc->torneosInscritosInscripcionTorneo($torneoSel, $asocId) as $r) {
+            $cedN = (int) preg_replace('/\D+/', '', (string) ($r['cedula'] ?? ''));
+            $fvdSitioInscritos[] = [
+                'atleta_id' => isset($r['atleta_id']) && $r['atleta_id'] !== null ? (int) $r['atleta_id'] : 0,
+                'nombre' => (string) ($r['nombre'] ?? ''),
+                'cedula' => (string) ($r['cedula'] ?? ''),
+                'numfvd' => (int) ($r['numfvd'] ?? 0),
+                'cedula_num' => $cedN,
+                'equipo' => (int) ($r['equipo'] ?? 0),
+            ];
+        }
+    }
+}
+
+$fvdSitioNuevoAtletaUrl = rtrim($appBase, '/') . '/fvdmasteradmin/modules/atletas/index.php?action=form';
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/inscribir.view.php';

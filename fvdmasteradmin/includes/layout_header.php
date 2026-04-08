@@ -144,6 +144,7 @@ $fvd_sn_active = static function (string $key) use ($fvd_sidebar_active): string
 };
 
 $fvd_topbar_asoc_nombre = '';
+$fvd_topbar_asoc_nombre_raw = '';
 $fvd_topbar_asoc_logo_url = null;
 $aidTopbar = AuthService::idAsociacion();
 if ($aidTopbar !== null && $aidTopbar > 0) {
@@ -155,7 +156,8 @@ if ($aidTopbar !== null && $aidTopbar > 0) {
         $stTop->execute([':id' => $aidTopbar]);
         $rowTop = $stTop->fetch(PDO::FETCH_ASSOC);
         if (is_array($rowTop)) {
-            $fvd_topbar_asoc_nombre = fvd_asoc_nombre_sin_prefijo((string) ($rowTop['nombre'] ?? ''));
+            $fvd_topbar_asoc_nombre_raw = (string) ($rowTop['nombre'] ?? '');
+            $fvd_topbar_asoc_nombre = fvd_asoc_nombre_sin_prefijo($fvd_topbar_asoc_nombre_raw);
             $appTop = rtrim((string) env('APP_BASE_PATH', ''), '/');
             $fvd_topbar_asoc_logo_url = fvd_asociacion_logo_public_url(
                 $appTop,
@@ -165,7 +167,23 @@ if ($aidTopbar !== null && $aidTopbar > 0) {
         }
     } catch (Throwable $e) {
         $fvd_topbar_asoc_nombre = '';
+        $fvd_topbar_asoc_nombre_raw = '';
         $fvd_topbar_asoc_logo_url = null;
+    }
+}
+
+$fvd_topbar_deleg_notif_no_vistas = 0;
+if (AuthService::isDelegadoAsociacion()) {
+    try {
+        require_once $fvdProjRoot . '/fvdmasteradmin/config/db.php';
+        require_once $fvdProjRoot . '/src/Services/DelegadoTorneoNotifService.php';
+        $pdoDelegNotif = fvd_db();
+        $fvd_topbar_deleg_notif_no_vistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas(
+            $pdoDelegNotif,
+            (int) AuthService::userId()
+        );
+    } catch (Throwable $e) {
+        $fvd_topbar_deleg_notif_no_vistas = 0;
     }
 }
 
@@ -617,6 +635,39 @@ header('Content-Type: text/html; charset=UTF-8');
             text-overflow: ellipsis;
         }
         .fvd-topbar__actions { justify-self: end; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+        .fvd-topbar__notif-inv {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.28rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: var(--fvd-azul, #2e3092);
+            background: var(--fvd-amarillo, #fff200);
+            border: 1px solid rgba(46, 48, 146, 0.25);
+            line-height: 1.2;
+            max-width: min(42vw, 11rem);
+            white-space: nowrap;
+        }
+        .fvd-topbar__notif-inv:hover {
+            filter: brightness(1.06);
+            color: var(--fvd-azul, #2e3092);
+        }
+        .fvd-topbar__notif-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.15rem;
+            height: 1.15rem;
+            padding: 0 0.28rem;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 800;
+            background: var(--fvd-azul, #2e3092);
+            color: #fff;
+        }
         .fvd-topbar__perfil {
             display: inline-flex;
             align-items: center;
@@ -878,6 +929,12 @@ header('Content-Type: text/html; charset=UTF-8');
                 <?php endif; ?>
             </div>
             <div class="fvd-topbar__actions">
+                <?php if ($fvd_topbar_deleg_notif_no_vistas > 0): ?>
+                <a class="fvd-topbar__notif-inv" href="<?= htmlspecialchars($fvdPanelUrl . '#fvd-deleg-torneos-invites', ENT_QUOTES, 'UTF-8') ?>" title="Invitaciones a torneos sin abrir">
+                    Invitaciones
+                    <span class="fvd-topbar__notif-badge"><?= (int) $fvd_topbar_deleg_notif_no_vistas ?></span>
+                </a>
+                <?php endif; ?>
                 <a class="fvd-topbar__perfil<?= $fvd_sidebar_active === 'perfil' ? ' fvd-topbar__perfil--active' : '' ?>" href="<?= htmlspecialchars($fvd_perfil_url, ENT_QUOTES, 'UTF-8') ?>">Mi perfil</a>
             </div>
         </div>

@@ -5,6 +5,37 @@ declare(strict_types=1);
 /**
  * Nombre corto para cabeceras (quita prefijos habituales).
  */
+function fvd_asoc_title_case(string $texto): string
+{
+    $t = trim($texto);
+    if ($t === '') {
+        return '';
+    }
+    if (function_exists('mb_convert_case') && function_exists('mb_strtolower')) {
+        return mb_convert_case(mb_strtolower($t, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+    }
+
+    return ucwords(strtolower($t));
+}
+
+/**
+ * Título h2 del panel delegados: "Asociación del estado …[, …]" usando nombre en BD.
+ * Si `nombre` trae coma (estado, asociación), se separa en dos fragmentos.
+ */
+function fvd_asoc_hero_h2_linea(string $rawNombre, string $nombreCorto): string
+{
+    $nom = trim($nombreCorto) !== '' ? trim($nombreCorto) : trim($rawNombre);
+    if ($nom === '') {
+        return 'Asociación';
+    }
+    $parts = preg_split('/\s*,\s*/u', $nom, 2);
+    if (count($parts) === 2 && $parts[0] !== '' && $parts[1] !== '') {
+        return 'Asociación del estado ' . fvd_asoc_title_case($parts[0]) . ', ' . fvd_asoc_title_case($parts[1]);
+    }
+
+    return 'Asociación del estado ' . fvd_asoc_title_case($nom);
+}
+
 function fvd_asoc_nombre_sin_prefijo(string $nombre): string
 {
     $n = trim($nombre);

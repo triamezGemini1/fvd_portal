@@ -14,18 +14,17 @@
 /** @var array<string,mixed>|null $torneoMeta */
 /** @var bool $fvd_inscripcion_bandera_modo */
 /** @var list<array<string,mixed>> $inscritosBandera */
+/** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int}> $fvdSitioDisponibles */
+/** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int}> $fvdSitioInscritos */
+/** @var string $fvdSitioNuevoAtletaUrl */
+/** @var list<array<string,mixed>> $fvdDelegadoGrupoTorneos */
 $fvd_inscripcion_bandera_modo = !empty($fvd_inscripcion_bandera_modo);
+$fvdSitioDisponibles = $fvdSitioDisponibles ?? [];
+$fvdSitioInscritos = $fvdSitioInscritos ?? [];
+$fvdSitioNuevoAtletaUrl = $fvdSitioNuevoAtletaUrl ?? (rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/') . '/fvdmasteradmin/modules/atletas/index.php?action=form');
 $inscritosBandera = $inscritosBandera ?? [];
+$fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
 ?>
-<h1>Inscribir atletas al torneo</h1>
-<p style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 0.75rem">
-    Solo aparecen torneos con fecha futura donde el administrador FVD ha <strong>registrado una invitación</strong> para su asociación.
-    La modalidad del evento (individual, parejas o equipos) se detecta automáticamente según la ficha del torneo (<code>clase</code> en <code>torneosact</code>).
-    <?php if ($fvd_inscripcion_bandera_modo): ?>
-        <strong>Modo delegado:</strong> la inscripción actualiza solo la ficha del atleta (<code>inscripcion=1</code>, <code>torneo_id</code>); no se crean filas en <code>inscripcion_torneo</code>.
-    <?php endif; ?>
-</p>
-
 <?php if (!empty($fvd_ok)): ?>
     <p class="fvd-mod-msg" style="color:#86efac"><?= htmlspecialchars($fvd_ok, ENT_QUOTES, 'UTF-8') ?></p>
 <?php endif; ?>
@@ -64,84 +63,48 @@ $inscritosBandera = $inscritosBandera ?? [];
                 <?php endforeach; ?>
             </select>
         </div>
-        <?php if ($torneoSel > 0): ?>
-            <input type="hidden" name="torneo_id" value="<?= $torneoSel ?>">
-        <?php endif; ?>
         <noscript><button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Aplicar</button></noscript>
     </form>
     <?php if ($asocId <= 0): ?>
-        <p class="fvd-atl-muted" style="font-size:0.875rem">Seleccione una asociación para ver sus torneos invitados e inscribir atletas.</p>
+        <p class="fvd-atl-muted" style="font-size:0.875rem">Seleccione una asociación.</p>
     <?php endif; ?>
 <?php elseif (!$esFvd && ($asocId === null || $asocId <= 0)): ?>
     <p class="fvd-mod-msg">Su usuario no tiene asociación asignada.</p>
 <?php endif; ?>
 
 <?php if ($asocId > 0): ?>
-    <form method="get" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="margin-bottom:1rem">
-        <?php if ($esFvd): ?><input type="hidden" name="asociacion_id" value="<?= $asocId ?>"><?php endif; ?>
-        <label style="font-size:.8125rem;color:var(--fvd-muted);display:block">Torneo</label>
-        <select class="fvd-input" name="torneo_id" style="max-width:28rem" onchange="this.form.submit()">
-            <option value="0">— Seleccione torneo —</option>
-            <?php foreach ($torneosAbiertos as $t): ?>
-                <option value="<?= (int) ($t['torneo'] ?? 0) ?>" <?= $torneoSel === (int) ($t['torneo'] ?? 0) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars((string) ($t['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                    (<?= htmlspecialchars(substr((string) ($t['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8') ?>)
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <noscript><button type="submit" class="fvd-input" style="width:auto;margin-top:6px;padding:6px 12px">Cargar</button></noscript>
-    </form>
-
     <?php if ($torneosAbiertos === []): ?>
-        <p style="font-size:0.875rem;color:var(--fvd-muted)">No hay torneos con invitación registrada para esta asociación.</p>
+        <p class="fvd-atl-muted" style="font-size:0.875rem">Sin eventos disponibles.</p>
     <?php elseif ($torneoSel > 0): ?>
 
         <?php if ($torneoMeta === null): ?>
             <p class="fvd-mod-msg">No se encontró el torneo o no está disponible.</p>
         <?php else: ?>
+            <?php if ($fvd_inscripcion_bandera_modo && count($fvdDelegadoGrupoTorneos) > 1): ?>
+            <form method="get" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-insc-delegado-grupo" style="margin:0 0 1rem">
+                <label for="fvd-insc-grupo-torneo" style="font-size:.8125rem;color:var(--fvd-muted);display:block">Evento / categoría / género</label>
+                <select id="fvd-insc-grupo-torneo" class="fvd-input" name="torneo_id" style="max-width:36rem" onchange="this.form.submit()">
+                    <?php foreach ($fvdDelegadoGrupoTorneos as $tg): ?>
+                        <?php $tgId = (int) ($tg['torneo'] ?? 0); ?>
+                        <?php if ($tgId <= 0) {
+                            continue;
+                        } ?>
+                        <option value="<?= $tgId ?>" <?= $torneoSel === $tgId ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string) ($tg['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+            <?php endif; ?>
+            <?php
+            require FVD_PROJECT_ROOT . '/templates/inscripciones/inscribir_sitio_panel.php';
+            $fvdInscDetOpen = (int) ($torneoMeta['clase'] ?? 1) !== 1;
+            ?>
+            <details class="fvd-insc-modalidad-details"<?= $fvdInscDetOpen ? ' open' : '' ?>>
+                <summary>Parejas, equipos o búsqueda por nombre</summary>
             <link rel="stylesheet" href="<?= htmlspecialchars(url('assets/css/fvd-inscripciones-13.css'), ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="fvd-insc-wrap" id="fvd-insc-root">
-                <?php
-                $cupo = $torneoMeta['cupo'] ?? ['usado' => 0, 'max' => null, 'restante' => null];
-                $usado = (int) ($cupo['usado'] ?? 0);
-                $cmax = isset($cupo['max']) && $cupo['max'] !== null ? (int) $cupo['max'] : null;
-                $rest = $cupo['restante'] ?? null;
-                $pct = ($cmax !== null && $cmax > 0) ? min(100, round(100 * $usado / $cmax)) : 0;
-                ?>
-                <div class="fvd-insc-cupo" aria-label="Cupo de inscripciones">
-                    <span style="font-weight:600">Cupo asociación</span>
-                    <?php if ($cmax === null): ?>
-                        <span class="fvd-insc-cupo__badge">Sin tope definido</span>
-                        <span style="color:var(--fvd-muted)"><?= (int) $usado ?> inscripción(es) registradas</span>
-                    <?php else: ?>
-                        <div class="fvd-insc-cupo__bar" title="<?= (int) $usado ?> / <?= (int) $cmax ?>">
-                            <div class="fvd-insc-cupo__fill" style="width:<?= (int) $pct ?>%"></div>
-                        </div>
-                        <span class="fvd-insc-cupo__badge"><?= (int) $usado ?> / <?= (int) $cmax ?></span>
-                        <?php if ($rest !== null): ?>
-                            <span style="color:var(--fvd-muted)"><?= (int) $rest ?> restante(s)</span>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                </div>
-
-                <p style="font-size:0.78rem;color:var(--fvd-muted);margin:0 0 8px">
-                    Evento: <strong><?= htmlspecialchars((string) ($torneoMeta['torneo']['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
-                    · Modalidad UI: <strong><?= htmlspecialchars((string) ($torneoMeta['modo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
-                    <?php if (!empty($torneoMeta['integrantes_equipo'])): ?>
-                        · Integrantes por equipo: <strong><?= (int) $torneoMeta['integrantes_equipo'] ?></strong>
-                    <?php endif; ?>
-                </p>
-                <p style="font-size:0.68rem;color:var(--fvd-muted);margin:0 0 10px">
-                    Cupo opcional: ejecute <code>fvdmasteradmin/sql/alter_torneo_convocatoria_cupos.sql</code> para limitar plazas por club.
-                    Equipos: el tamaño del equipo usa <code>pareclub</code> en el torneo (mín. 2; si es 0 se asume 4).
-                </p>
-
-                <?php if ($fvd_inscripcion_bandera_modo): ?>
-                <div class="fvd-insc-bandera-layout" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start">
-                <div class="fvd-insc-bandera-main">
-                <?php endif; ?>
-
                 <?php
                 $clInsc = (int) ($torneoMeta['clase'] ?? 1);
                 $fvd_insc_integrantes_equipo = (int) ($torneoMeta['integrantes_equipo'] ?? 4);
@@ -167,7 +130,7 @@ $inscritosBandera = $inscritosBandera ?? [];
 
                 <?php
                 $fvd_resumen_inscripcion = [];
-                $fvd_resumen_titulo = $fvd_inscripcion_bandera_modo ? 'Integrantes en lista (pendiente de confirmar)' : null;
+                $fvd_resumen_titulo = null;
                 require FVD_PROJECT_ROOT . '/templates/components/resumen_inscripcion.php';
                 ?>
 
@@ -177,52 +140,6 @@ $inscritosBandera = $inscritosBandera ?? [];
                     <a class="fvd-insc-btn fvd-insc-btn--comprobante" id="fvd-insc-ver-listado" href="<?= htmlspecialchars($selfUrl . '?torneo_id=' . $torneoSel . ($esFvd ? '&asociacion_id=' . $asocId : ''), ENT_QUOTES, 'UTF-8') ?>">Actualizar página</a>
                 </div>
 
-                <?php if ($fvd_inscripcion_bandera_modo): ?>
-                </div>
-                <aside class="fvd-insc-bandera-aside" style="border:1px solid var(--fvd-border);border-radius:8px;padding:10px;background:rgba(0,0,0,.15);min-height:12rem">
-                    <h3 style="font-size:0.9rem;margin:0 0 6px">Inscritos (confirmados)</h3>
-                    <p style="font-size:0.68rem;color:var(--fvd-muted);margin:0 0 10px">Atletas con <code>inscripcion=1</code> y este <code>torneo_id</code>. El buscador solo muestra disponibles (<code>inscripcion=0</code> u otro torneo según reglas).</p>
-                    <div id="fvd-insc-inscritos-list" style="display:flex;flex-direction:column;gap:8px">
-                        <?php
-                        $ub = rtrim($uploadsPublicBase, '/') . '/';
-                        foreach ($inscritosBandera as $ib) {
-                            $iid = (int) ($ib['id'] ?? 0);
-                            if ($iid <= 0) {
-                                continue;
-                            }
-                            $nom = htmlspecialchars((string) ($ib['nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
-                            $ced = htmlspecialchars((string) ($ib['cedula'] ?? ''), ENT_QUOTES, 'UTF-8');
-                            $fn = trim((string) ($ib['foto'] ?? ''));
-                            $fu = '';
-                            if ($fn !== '' && strpos($fn, '..') === false) {
-                                $fu = htmlspecialchars($ub . implode('/', array_map('rawurlencode', explode('/', str_replace('\\', '/', $fn)))), ENT_QUOTES, 'UTF-8');
-                            }
-                            ?>
-                            <article class="fvd-insc-card fvd-insc-card--confirmado" data-fvd-inscrito-id="<?= $iid ?>" style="position:relative;padding:8px">
-                                <?php if ($fu !== ''): ?>
-                                    <img class="fvd-insc-card__photo" src="<?= $fu ?>" alt="" width="72" height="72" loading="lazy" style="width:72px;height:72px;object-fit:cover;border-radius:6px">
-                                <?php else: ?>
-                                    <div class="fvd-insc-card__ph" style="width:72px;height:72px">Sin foto</div>
-                                <?php endif; ?>
-                                <button type="button" class="fvd-insc-card__rm fvd-insc-retirar" data-aid="<?= $iid ?>" aria-label="Retirar inscripción" title="Retirar">×</button>
-                                <div class="fvd-insc-card__name" style="margin-top:4px"><?= $nom ?></div>
-                                <div style="font-size:0.75rem">CI <?= $ced ?></div>
-                            </article>
-                            <?php
-                        }
-                        ?>
-                    </div>
-                    <?php if ($inscritosBandera === []): ?>
-                        <p id="fvd-insc-inscritos-empty" style="font-size:0.78rem;color:var(--fvd-muted);margin:0">Ningún inscrito aún.</p>
-                    <?php endif; ?>
-                </aside>
-                </div>
-                <style>
-                @media (max-width: 900px) {
-                    .fvd-insc-bandera-layout { grid-template-columns: 1fr !important; }
-                }
-                </style>
-                <?php endif; ?>
             </div>
 
             <script>
@@ -472,7 +389,7 @@ $inscritosBandera = $inscritosBandera ?? [];
                                 window.location.reload();
                                 return;
                             }
-                            if (msg) msg.textContent = 'Listo: ' + (d.inscritos | 0) + ' fila(s). Recargue para ver cupo actualizado.';
+                            if (msg) msg.textContent = 'Listo.';
                             nomina = [];
                             renderNomina();
                         } else {
@@ -485,33 +402,9 @@ $inscritosBandera = $inscritosBandera ?? [];
                 });
 
                 renderNomina();
-
-                if (banderaMode) {
-                    document.addEventListener('click', function (ev) {
-                        var t = ev.target;
-                        if (!t || !t.closest) return;
-                        var btn = t.closest('.fvd-insc-retirar');
-                        if (!btn) return;
-                        var aid = parseInt(btn.getAttribute('data-aid') || '0', 10);
-                        if (!aid || !torneoId) return;
-                        if (!window.confirm('¿Retirar la inscripción de este atleta?')) return;
-                        if (msg) msg.textContent = 'Retirando…';
-                        fetch(api, {
-                            method: 'POST',
-                            credentials: 'same-origin',
-                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                            body: JSON.stringify({ action: 'retirar', torneo_id: torneoId, atleta_id: aid })
-                        }).then(function (r) { return r.json(); }).then(function (d) {
-                            if (d && d.ok && d.retirado) {
-                                window.location.reload();
-                            } else {
-                                if (msg) msg.textContent = (d && d.error) ? d.error : 'No se pudo retirar.';
-                            }
-                        }).catch(function () { if (msg) msg.textContent = 'Error de red.'; });
-                    });
-                }
             })();
             </script>
+            </details>
         <?php endif; ?>
     <?php endif; ?>
 <?php endif; ?>

@@ -63,6 +63,7 @@ foreach ($convocatoriaFilas as $rf) {
 }
 $fvdEvTotalAsoc = count($convocatoriaFilas);
 $tidTorneo = (int) ($t['torneo'] ?? 0);
+$fvdTorneoFinalizado = !empty($t['finalizado_en']);
 $urlAtletas = fvd_crud_self_url('atletas');
 $urlInscTorneo = fvd_master_module_url('inscripcion_torneo/index.php?torneo_id=' . $tidTorneo);
 $urlTorneoInsc = admin_module_url('torneo_inscripcion/index.php?torneo_id=' . $tidTorneo);
@@ -89,6 +90,16 @@ $fvdClaseLab = [1 => 'Individual', 2 => 'Parejas', 3 => 'Equipos'][(int) ($t['cl
                 <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px;font-size:0.8125rem;font-weight:600" title="Envía correo a delegados activos">Notificar delegados (correo masivo)</button>
             </form>
             <a class="fvd-input" style="width:auto;padding:6px 12px;font-size:0.8125rem;font-weight:600;text-decoration:none;display:inline-block;box-sizing:border-box" href="<?= htmlspecialchars($selfUrl . '?action=tarjetas_zip&id=' . $tidTorneo, ENT_QUOTES, 'UTF-8') ?>" title="ZIP con una tarjeta PDF por delegado (registros con archivo en disco)">Descargar ZIP de tarjetas PDF</a>
+            <a class="fvd-input" style="width:auto;padding:6px 12px;font-size:0.8125rem;font-weight:600;text-decoration:none;display:inline-block;box-sizing:border-box" href="<?= htmlspecialchars($selfUrl . '?action=historico_torneo&id=' . $tidTorneo, ENT_QUOTES, 'UTF-8') ?>">Histórico del torneo</a>
+            <?php if (!$fvdTorneoFinalizado): ?>
+            <form method="post" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="margin:0;display:inline" onsubmit="return confirm('¿Dar este torneo por concluido? Se registrará el histórico y se limpiarán inscripciones y marcas en los atletas que participaron (bandera y tabla).');">
+                <input type="hidden" name="_action" value="torneo_finalizar">
+                <input type="hidden" name="torneo_id" value="<?= $tidTorneo ?>">
+                <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px;font-size:0.8125rem;font-weight:600;background:#7f1d1d;color:#fecaca;border-color:#991b1b">Dar torneo por concluido</button>
+            </form>
+            <?php else: ?>
+            <span class="fvd-atl-muted" style="font-size:0.8125rem">Concluido <?= htmlspecialchars(substr((string) ($t['finalizado_en'] ?? ''), 0, 19), ENT_QUOTES, 'UTF-8') ?></span>
+            <?php endif; ?>
         </div>
         <h1 class="fvd-mis-panel__title"><?= htmlspecialchars((string) ($t['nombre'] ?? 'Torneo'), ENT_QUOTES, 'UTF-8') ?></h1>
         <div class="fvd-mis-panel__hero-meta">

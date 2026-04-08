@@ -35,12 +35,45 @@ $aid = isset($_GET['aid']) ? (int) $_GET['aid'] : null;
 
 if ($action === 'form' && $tid !== null && $aid !== null) {
     $row = $ctrl->find($tid, $aid);
+    $fvdCostoTarifa = $row !== null ? $ctrl->ultimoCostoTarifa() : null;
     if ($row === null) {
         http_response_code(404);
         $fvd_page_title = 'No encontrado';
+    } else {
+        $fvd_page_title = 'Reporte detallado de costos';
     }
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/form.view.php';
+    require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+    exit;
+}
+
+if ($action === 'reporte_conceptos' && $tid !== null && $aid !== null) {
+    $row = $ctrl->find($tid, $aid);
+    $fvdReportePorConcepto = [];
+    $fvdReporteConceptosOk = false;
+    $fvdReporteConceptoFiltro = null;
+    $cParam = isset($_GET['concepto']) ? trim((string) $_GET['concepto']) : '';
+    if ($cParam !== '' && array_key_exists($cParam, DeudaAsociacionController::ETIQUETAS_CONCEPTO)) {
+        $fvdReporteConceptoFiltro = $cParam;
+    }
+    if ($row === null) {
+        http_response_code(404);
+        $fvd_page_title = 'No encontrado';
+    } else {
+        $fvd_page_title = $fvdReporteConceptoFiltro !== null
+            ? ('Registros · ' . DeudaAsociacionController::ETIQUETAS_CONCEPTO[$fvdReporteConceptoFiltro])
+            : 'Detalle por concepto';
+        try {
+            $fvdReportePorConcepto = $ctrl->detallePorConceptos($tid, $aid, $fvdReporteConceptoFiltro);
+            $fvdReporteConceptosOk = true;
+        } catch (Throwable $e) {
+            $fvd_error = $e->getMessage();
+            error_log('[deuda_asociacion] reporte_conceptos: ' . $fvd_error);
+        }
+    }
+    require FVD_MASTER_ROOT . '/includes/layout_header.php';
+    include __DIR__ . '/reporte_conceptos.view.php';
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';
     exit;
 }

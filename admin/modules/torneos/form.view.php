@@ -72,6 +72,21 @@ $federacionNombre = $fvd_torneo_org_nombre !== '' ? $fvd_torneo_org_nombre : 'Or
             </div>
 
             <?php if ($fvdEsAdminGeneral): ?>
+            <div>
+                <label for="grupo_evento_id">ID grupo de evento (opcional)</label>
+                <input class="fvd-input" type="number" min="1" id="grupo_evento_id" name="grupo_evento_id" style="max-width:14rem"
+                    placeholder="Mismo ID = circuito vinculado"
+                    value="<?= isset($r['grupo_evento_id']) && (int) ($r['grupo_evento_id'] ?? 0) > 0 ? (int) $r['grupo_evento_id'] : '' ?>">
+                <small style="display:block;font-size:0.7rem;color:var(--fvd-muted,#94a3b8);margin-top:4px">
+                    Torneos con el mismo número comparten selector en el panel del delegado (p. ej. por género o categoría).
+                </small>
+            </div>
+            <div>
+                <label class="fvd-tf-check-readonly" style="cursor:pointer">
+                    <input type="checkbox" name="apertura_anual" value="1" <?= !empty($r['apertura_anual']) ? 'checked' : '' ?>>
+                    <span>Primer torneo del año: al <strong>crear</strong> este evento, marcar <code>anualidad = 1</code> en todos los atletas.</span>
+                </label>
+            </div>
             <div class="fvd-tf-checks-row">
                 <label class="fvd-tf-check-readonly">
                     <input type="checkbox" checked disabled>

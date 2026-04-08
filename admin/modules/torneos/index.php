@@ -94,6 +94,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'torneo_finalizar') {
+    require_once FVD_PROJECT_ROOT . '/src/Services/TorneoFinalizacionService.php';
+    AuthService::ensureSession();
+    try {
+        $svc->torneosEventoRequireFvdAdmin();
+        $tidF = (int) ($_POST['torneo_id'] ?? 0);
+        $out = \FvdPortal\Services\TorneoFinalizacionService::finalizarTorneo(fvd_db(), $tidF);
+        $_SESSION['fvd_torneo_evento_flash'] = sprintf(
+            'Torneo dado por concluido. Histórico: %d registro(s); inscritos (bandera): %d; filas en tabla: %d.',
+            $out['movimientos'],
+            $out['participantes_bandera'],
+            $out['filas_tabla']
+        );
+        header('Location: ' . $selfUrl . '?action=evento&id=' . $tidF . '&msg=ok');
+        exit;
+    } catch (Throwable $e) {
+        AuthService::ensureSession();
+        $_SESSION['fvd_torneo_evento_flash'] = $e->getMessage();
+        $tidF = (int) ($_POST['torneo_id'] ?? 0);
+        header('Location: ' . $selfUrl . '?action=evento&id=' . max(1, $tidF));
+        exit;
+    }
+}
+
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
     $svc->torneosDelete((int) $_GET['id']);
     header('Location: ' . $selfUrl);
@@ -123,8 +147,13 @@ $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 
 if (AuthService::isDelegadoAsociacion() && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     $ctx = AuthService::delegadoTorneoContextId();
+    $asocDel = (int) (AuthService::idAsociacion() ?? 0);
     if ($ctx !== null && $ctx > 0) {
-        if ($action !== 'evento' || $id === null || (int) $id !== $ctx) {
+        if ($action !== 'evento' || $id === null || $id <= 0) {
+            header('Location: ' . $selfUrl . '?action=evento&id=' . $ctx);
+            exit;
+        }
+        if ($asocDel > 0 && !$svc->delegadoPuedeAbrirPantallaEvento($asocDel, (int) $id)) {
             header('Location: ' . $selfUrl . '?action=evento&id=' . $ctx);
             exit;
         }
@@ -300,6 +329,17 @@ if ($action === 'tarjetas_zip' && $id !== null && $id > 0) {
     exit;
 }
 
+if ($action === 'historico_torneo' && $id !== null && $id > 0) {
+    $svc->torneosEventoRequireFvdAdmin();
+    $fvdHistoricoFilas = $svc->torneosHistoricoMovimientos((int) $id);
+    $fvdHistoricoTorneo = $svc->torneosFind($id);
+    $fvd_page_title = 'Histórico del torneo';
+    require FVD_MASTER_ROOT . '/includes/layout_header.php';
+    include __DIR__ . '/historico_torneo.view.php';
+    require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+    exit;
+}
+
 if ($action === 'evento' && $id !== null && $id > 0) {
     AuthService::ensureSession();
     $pdoEv = fvd_db();
@@ -307,7 +347,9 @@ if ($action === 'evento' && $id !== null && $id > 0) {
 
     if (AuthService::isDelegadoAsociacion()) {
         $delegadoId = (int) AuthService::userId();
-        if (!DelegadoTorneoNotifService::delegadoTieneNotificacionTorneo($pdoEv, $delegadoId, (int) $id)) {
+        $asocEv = (int) (AuthService::idAsociacion() ?? 0);
+        $grupoEv = $svc->torneoGrupoEventoId((int) $id);
+        if (!DelegadoTorneoNotifService::delegadoTieneAccesoEventoGrupo($pdoEv, $delegadoId, $asocEv, (int) $id, $grupoEv)) {
             http_response_code(403);
             exit('No tiene una invitaci?n web registrada para este torneo.');
         }

@@ -66,6 +66,19 @@ final class DelegadoTorneoNotifService
      */
     public static function crearNotificacionesParaTorneo(PDO $pdo, int $torneoId): int
     {
+        return self::crearNotificacionesParaTorneoFiltrado($pdo, $torneoId, null);
+    }
+
+    /**
+     * Igual que {@see crearNotificacionesParaTorneo} pero solo delegados cuya asociación está en la lista.
+     * Al actualizar una fila existente, se refresca la fecha y se marca como no vista para que el panel muestre el aviso.
+     *
+     * @param list<int>|null $soloAsociacionIds null = todas las asociaciones con delegado activo
+     *
+     * @return int Filas afectadas (INSERT + UPDATE duplicados)
+     */
+    public static function crearNotificacionesParaTorneoFiltrado(PDO $pdo, int $torneoId, ?array $soloAsociacionIds): int
+    {
         if ($torneoId <= 0) {
             return 0;
         }
@@ -77,9 +90,34 @@ final class DelegadoTorneoNotifService
         $inv = $st->fetchColumn();
         $invFile = $inv !== false && $inv !== null && trim((string) $inv) !== '' ? trim((string) $inv) : null;
 
-        $stD = $pdo->query(
-            'SELECT d.id, d.asociacion_id FROM delegados d WHERE d.activo = 1 AND d.asociacion_id IS NOT NULL AND d.asociacion_id > 0'
-        );
+        $sqlBase = 'SELECT d.id, d.asociacion_id FROM delegados d WHERE d.activo = 1 AND d.asociacion_id IS NOT NULL AND d.asociacion_id > 0';
+        $stD = null;
+        if ($soloAsociacionIds !== null) {
+            $ids = [];
+            foreach ($soloAsociacionIds as $v) {
+                $i = (int) $v;
+                if ($i > 0) {
+                    $ids[$i] = true;
+                }
+            }
+            $ids = array_keys($ids);
+            if ($ids === []) {
+                return 0;
+            }
+            sort($ids, SORT_NUMERIC);
+            $ph = [];
+            $params = [];
+            foreach ($ids as $k => $ida) {
+                $p = ':aid' . $k;
+                $ph[] = $p;
+                $params[$p] = $ida;
+            }
+            $sql = $sqlBase . ' AND d.asociacion_id IN (' . implode(', ', $ph) . ')';
+            $stD = $pdo->prepare($sql);
+            $stD->execute($params);
+        } else {
+            $stD = $pdo->query($sqlBase);
+        }
         if ($stD === false) {
             return 0;
         }
@@ -89,6 +127,8 @@ final class DelegadoTorneoNotifService
              ON DUPLICATE KEY UPDATE
                 invitacion_archivo = VALUES(invitacion_archivo),
                 asociacion_id = VALUES(asociacion_id),
+                creado_en = CURRENT_TIMESTAMP,
+                visto_en = NULL,
                 access_token = IFNULL(fvd_delegado_notif_torneo.access_token, VALUES(access_token))'
         );
         $n = 0;
@@ -148,6 +188,36 @@ final class DelegadoTorneoNotifService
                 'SELECT 1 FROM fvd_delegado_notif_torneo WHERE delegado_id = :d AND torneo_id = :t LIMIT 1'
             );
             $st->execute([':d' => $delegadoId, ':t' => $torneoId]);
+
+            return (bool) $st->fetchColumn();
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Acceso al panel de un torneo: notificación directa o cualquier torneo del mismo grupo_evento_id (misma invitación de circuito).
+     */
+    public static function delegadoTieneAccesoEventoGrupo(PDO $pdo, int $delegadoId, int $asociacionId, int $torneoId, ?int $grupoEventoId): bool
+    {
+        if ($delegadoId <= 0 || $torneoId <= 0 || $asociacionId <= 0) {
+            return false;
+        }
+        if (self::delegadoTieneNotificacionTorneo($pdo, $delegadoId, $torneoId)) {
+            return true;
+        }
+        if ($grupoEventoId === null || $grupoEventoId <= 0) {
+            return false;
+        }
+        self::ensureTable($pdo);
+        try {
+            $st = $pdo->prepare(
+                'SELECT 1 FROM fvd_delegado_notif_torneo n
+                 INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                 INNER JOIN delegados d ON d.id = n.delegado_id
+                 WHERE n.delegado_id = :d AND d.asociacion_id = :a AND t.grupo_evento_id = :g LIMIT 1'
+            );
+            $st->execute([':d' => $delegadoId, ':a' => $asociacionId, ':g' => $grupoEventoId]);
 
             return (bool) $st->fetchColumn();
         } catch (PDOException $e) {
