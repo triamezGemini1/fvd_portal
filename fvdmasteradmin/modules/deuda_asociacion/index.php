@@ -45,6 +45,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'actu
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'actualizar_deudas_masivo') {
+    try {
+        $res = $ctrl->sincronizarTodasLasDeudasDesdeAtletas();
+        $_SESSION['fvd_deuda_masiva_result'] = $res;
+        header('Location: ' . $selfUrl . '?msg=deuda_masiva');
+        exit;
+    } catch (Throwable $e) {
+        $fvd_error = $e->getMessage();
+        error_log('[deuda_asociacion] actualizar_deudas_masivo: ' . $fvd_error);
+    }
+}
+
 $fvd_page_title = 'Deudas por asociación';
 $action = $_GET['action'] ?? 'list';
 $tid = isset($_GET['tid']) ? (int) $_GET['tid'] : null;
@@ -75,6 +87,22 @@ if ($action === 'form' && $tid !== null && $aid !== null) {
     }
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/form.view.php';
+    require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+    exit;
+}
+
+if ($action === 'estadisticas_inscripcion') {
+    $fvd_page_title = 'Estadísticas origen inscripciones';
+    $fvdTorneosSelect = $ctrl->listTorneosParaSelector();
+    $tidStats = isset($_GET['tid']) ? (int) $_GET['tid'] : 0;
+    $fvdEstadisticasInscripcion = ['tabla_ok' => false, 'rows' => []];
+    $fvdTorneoNombreStats = '';
+    if ($tidStats > 0) {
+        $fvdEstadisticasInscripcion = $ctrl->estadisticasInscripcionOrigenPorTorneo($tidStats);
+        $fvdTorneoNombreStats = $ctrl->nombreTorneo($tidStats);
+    }
+    require FVD_MASTER_ROOT . '/includes/layout_header.php';
+    include __DIR__ . '/estadisticas_inscripcion.view.php';
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';
     exit;
 }
@@ -111,6 +139,12 @@ if ($action === 'reporte_conceptos' && $tid !== null && $aid !== null) {
 
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $result = $ctrl->paginateList($page, 15);
+
+$fvd_deuda_masiva_result = null;
+if (isset($_SESSION['fvd_deuda_masiva_result'])) {
+    $fvd_deuda_masiva_result = $_SESSION['fvd_deuda_masiva_result'];
+    unset($_SESSION['fvd_deuda_masiva_result']);
+}
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';

@@ -274,6 +274,75 @@ class DeudaAsociacionController extends FvdModuleController
     }
 
     /**
+     * Pares torneo+asociación con fila en deuda_asociaciones, respetando alcance (admin: todas; delegado: solo su club).
+     *
+     * @return list<array{torneo_id:int, asociacion_id:int}>
+     */
+    public function listarParesDeudaParaSincronizacion(): array
+    {
+        $params = [];
+        $scope = self::asociacionScopeSql('d.asociacion_id', $params);
+        $sql = 'SELECT d.torneo_id, d.asociacion_id FROM deuda_asociaciones d WHERE 1=1 ' . $scope
+            . ' ORDER BY d.torneo_id DESC, d.asociacion_id ASC';
+        $st = $this->pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        if (!is_array($rows)) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'torneo_id' => (int) ($r['torneo_id'] ?? 0),
+                'asociacion_id' => (int) ($r['asociacion_id'] ?? 0),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Recalcula montos desde atletas para cada par visible según rol (admin: todas las asociaciones; delegado: solo la suya).
+     *
+     * @return array{ok:int, omitidos:int, errores:int, mensajes:list<string>}
+     */
+    public function sincronizarTodasLasDeudasDesdeAtletas(): array
+    {
+        $pares = $this->listarParesDeudaParaSincronizacion();
+        $ok = 0;
+        $omitidos = 0;
+        $errores = 0;
+        $mensajes = [];
+        foreach ($pares as $p) {
+            $tid = $p['torneo_id'];
+            $aid = $p['asociacion_id'];
+            if ($tid <= 0 || $aid <= 0) {
+                continue;
+            }
+            if ($this->torneoEstaFinalizado($tid)) {
+                $omitidos++;
+
+                continue;
+            }
+            try {
+                $this->actualizarDeudaDesdeAtletas($tid, $aid);
+                $ok++;
+            } catch (Throwable $e) {
+                $errores++;
+                $mensajes[] = sprintf('Torneo %d / Asoc. %d: %s', $tid, $aid, $e->getMessage());
+                error_log('[DeudaAsociacion] sincronización masiva: ' . $e->getMessage());
+            }
+        }
+
+        return [
+            'ok' => $ok,
+            'omitidos' => $omitidos,
+            'errores' => $errores,
+            'mensajes' => $mensajes,
+        ];
+    }
+
+    /**
      * Recibos de pago (`relacion_pagos`) del torneo y asociación, orden cronológico descendente.
      *
      * @return list<array<string, mixed>>
@@ -295,5 +364,56 @@ class DeudaAsociacionController extends FvdModuleController
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
         return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @return list<array<string, mixed>> filas con id (torneo) y nombre
+     */
+    public function listTorneosParaSelector(): array
+    {
+        try {
+            $st = $this->pdo->query('SELECT torneo AS id, nombre FROM torneosact ORDER BY torneo DESC');
+            $rows = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+
+            return is_array($rows) ? $rows : [];
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    public function nombreTorneo(int $torneoId): string
+    {
+        if ($torneoId <= 0) {
+            return '';
+        }
+        $st = $this->pdo->prepare('SELECT nombre FROM torneosact WHERE torneo = :t LIMIT 1');
+        $st->execute([':t' => $torneoId]);
+        $n = $st->fetchColumn();
+
+        return $n !== false ? (string) $n : '';
+    }
+
+    /**
+     * Estadísticas solo lectura desde inscripcion_torneo (origen inscripciones), por asociación y renglón (concepto).
+     *
+     * @return array{tabla_ok:bool, rows:list<array<string, mixed>>}
+     */
+    public function estadisticasInscripcionOrigenPorTorneo(int $torneoId): array
+    {
+        require_once $this->projectRoot() . '/src/Services/InscripcionTorneoEstadisticasService.php';
+        if (!\FvdPortal\Services\InscripcionTorneoEstadisticasService::tablaExiste($this->pdo)) {
+            return [
+                'tabla_ok' => false,
+                'rows' => [],
+            ];
+        }
+        $params = [':tid' => $torneoId];
+        $scope = self::asociacionScopeSql('i.asociacion_id', $params);
+        $rows = \FvdPortal\Services\InscripcionTorneoEstadisticasService::estadisticasPorTorneoAgrupadas($this->pdo, $scope, $params);
+
+        return [
+            'tabla_ok' => true,
+            'rows' => $rows,
+        ];
     }
 }

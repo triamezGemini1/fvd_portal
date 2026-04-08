@@ -840,6 +840,7 @@ header('Content-Type: text/html; charset=UTF-8');
                     <div class="fvd-sn-acc__body">
                         <a class="fvd-sn<?= $fvd_sn_active('costos') ?>" href="<?= htmlspecialchars(fvd_module_url('costos/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="CRUD de tarifas">Tarifas (costos)</a>
                         <a class="fvd-sn<?= $fvd_sn_active('deudas') ?>" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Estados de cuenta por torneo y asociación">Estados de cuenta (deudas)</a>
+                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>" title="Conteos por asociación desde inscripcion_torneo (origen)">Estadísticas inscripciones (origen)</a>
                         <a class="fvd-sn<?= $fvd_sn_active('pagos') ?>" href="<?= htmlspecialchars(fvd_module_url('relacion_pago/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Pagos registrados">Pagos realizados</a>
                     </div>
                 </details>
@@ -864,6 +865,7 @@ header('Content-Type: text/html; charset=UTF-8');
                     <summary class="fvd-sn-acc__summary" title="Finanzas">Finanz. <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
                         <a class="fvd-sn<?= $fvd_sn_active('deudas') ?>" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Deudas">Deudas</a>
+                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>" title="Origen inscripcion_torneo">Estad. inscripciones</a>
                         <a class="fvd-sn<?= $fvd_sn_active('pagos') ?>" href="<?= htmlspecialchars(fvd_module_url('relacion_pago/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Pagos">Pagos</a>
                     </div>
                 </details>

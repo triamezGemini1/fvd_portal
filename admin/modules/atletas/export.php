@@ -13,6 +13,9 @@ use FvdPortal\Services\ReportService;
 fvd_admin_require_roles();
 
 $format = isset($_GET['format']) ? strtolower(trim((string) $_GET['format'])) : '';
+if ($format === '') {
+    $format = 'csv';
+}
 if ($format !== 'csv' && $format !== 'pdf') {
     http_response_code(400);
     header('Content-Type: text/plain; charset=UTF-8');
