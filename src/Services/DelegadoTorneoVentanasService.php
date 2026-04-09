@@ -18,7 +18,7 @@ require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
  *
  * Fase 1 (día del torneo −15 … −7): afiliaciones, carnets, traspasos, altas de atletas.
  * Fase 2 (día del torneo −7 … −3): inscripciones, retiros y cambios en plantilla.
- * Fuera de esas ventanas: solo consulta y pagos (sin mutaciones operativas).
+ * Fuera de esas ventanas: solo consulta y pagos (sin mutaciones operativas). Las estadísticas (tabla <code>atletas</code>, renglones afiliación, anualidad, carnet, traspaso, inscripción) siguen siendo consultables.
  */
 final class DelegadoTorneoVentanasService
 {

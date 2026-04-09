@@ -96,9 +96,7 @@ if (!isset($fvd_sidebar_active)) {
 if (str_contains($fvdScript, '/modules/atletas/') || str_contains($fvdScript, '/admin/modules/atletas/')) {
     $rawAtAct = isset($_GET['action']) ? trim((string) $_GET['action']) : '';
     $atImpliesList = isset($_GET['tab']) || isset($_GET['page']) || isset($_GET['cedula'])
-        || (isset($_GET['q']) && trim((string) $_GET['q']) !== '')
-        || (isset($_GET['ficha']) && trim((string) $_GET['ficha']) !== '')
-        || (isset($_GET['revision_delegado']) && (string) $_GET['revision_delegado'] === '1');
+        || (isset($_GET['q']) && trim((string) $_GET['q']) !== '');
     $atEff = $rawAtAct === '' ? ($atImpliesList ? 'list' : 'form') : $rawAtAct;
     if ($atEff === 'form' && (!isset($_GET['id']) || (string) $_GET['id'] === '')) {
         $fvd_sidebar_active = 'atletas_nuevo';
@@ -120,6 +118,9 @@ if (str_contains($fvdScript, 'reporte_carnets.php')) {
 }
 if (str_contains($fvdScript, 'reporte_traspasos.php')) {
     $fvd_sidebar_active = 'informe_traspasos';
+}
+if (str_contains($fvdScript, 'reporte_indicadores.php')) {
+    $fvd_sidebar_active = 'informe_indicadores_atletas';
 }
 if (str_contains($fvdScript, '/atletas/export.php')) {
     $fvd_sidebar_active = 'informe_export_atletas';
@@ -191,7 +192,7 @@ $fvd_acc_adm_sol_open = in_array($fvd_sidebar_active, ['sol_traspasos_fvd', 'sol
 $fvd_acc_adm_fin_open = in_array($fvd_sidebar_active, ['costos', 'deudas', 'pagos'], true);
 $fvd_acc_adm_inf_open = in_array(
     $fvd_sidebar_active,
-    ['inscripciones', 'inscripcion_torneo', 'torneo_inscripcion', 'informe_carnets_pend', 'informe_carnets_sol', 'informe_traspasos', 'informe_export_atletas', 'informe_deudas_resumen'],
+    ['inscripciones', 'inscripcion_torneo', 'torneo_inscripcion', 'informe_carnets_pend', 'informe_carnets_sol', 'informe_traspasos', 'informe_indicadores_atletas', 'informe_export_atletas', 'informe_deudas_resumen'],
     true
 );
 
@@ -388,33 +389,6 @@ header('Content-Type: text/html; charset=UTF-8');
         }
         .fvd-shell--sidebar-rail .fvd-sidebar-fvd-logo { max-height: 30px; }
         .fvd-shell--sidebar-rail .fvd-sidebar-fvd-tagline { display: none; }
-        .fvd-dash-fvd-identity {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 1.25rem 0 2rem;
-            padding: 0 1rem;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .fvd-dash-fvd-identity__logo {
-            width: 50%;
-            max-width: min(50vw, 28rem);
-            height: auto;
-            object-fit: contain;
-            display: block;
-        }
-        .fvd-dash-fvd-identity__legend {
-            margin: 0.85rem 0 0;
-            padding: 0 0.5rem;
-            font-size: clamp(1.425rem, 5.25vw, 2.175rem);
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            color: var(--fvd-amarillo);
-            text-align: center;
-            line-height: 1.3;
-        }
         .fvd-sidebar-brand {
             font-weight: 700;
             font-size: var(--fvd-font-h3);
@@ -790,7 +764,7 @@ header('Content-Type: text/html; charset=UTF-8');
             <a class="fvd-sn<?= $fvd_sn_active('panel') ?>" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Panel / Inicio">Panel / Inicio</a>
             <?php if ($fvd_es_admin_fvd && $fvd_revision_total > 0 && function_exists('admin_module_url') && function_exists('fvd_module_url')): ?>
                 <?php if ($fvd_revision_altas > 0): ?>
-                    <a class="fvd-sn fvd-sn--pend" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=list&revision_delegado=1'), ENT_QUOTES, 'UTF-8') ?>" title="Altas cargadas por delegados, pendientes de validar">Revisar altas delegado<span class="fvd-pend-badge" aria-label="Cantidad"><?= (int) $fvd_revision_altas ?></span></a>
+                    <a class="fvd-sn fvd-sn--pend" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=list'), ENT_QUOTES, 'UTF-8') ?>" title="Listado de atletas (incluye altas desde delegados pendientes de validar)">Revisar altas delegado<span class="fvd-pend-badge" aria-label="Cantidad"><?= (int) $fvd_revision_altas ?></span></a>
                 <?php endif; ?>
                 <?php if ($fvd_revision_sol > 0): ?>
                     <a class="fvd-sn fvd-sn--pend" href="<?= htmlspecialchars(admin_module_url('solicitudes_delegado/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Solicitudes de carnet, traspaso o afiliación">Revisar solicitudes club<span class="fvd-pend-badge" aria-label="Cantidad"><?= (int) $fvd_revision_sol ?></span></a>
@@ -840,7 +814,7 @@ header('Content-Type: text/html; charset=UTF-8');
                     <div class="fvd-sn-acc__body">
                         <a class="fvd-sn<?= $fvd_sn_active('costos') ?>" href="<?= htmlspecialchars(fvd_module_url('costos/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="CRUD de tarifas">Tarifas (costos)</a>
                         <a class="fvd-sn<?= $fvd_sn_active('deudas') ?>" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Estados de cuenta por torneo y asociación">Estados de cuenta (deudas)</a>
-                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>" title="Conteos por asociación desde inscripcion_torneo (origen)">Estadísticas inscripciones (origen)</a>
+                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>" title="Conteos por asociación desde atletas (torneo_id y banderas)">Estadísticas inscripciones (atletas)</a>
                         <a class="fvd-sn<?= $fvd_sn_active('pagos') ?>" href="<?= htmlspecialchars(fvd_module_url('relacion_pago/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Pagos registrados">Pagos realizados</a>
                     </div>
                 </details>
@@ -850,6 +824,7 @@ header('Content-Type: text/html; charset=UTF-8');
                         <a class="fvd-sn<?= $fvd_sn_active('informe_carnets_pend') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_carnets.php?tipo=pendientes'), ENT_QUOTES, 'UTF-8') ?>" title="Pendientes de elaborar">Carnets — elaboración</a>
                         <a class="fvd-sn<?= $fvd_sn_active('informe_carnets_sol') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_carnets.php?tipo=solicitados'), ENT_QUOTES, 'UTF-8') ?>" title="Carnets solicitados">Carnets emitidos / solicitados</a>
                         <a class="fvd-sn<?= $fvd_sn_active('informe_traspasos') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_traspasos.php'), ENT_QUOTES, 'UTF-8') ?>" title="Informe de traspasos">Informe traspasos</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('informe_indicadores_atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_indicadores.php'), ENT_QUOTES, 'UTF-8') ?>" title="Todos los campos de atletas con indicadores de servicio">Indicadores servicio (ficha completa)</a>
                         <a class="fvd-sn<?= $fvd_sn_active('informe_deudas_resumen') ?>" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?fvd_from=informes'), ENT_QUOTES, 'UTF-8') ?>" title="Montos por concepto (inscripciones, afiliaciones, carnets, traspasos…)">Resumen finanzas / deudas por torneo</a>
                         <a class="fvd-sn<?= $fvd_sn_active('informe_export_atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/export.php'), ENT_QUOTES, 'UTF-8') ?>" title="Exportar datos de atletas">Exportar atletas (afiliaciones / datos)</a>
                     </div>
@@ -865,7 +840,7 @@ header('Content-Type: text/html; charset=UTF-8');
                     <summary class="fvd-sn-acc__summary" title="Finanzas">Finanz. <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
                         <a class="fvd-sn<?= $fvd_sn_active('deudas') ?>" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Deudas">Deudas</a>
-                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>" title="Origen inscripcion_torneo">Estad. inscripciones</a>
+                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>" title="Conteos desde tabla atletas">Estad. inscripciones</a>
                         <a class="fvd-sn<?= $fvd_sn_active('pagos') ?>" href="<?= htmlspecialchars(fvd_module_url('relacion_pago/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Pagos">Pagos</a>
                     </div>
                 </details>

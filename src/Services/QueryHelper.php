@@ -18,8 +18,8 @@ final class QueryHelper
     /**
      * Listado paginado por igualdad en columnas (AND).
      *
-     * Si $tabla es "atletas", listado admin (JOIN asociaciones, LIKE cédula/nombre, alcance regional).
-     * En ese caso $filtros puede incluir __cedula y __nombre (búsqueda).
+     * Si $tabla es "atletas", listado admin (LIKE cédula/nombre, alcance solo por asociación).
+     * Claves admitidas: __cedula, __nombre.
      *
      * @param array<string, scalar|null> $filtros column => valor; columnas [a-zA-Z0-9_], salvo claves __* en modo atletas
      * @return array{registros: list<array<string, mixed>>, total: int, paginas: int}
@@ -36,20 +36,8 @@ final class QueryHelper
         if ($tabla === 'atletas') {
             $cedula = isset($filtros['__cedula']) ? (string) $filtros['__cedula'] : '';
             $nombre = isset($filtros['__nombre']) ? (string) $filtros['__nombre'] : '';
-            $fichaFiltro = isset($filtros['__ficha_filtro']) ? trim((string) $filtros['__ficha_filtro']) : '';
-            if (!in_array($fichaFiltro, ['sin_carnet', 'carnet_solicitado', 'carnet_emitido', 'ficha_vencida', ''], true)) {
-                $fichaFiltro = '';
-            }
-            if ($fichaFiltro === 'carnet_emitido') {
-                $fichaFiltro = 'carnet_solicitado';
-            }
-            $revisionDelegado = false;
-            if (isset($filtros['__revision_delegado'])) {
-                $rv = $filtros['__revision_delegado'];
-                $revisionDelegado = $rv === '1' || $rv === 1 || $rv === true;
-            }
 
-            return self::selectPaginadoAtletasAdmin($cedula, $nombre, $fichaFiltro, $revisionDelegado, $pagina, $limite, $pdo);
+            return self::selectPaginadoAtletasAdmin($cedula, $nombre, $pagina, $limite, $pdo);
         }
 
         if ($tabla === 'fvd_invitaciones') {
@@ -101,38 +89,6 @@ final class QueryHelper
             'total'     => $total,
             'paginas'   => $paginas,
         ];
-    }
-
-    /**
-     * Listado de atletas del panel (misma semántica que el legado en FvdAdminService).
-     *
-     * @return array{registros: list<array<string, mixed>>, total: int, paginas: int}
-     */
-    private static function atletasFichaCondicionSql(string $fichaFiltro): string
-    {
-        if ($fichaFiltro === 'sin_carnet') {
-            return ' AND COALESCE(a.carnet, 0) = 0 ';
-        }
-        if ($fichaFiltro === 'carnet_solicitado') {
-            return ' AND COALESCE(a.carnet, 0) = 1 ';
-        }
-        if ($fichaFiltro === 'ficha_vencida') {
-            return " AND (
-            a.fechact IS NULL OR TRIM(COALESCE(a.fechact, '')) = '' OR a.fechact = '0000-00-00' OR a.fechact = '0000-00-00 00:00:00'
-            OR DATE(a.fechact) < DATE_SUB(CURDATE(), INTERVAL 365 DAY)
-        ) ";
-        }
-
-        return '';
-    }
-
-    private static function atletasRevisionDelegadoSql(bool $solo): string
-    {
-        if (!$solo) {
-            return '';
-        }
-
-        return ' AND COALESCE(a.alta_desde_delegado, 0) = 1 AND COALESCE(a.estatus, 0) = 0 ';
     }
 
     /**
@@ -205,8 +161,6 @@ final class QueryHelper
     private static function selectPaginadoAtletasAdmin(
         string $cedula,
         string $nombre,
-        string $fichaFiltro,
-        bool $revisionDelegado,
         int $pagina,
         int $limite,
         PDO $pdo
@@ -227,8 +181,6 @@ final class QueryHelper
             $params[':fnom'] = '%' . $nombre . '%';
             $search .= ' AND a.nombre LIKE :fnom ';
         }
-        $search .= self::atletasFichaCondicionSql($fichaFiltro);
-        $search .= self::atletasRevisionDelegadoSql($revisionDelegado);
 
         $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1' . $search;
         $dataSql = 'SELECT a.id, a.foto, a.cedula, a.nombre, a.sexo, a.numfvd, a.estatus, a.celular, a.email, a.asociacion, a.categ,
@@ -261,27 +213,19 @@ final class QueryHelper
     /**
      * Todas las filas del listado admin de atletas (mismos filtros y alcance regional), sin paginar.
      *
+     * @param int|null $carnetEquals Si es 0 o 1, filtra por `atletas.carnet` (informes de carnets). Null = sin filtro extra.
      * @return list<array<string, mixed>>
      */
     public static function selectAtletasAdminAll(
         string $cedula,
         string $nombre,
         ?PDO $pdo = null,
-        string $fichaFiltro = '',
-        bool $revisionDelegado = false
+        ?int $carnetEquals = null
     ): array {
         $pdo = $pdo ?? fvd_db();
         $legacy = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
         if (!\class_exists('QueryHelper', false)) {
             require_once $legacy;
-        }
-
-        $fichaFiltro = trim($fichaFiltro);
-        if (!in_array($fichaFiltro, ['sin_carnet', 'carnet_solicitado', 'carnet_emitido', 'ficha_vencida', ''], true)) {
-            $fichaFiltro = '';
-        }
-        if ($fichaFiltro === 'carnet_emitido') {
-            $fichaFiltro = 'carnet_solicitado';
         }
 
         $params = [];
@@ -295,8 +239,10 @@ final class QueryHelper
             $params[':fnom'] = '%' . $nombre . '%';
             $search .= ' AND a.nombre LIKE :fnom ';
         }
-        $search .= self::atletasFichaCondicionSql($fichaFiltro);
-        $search .= self::atletasRevisionDelegadoSql($revisionDelegado);
+        if ($carnetEquals !== null) {
+            $params[':carnet_eq'] = $carnetEquals === 1 ? 1 : 0;
+            $search .= ' AND COALESCE(a.carnet, 0) = :carnet_eq ';
+        }
 
         $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1' . $search;
         $dataSql = 'SELECT a.id, a.foto, a.cedula, a.nombre, a.sexo, a.numfvd, a.estatus, a.celular, a.email, a.asociacion, a.categ,
@@ -306,6 +252,166 @@ final class QueryHelper
             LEFT JOIN asociaciones s ON a.asociacion = s.id
             WHERE 1=1' . $search . ' ORDER BY a.id DESC';
 
+        \QueryHelper::applyAsociacionScope($countSql, $dataSql, 'a.asociacion', $params);
+
+        $stmt = $pdo->prepare($dataSql);
+        self::bindNamed($stmt, $params);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Filas completas de `atletas` (SELECT a.*) con nombre de asociación, según indicadores de servicio.
+     *
+     * - `cualquiera`: al menos uno de afiliación, anualidad, carnet, traspaso o inscripción está en 1.
+     * - `todos`: los cinco están en 1.
+     *
+     * Respeta el alcance regional ({@see \QueryHelper::applyAsociacionScope} sobre `a.asociacion`).
+     *
+     * @param 'cualquiera'|'todos' $modo
+     * @return list<array<string, mixed>>
+     */
+    public static function selectAtletasPorIndicadoresServicioFull(
+        string $modo,
+        string $cedula = '',
+        string $nombre = '',
+        ?PDO $pdo = null
+    ): array {
+        $pdo = $pdo ?? fvd_db();
+        $legacy = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
+        if (!\class_exists('QueryHelper', false)) {
+            require_once $legacy;
+        }
+
+        $modo = $modo === 'todos' ? 'todos' : 'cualquiera';
+        if ($modo === 'todos') {
+            $indSql = ' AND COALESCE(a.afiliacion, 0) = 1 AND COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.carnet, 0) = 1'
+                . ' AND COALESCE(a.traspaso, 0) = 1 AND COALESCE(a.inscripcion, 0) = 1 ';
+        } else {
+            $indSql = ' AND (COALESCE(a.afiliacion, 0) = 1 OR COALESCE(a.anualidad, 0) = 1 OR COALESCE(a.carnet, 0) = 1'
+                . ' OR COALESCE(a.traspaso, 0) = 1 OR COALESCE(a.inscripcion, 0) = 1) ';
+        }
+
+        $params = [];
+        $search = '';
+        if ($cedula !== '') {
+            $digits = preg_replace('/\D+/', '', $cedula);
+            $params[':fced'] = $digits !== '' ? $digits . '%' : '%' . $cedula . '%';
+            $search .= ' AND a.cedula LIKE :fced ';
+        }
+        if ($nombre !== '') {
+            $params[':fnom'] = '%' . $nombre . '%';
+            $search .= ' AND a.nombre LIKE :fnom ';
+        }
+
+        $dataSql = 'SELECT a.*, s.nombre AS asociacion_nombre
+            FROM atletas a
+            LEFT JOIN asociaciones s ON a.asociacion = s.id
+            WHERE 1=1' . $indSql . $search . ' ORDER BY a.id ASC';
+
+        $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1' . $indSql . $search;
+
+        \QueryHelper::applyAsociacionScope($countSql, $dataSql, 'a.asociacion', $params);
+
+        $stmt = $pdo->prepare($dataSql);
+        self::bindNamed($stmt, $params);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Cuantificación global sobre `atletas` en el alcance de sesión: total de filas y conteos por indicador.
+     * Anualidad: solo `anualidad = 1` y `afiliacion = 1`. Inscripción: `inscripcion = 1` y `afiliacion = 0` (sin solapar con afiliado).
+     *
+     * @return array{
+     *   total_atletas:int,
+     *   afiliacion:int,
+     *   anualidad:int,
+     *   carnet:int,
+     *   traspaso:int,
+     *   inscripcion:int
+     * }
+     */
+    public static function aggregateIndicadoresAtletasTotales(?PDO $pdo = null): array
+    {
+        $pdo = $pdo ?? fvd_db();
+        $legacy = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
+        if (!\class_exists('QueryHelper', false)) {
+            require_once $legacy;
+        }
+
+        $params = [];
+        $base = 'SELECT COUNT(*) AS total_atletas,
+            SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS afiliacion,
+            SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS anualidad,
+            SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS carnet,
+            SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS traspaso,
+            SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) AS inscripcion
+            FROM atletas a
+            WHERE 1=1';
+
+        $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1';
+        $dataSql = $base;
+        \QueryHelper::applyAsociacionScope($countSql, $dataSql, 'a.asociacion', $params);
+
+        $stmt = $pdo->prepare($dataSql);
+        self::bindNamed($stmt, $params);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return [
+                'total_atletas' => 0,
+                'afiliacion'    => 0,
+                'anualidad'     => 0,
+                'carnet'        => 0,
+                'traspaso'      => 0,
+                'inscripcion'   => 0,
+            ];
+        }
+
+        return [
+            'total_atletas' => (int) ($row['total_atletas'] ?? 0),
+            'afiliacion'    => (int) ($row['afiliacion'] ?? 0),
+            'anualidad'     => (int) ($row['anualidad'] ?? 0),
+            'carnet'        => (int) ($row['carnet'] ?? 0),
+            'traspaso'      => (int) ($row['traspaso'] ?? 0),
+            'inscripcion'   => (int) ($row['inscripcion'] ?? 0),
+        ];
+    }
+
+    /**
+     * Misma lógica que {@see self::aggregateIndicadoresAtletasTotales}, agrupada por asociación (club regional).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function aggregateIndicadoresAtletasPorAsociacion(?PDO $pdo = null): array
+    {
+        $pdo = $pdo ?? fvd_db();
+        $legacy = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
+        if (!\class_exists('QueryHelper', false)) {
+            require_once $legacy;
+        }
+
+        $params = [];
+        $dataSql = 'SELECT a.asociacion AS asociacion_id,
+            COALESCE(s.nombre, \'\') AS asociacion_nombre,
+            COUNT(*) AS total_atletas,
+            SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS afiliacion,
+            SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS anualidad,
+            SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS carnet,
+            SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS traspaso,
+            SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) AS inscripcion
+            FROM atletas a
+            LEFT JOIN asociaciones s ON a.asociacion = s.id
+            WHERE 1=1
+            GROUP BY a.asociacion, s.nombre
+            ORDER BY asociacion_nombre ASC';
+
+        $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1';
         \QueryHelper::applyAsociacionScope($countSql, $dataSql, 'a.asociacion', $params);
 
         $stmt = $pdo->prepare($dataSql);

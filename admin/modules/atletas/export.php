@@ -5,8 +5,6 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/ReportService.php';
-require_once FVD_PROJECT_ROOT . '/src/Services/FvdAdminRevisionPendienteService.php';
-
 use FvdPortal\Services\QueryHelper;
 use FvdPortal\Services\ReportService;
 
@@ -25,22 +23,8 @@ if ($format !== 'csv' && $format !== 'pdf') {
 
 $cedula = isset($_GET['cedula']) ? trim((string) $_GET['cedula']) : '';
 $q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
-$fichaFiltro = isset($_GET['ficha']) ? trim((string) $_GET['ficha']) : '';
-if (!in_array($fichaFiltro, ['sin_carnet', 'carnet_solicitado', 'carnet_emitido', 'ficha_vencida', ''], true)) {
-    $fichaFiltro = '';
-}
-if ($fichaFiltro === 'carnet_emitido') {
-    $fichaFiltro = 'carnet_solicitado';
-}
 
-$revisionDelegado = AuthService::isSuperAdmin()
-    && isset($_GET['revision_delegado'])
-    && (string) $_GET['revision_delegado'] === '1';
-if ($revisionDelegado) {
-    \FvdPortal\Services\FvdAdminRevisionPendienteService::ensureAltaDesdeDelegadoColumn(fvd_db());
-}
-
-$rows = QueryHelper::selectAtletasAdminAll($cedula, $q, fvd_db(), $fichaFiltro, $revisionDelegado);
+$rows = QueryHelper::selectAtletasAdminAll($cedula, $q, fvd_db());
 $rowCount = count($rows);
 $ts = date('Y-m-d_His');
 

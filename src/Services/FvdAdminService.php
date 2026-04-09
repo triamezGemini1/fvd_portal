@@ -218,9 +218,8 @@ final class FvdAdminService
         $p = \FvdPortal\Services\QueryHelper::selectPaginado(
             'atletas',
             [
-                '__cedula'       => $cedula,
-                '__nombre'       => $q,
-                '__ficha_filtro' => '',
+                '__cedula' => $cedula,
+                '__nombre' => $q,
             ],
             $page,
             $perPage,
@@ -319,29 +318,6 @@ final class FvdAdminService
         }
     }
 
-    /**
-     * Torneo de referencia para ventanas del delegado (post o ficha o contexto de sesión).
-     *
-     * @param array<string, mixed> $data
-     * @param array<string, mixed>|null $prevRow
-     */
-    private function delegadoTorneoIdParaVentana(array $data, ?array $prevRow): int
-    {
-        $t = (int) ($data['torneo_id'] ?? 0);
-        if ($t > 0) {
-            return $t;
-        }
-        if ($prevRow !== null) {
-            $tp = (int) ($prevRow['torneo_id'] ?? 0);
-            if ($tp > 0) {
-                return $tp;
-            }
-        }
-        $ctx = AuthService::delegadoTorneoContextId();
-
-        return $ctx !== null && $ctx > 0 ? $ctx : 0;
-    }
-
     public function atletasSave(?int $id, array $post, array $files): void
     {
         $prevRow = $id !== null ? $this->atletasFind($id) : null;
@@ -389,20 +365,6 @@ final class FvdAdminService
                 throw new RuntimeException('Sin asociación asignada.');
             }
             $data['asociacion'] = $mine;
-        }
-
-        if (AuthService::isDelegadoAsociacion()) {
-            $tidV = $this->delegadoTorneoIdParaVentana($data, $prevRow);
-            if ($tidV <= 0) {
-                throw new RuntimeException(
-                    'Indique el torneo del atleta o acceda desde el panel del evento (invitación) para gestionar fichas según el calendario del torneo.'
-                );
-            }
-            if ($id === null) {
-                \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeAltaAtleta($this->pdo, $tidV);
-            } else {
-                \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeEditarOBorrarAtleta($this->pdo, $tidV);
-            }
         }
 
         $fechnacParaCateg = $data['fechnac'] ?? null;
@@ -567,17 +529,6 @@ final class FvdAdminService
             return;
         }
         $this->enforceAsociacionId(isset($prev['asociacion']) ? (int) $prev['asociacion'] : null);
-        if (AuthService::isDelegadoAsociacion()) {
-            $tidV = (int) ($prev['torneo_id'] ?? 0);
-            if ($tidV <= 0) {
-                $ctx = AuthService::delegadoTorneoContextId();
-                $tidV = $ctx !== null && $ctx > 0 ? $ctx : 0;
-            }
-            if ($tidV <= 0) {
-                throw new RuntimeException('No se pudo determinar el torneo para validar el periodo de gestión.');
-            }
-            \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeEditarOBorrarAtleta($this->pdo, $tidV);
-        }
         $params = [':id' => $id];
         $scope = QueryHelper::asociacionScopeSql('a.asociacion', $params);
         $sql = 'DELETE FROM atletas a WHERE a.id = :id ' . $scope;
@@ -601,17 +552,6 @@ final class FvdAdminService
         $prev = $this->atletasFind($id);
         if ($prev === null) {
             throw new RuntimeException('Atleta no encontrado o sin acceso.');
-        }
-        if (AuthService::isDelegadoAsociacion()) {
-            $tidV = (int) ($prev['torneo_id'] ?? 0);
-            if ($tidV <= 0) {
-                $ctx = AuthService::delegadoTorneoContextId();
-                $tidV = $ctx !== null && $ctx > 0 ? $ctx : 0;
-            }
-            if ($tidV <= 0) {
-                throw new RuntimeException('No se pudo determinar el torneo para validar el periodo de gestión.');
-            }
-            \FvdPortal\Services\DelegadoTorneoVentanasService::assertDelegadoPuedeEditarOBorrarAtleta($this->pdo, $tidV);
         }
         if (empty($files['foto']['tmp_name']) || (int) ($files['foto']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             throw new RuntimeException('Seleccione un archivo de imagen.');

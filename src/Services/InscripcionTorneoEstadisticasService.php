@@ -8,8 +8,9 @@ use PDO;
 use PDOException;
 
 /**
- * Conteos por concepto y asociación leyendo solo {@see inscripcion_torneo} (origen de inscripciones).
- * No calcula montos ni deuda; sirve para comparar con el destino (`atletas`).
+ * Conteos por concepto y asociación leyendo solo {@see atletas} para el torneo dado (`torneo_id`).
+ * Renglones: afiliacion, anualidad, carnet, traspaso, inscripcion (inscritos).
+ * No calcula montos ni deuda.
  */
 final class InscripcionTorneoEstadisticasService
 {
@@ -23,7 +24,7 @@ final class InscripcionTorneoEstadisticasService
             $st = $pdo->prepare(
                 'SELECT 1 FROM information_schema.tables WHERE table_schema = :db AND table_name = :t LIMIT 1'
             );
-            $st->execute([':db' => (string) $db, ':t' => 'inscripcion_torneo']);
+            $st->execute([':db' => (string) $db, ':t' => 'atletas']);
 
             return (bool) $st->fetchColumn();
         } catch (PDOException $e) {
@@ -34,25 +35,25 @@ final class InscripcionTorneoEstadisticasService
     }
 
     /**
-     * @param array<string, mixed> $params Debe incluir :tid; el alcance delegado añade :fvd_asoc_scope vía asociacionScopeSql
+     * @param array<string, mixed> $params Debe incluir :tid; el alcance delegado añade :fvd_asoc_scope sobre `a.asociacion`
      *
      * @return list<array<string, mixed>>
      */
     public static function estadisticasPorTorneoAgrupadas(PDO $pdo, string $asociacionScopeSql, array $params): array
     {
-        $sql = 'SELECT i.asociacion_id,
-                a.nombre AS asoc_nombre,
+        $sql = 'SELECT a.asociacion AS asociacion_id,
+                COALESCE(NULLIF(TRIM(s.nombre), \'\'), \'Sin nombre\') AS asoc_nombre,
                 COUNT(*) AS filas_origen,
-                SUM(CASE WHEN COALESCE(i.inscripcion, 0) = 1 THEN 1 ELSE 0 END) AS total_inscritos,
-                SUM(CASE WHEN COALESCE(i.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_afiliados,
-                SUM(CASE WHEN COALESCE(i.anualidad, 0) = 1 THEN 1 ELSE 0 END) AS total_anualidad,
-                SUM(CASE WHEN COALESCE(i.carnet, 0) = 1 THEN 1 ELSE 0 END) AS total_carnets,
-                SUM(CASE WHEN COALESCE(i.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS total_traspasos
-            FROM inscripcion_torneo i
-            LEFT JOIN asociaciones a ON a.id = i.asociacion_id
-            WHERE i.torneo_id = :tid ' . $asociacionScopeSql . '
-            GROUP BY i.asociacion_id, a.nombre
-            ORDER BY a.nombre ASC';
+                SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) AS total_inscritos,
+                SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_afiliados,
+                SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_anualidad,
+                SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS total_carnets,
+                SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS total_traspasos
+            FROM atletas a
+            LEFT JOIN asociaciones s ON s.id = a.asociacion
+            WHERE a.torneo_id = :tid ' . $asociacionScopeSql . '
+            GROUP BY a.asociacion, s.nombre
+            ORDER BY asoc_nombre ASC';
         try {
             $st = $pdo->prepare($sql);
             $st->execute($params);

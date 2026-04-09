@@ -11,11 +11,11 @@ $fvdTorneoNombreStats = $fvdTorneoNombreStats ?? '';
 $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 ?>
 
-<h1>Estadísticas por origen — <code>inscripcion_torneo</code></h1>
+<h1>Estadísticas por torneo — <code>atletas</code></h1>
 <p class="muted" style="font-size:0.875rem;line-height:1.5;margin-bottom:16px">
-    Aquí el <strong>origen</strong> es la tabla de inscripciones al torneo (<code>inscripcion_torneo</code>), equivalente al criterio de la tabla de inscripciones del sistema legado.
-    <strong>No</strong> se calculan montos ni deudas: solo conteos por renglón (concepto) y por asociación.
-    La ficha en <code>atletas</code> es el <strong>destino</strong> del portal; para comparar con estos totales use el detalle de deuda o el listado de atletas.
+    Fichas con <code>torneo_id</code> igual al torneo elegido. Conteos por renglón en la misma tabla:
+    <strong>inscripción</strong>, <strong>afiliación</strong>, <strong>anualidad</strong>, <strong>carnet</strong> y <strong>traspaso</strong> (valor <code>1</code> en cada columna).
+    <strong>No</strong> se calculan montos ni deudas aquí. Fuera de las ventanas de calendario del torneo, delegados y asociaciones solo pueden <strong>consultar</strong> esta información.
 </p>
 <?php if (!$fvd_admin): ?>
     <p class="fvd-mod-msg" style="font-size:0.8125rem">Como delegado solo ve las filas de <strong>su asociación</strong>.</p>
@@ -40,16 +40,16 @@ $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 <?php if ($tidStats > 0): ?>
     <h2 style="font-size:1rem;margin:0 0 10px"><?= htmlspecialchars($fvdTorneoNombreStats !== '' ? $fvdTorneoNombreStats : 'Torneo ' . $tidStats, ENT_QUOTES, 'UTF-8') ?></h2>
     <?php if (!$fvdEstadisticasInscripcion['tabla_ok']): ?>
-        <p class="fvd-mod-msg">La tabla <code>inscripcion_torneo</code> no existe en esta base. Ejecute <code>fvdmasteradmin/sql/install_inscripcion_torneo.sql</code>.</p>
+        <p class="fvd-mod-msg">No está disponible la tabla <code>atletas</code> en esta base.</p>
     <?php elseif (($fvdEstadisticasInscripcion['rows'] ?? []) === []): ?>
-        <p class="fvd-mod-msg">No hay filas en <code>inscripcion_torneo</code> para este torneo<?= $fvd_admin ? '' : ' y su asociación' ?>.</p>
+        <p class="fvd-mod-msg">No hay atletas con <code>torneo_id</code> de este torneo<?= $fvd_admin ? '' : ' en su asociación' ?>.</p>
     <?php else: ?>
         <div class="fvd-mod-table-wrap">
             <table class="fvd-mod-table fvd-mod-table--nowrap">
                 <thead>
                 <tr>
                     <th>Asociación</th>
-                    <th class="num">Filas origen</th>
+                    <th class="num">Fichas (torneo)</th>
                     <th class="num">Inscripción</th>
                     <th class="num">Afiliación</th>
                     <th class="num">Anualidad</th>

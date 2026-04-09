@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
-require_once FVD_PROJECT_ROOT . '/src/Services/FvdAdminRevisionPendienteService.php';
-
 use FvdPortal\Services\QueryHelper;
 
 fvd_admin_require_roles();
@@ -40,27 +38,6 @@ try {
             }
         }
     }
-
-    $tab = isset($_GET['tab']) && $_GET['tab'] === 'ficha' ? 'ficha' : 'list';
-    $fichaFiltro = '';
-    if ($tab === 'ficha') {
-        $fichaFiltro = isset($_GET['ficha']) ? trim((string) $_GET['ficha']) : '';
-        if (!in_array($fichaFiltro, ['sin_carnet', 'carnet_solicitado', 'carnet_emitido', 'ficha_vencida'], true)) {
-            $fichaFiltro = '';
-        }
-        if ($fichaFiltro === 'carnet_emitido') {
-            $fichaFiltro = 'carnet_solicitado';
-        }
-    }
-    $filtros['__ficha_filtro'] = $fichaFiltro;
-
-    $revisionDelegado = AuthService::isSuperAdmin()
-        && isset($_GET['revision_delegado'])
-        && (string) $_GET['revision_delegado'] === '1';
-    if ($revisionDelegado) {
-        \FvdPortal\Services\FvdAdminRevisionPendienteService::ensureAltaDesdeDelegadoColumn(fvd_db());
-    }
-    $filtros['__revision_delegado'] = $revisionDelegado ? '1' : '0';
 
     $perPage = 12;
     $paged = QueryHelper::selectPaginado('atletas', $filtros, $page, $perPage, fvd_db());

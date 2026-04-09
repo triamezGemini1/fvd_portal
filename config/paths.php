@@ -111,4 +111,21 @@ function is_debug() {
     return env('APP_DEBUG', false) === 'true' || env('APP_DEBUG', false) === true;
 }
 
+/**
+ * Formato uniforme para importes y cantidades contables en pantalla (2 decimales, es-VE).
+ *
+ * @param float|int|string|null $value
+ */
+function fvd_format_contable($value, string $empty = '—'): string
+{
+    if ($value === null || $value === '') {
+        return $empty;
+    }
+    if (!is_numeric($value)) {
+        return $empty;
+    }
+
+    return number_format((float) $value, 2, ',', '.');
+}
+
 

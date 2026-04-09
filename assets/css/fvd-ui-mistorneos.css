@@ -1466,6 +1466,39 @@ table.fvd-mod-table {
   margin: 0 auto;
 }
 
+/* Admin general FVD: logo alineado al título (misma escala visual que el h1) */
+.fvd-dash__admin-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.5rem;
+}
+
+.fvd-dash__admin-head-logo {
+  flex-shrink: 0;
+  height: 2.75rem;
+  width: auto;
+  max-width: 9rem;
+  object-fit: contain;
+  display: block;
+}
+
+.fvd-dash__admin-title {
+  margin: 0;
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: clamp(1.2rem, 2.4vw, 1.5rem);
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--fvd-text, #f8fafc);
+  letter-spacing: -0.01em;
+}
+
+.fvd-dash__intro--after-admin-head {
+  margin-top: 0.35rem;
+}
+
 .fvd-dash__intro {
   margin-bottom: 1.15rem;
   color: var(--fvd-muted, #cbd5e1);

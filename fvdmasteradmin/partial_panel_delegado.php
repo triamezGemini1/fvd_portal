@@ -292,6 +292,15 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
     </div>
 
+    <?php
+    $fvdIndicadoresCostos = isset($delegSnap['indicadores_costos']) && is_array($delegSnap['indicadores_costos'])
+        ? $delegSnap['indicadores_costos']
+        : [];
+    $fvdIndicadoresCostosVariant = 'delegado';
+    $fvdReporteIndicadoresUrl = function_exists('fvd_module_url') ? fvd_module_url('atletas/reporte_indicadores.php') : null;
+    require __DIR__ . '/includes/partial_indicadores_costos_dashboard.php';
+    ?>
+
     <?php if ($delegVentana !== null): ?>
     <p class="fvd-mod-msg" style="margin:0 0 1rem;font-size:0.8125rem;border-left:4px solid #f59e0c;padding:8px 12px;background:rgba(245,158,11,0.12)">
         <strong>Calendario del torneo:</strong> <?= htmlspecialchars((string) ($delegVentana['etiqueta_fase'] ?? ''), ENT_QUOTES, 'UTF-8') ?>

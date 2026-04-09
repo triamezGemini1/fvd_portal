@@ -313,7 +313,7 @@ $renglones = [
                                     <td><?= (int) ($p['secuencia'] ?? 0) ?></td>
                                     <td><?= htmlspecialchars($tipoLbl, ENT_QUOTES, 'UTF-8') ?></td>
                                     <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($p['monto_dolares'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
-                                    <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($p['tasa_cambio'] ?? null, 4), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($p['tasa_cambio'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
                                     <td class="fvd-num"><?= htmlspecialchars($fvdFmtMonto($p['monto_total'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
                                     <td>
                                         <?php if ($fvdUrlRelacionPago !== ''): ?>

@@ -2,6 +2,9 @@
 /** @var array $result */
 /** @var string $selfUrl */
 $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
+if (!function_exists('fvd_format_contable')) {
+    require_once dirname(__DIR__, 3) . '/config/paths.php';
+}
 ?>
 
 <h1>Tarifas (costos)</h1>
@@ -33,11 +36,11 @@ $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
             <tr>
                 <td><?= (int) $r['id'] ?></td>
                 <td><?= htmlspecialchars((string) ($r['fecha'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['afiliacion'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['anualidad'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['carnets'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['traspasos'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars((string) ($r['inscripciones'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars(fvd_format_contable($r['afiliacion'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars(fvd_format_contable($r['anualidad'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars(fvd_format_contable($r['carnets'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars(fvd_format_contable($r['traspasos'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars(fvd_format_contable($r['inscripciones'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
                 <td>
                     <?php if ($fvd_admin): ?>
                         <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>

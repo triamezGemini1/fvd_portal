@@ -394,7 +394,7 @@ class DeudaAsociacionController extends FvdModuleController
     }
 
     /**
-     * Estadísticas solo lectura desde inscripcion_torneo (origen inscripciones), por asociación y renglón (concepto).
+     * Estadísticas solo lectura desde `atletas` (torneo_id del torneo), por asociación y renglón (banderas).
      *
      * @return array{tabla_ok:bool, rows:list<array<string, mixed>>}
      */
@@ -408,7 +408,7 @@ class DeudaAsociacionController extends FvdModuleController
             ];
         }
         $params = [':tid' => $torneoId];
-        $scope = self::asociacionScopeSql('i.asociacion_id', $params);
+        $scope = self::asociacionScopeSql('a.asociacion', $params);
         $rows = \FvdPortal\Services\InscripcionTorneoEstadisticasService::estadisticasPorTorneoAgrupadas($this->pdo, $scope, $params);
 
         return [

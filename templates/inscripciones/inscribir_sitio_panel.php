@@ -7,7 +7,7 @@ declare(strict_types=1);
 /** @var bool $esFvd */
 /** @var bool $fvd_inscripcion_bandera_modo */
 /** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int,cedula_num:int}> $fvdSitioDisponibles */
-/** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int,cedula_num:int,equipo:int}> $fvdSitioInscritos */
+/** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int,cedula_num:int,equipo:int,retirar_mode?:string}> $fvdSitioInscritos */
 /** @var string $fvdSitioNuevoAtletaUrl */
 $clSitio = (int) ($torneoMeta['clase'] ?? 1);
 $tnom = htmlspecialchars((string) ($torneoMeta['torneo']['nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -102,9 +102,13 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
                                 $iAid = (int) $i['atleta_id'];
                                 $iCedN = (int) ($i['cedula_num'] ?? 0);
                                 $iEq = (int) ($i['equipo'] ?? 0);
-                                $retMode = $fvd_inscripcion_bandera_modo && $iAid > 0
-                                    ? 'bandera'
-                                    : (!$fvd_inscripcion_bandera_modo && $iCedN > 0 && $iEq === 0 ? 'tabla' : '0');
+                                if (isset($i['retirar_mode']) && (string) $i['retirar_mode'] !== '') {
+                                    $retMode = (string) $i['retirar_mode'];
+                                } else {
+                                    $retMode = $fvd_inscripcion_bandera_modo && $iAid > 0
+                                        ? 'bandera'
+                                        : (!$fvd_inscripcion_bandera_modo && $iCedN > 0 && $iEq === 0 ? 'tabla' : '0');
+                                }
                                 ?>
                             <tr data-aid="<?= $iAid ?>" data-nombre="<?= htmlspecialchars($i['nombre'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-cedula-num="<?= $iCedN ?>"

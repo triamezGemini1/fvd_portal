@@ -107,22 +107,22 @@ class DeudaAsociacion {
                 SELECT 
                     a.torneo_id,
                     a.asociacion,
-                    SUM(a.inscripcion = 1) AS total_inscritos,
-                    SUM(a.inscripcion = 1) * c.inscripciones AS monto_inscritos,
-                    SUM(a.afiliacion = 1) AS total_afiliados,
-                    SUM(a.afiliacion = 1) * c.afiliacion AS monto_afiliados,
-                    SUM(a.carnet = 1) AS total_carnets,
-                    SUM(a.carnet = 1) * c.carnets AS monto_carnets,
-                    SUM(a.traspaso = 1) AS total_traspasos,
-                    SUM(a.traspaso = 1) * c.traspasos AS monto_traspasos,
-                    SUM(a.anualidad = 1) AS total_anualidad,
-                    SUM(a.anualidad = 1) * c.anualidad AS monto_anualidad,
+                    SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) AS total_inscritos,
+                    SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) * c.inscripciones AS monto_inscritos,
+                    SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_afiliados,
+                    SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) * c.afiliacion AS monto_afiliados,
+                    SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS total_carnets,
+                    SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) * c.carnets AS monto_carnets,
+                    SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS total_traspasos,
+                    SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) * c.traspasos AS monto_traspasos,
+                    SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_anualidad,
+                    SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) * c.anualidad AS monto_anualidad,
                     (
-                      SUM(a.inscripcion = 1) * c.inscripciones +
-                      SUM(a.afiliacion = 1) * c.afiliacion +
-                      SUM(a.carnet = 1) * c.carnets +
-                      SUM(a.traspaso = 1) * c.traspasos +
-                      SUM(a.anualidad = 1) * c.anualidad
+                      SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) * c.inscripciones +
+                      SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) * c.afiliacion +
+                      SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) * c.carnets +
+                      SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) * c.traspasos +
+                      SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) * c.anualidad
                     ) AS monto_total,
                     NOW(), NOW()
                 FROM atletas a

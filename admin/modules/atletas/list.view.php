@@ -3,7 +3,6 @@
 /** @var string $selfUrl */
 /** @var string $cedula */
 /** @var string $q */
-/** @var string $fichaFiltro */
 /** @var string $fvd_atletas_tab */
 /** @var bool $fvd_puede_traspaso */
 /** @var string $atletasSearchApiUrl */
@@ -14,15 +13,8 @@ $fvd_tab_class = ($fvd_atletas_tab ?? 'list') === 'ficha' ? 'fvd-atletas-tab-fic
 $carnetsUrlBase = $selfUrl . '?action=carnets';
 $appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
 $fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
-$fvdRevFilt = !empty($fvd_revision_delegado_filtro);
-$fvdEsSuper = \AuthService::isSuperAdmin();
 ?>
 <h1 class="fvd-atletas-title">Atletas</h1>
-<?php if ($fvdRevFilt && $fvdEsSuper): ?>
-<p class="fvd-mod-msg no-print" role="status" style="margin:0 0 0.75rem;padding:8px 12px;border-radius:8px;background:rgba(255,242,0,0.12);border:1px solid var(--fvd-amarillo);font-size:0.8125rem">
-    Mostrando solo <strong>altas ingresadas por delegados</strong> pendientes de validación FVD (estatus pendiente). Quite el filtro para ver el listado completo.
-</p>
-<?php endif; ?>
 <p class="fvd-atletas-intro no-print hide-on-13 fvd-only-list-tab" style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 0.75rem">Busque por <strong>cédula</strong> (coincidencia por inicio) o refine por nombre. La tabla se actualiza al escribir (espera breve). Pantalla optimizada para 13".</p>
 <?php if (!empty($fvd_error ?? '')): ?><p class="fvd-mod-msg"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 
@@ -38,8 +30,6 @@ $fvdEsSuper = \AuthService::isSuperAdmin();
     <form method="get" action="" class="no-print" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
         <input type="hidden" name="action" value="list">
         <input type="hidden" name="tab" id="fvd-form-tab" value="<?= htmlspecialchars($fvd_atletas_tab ?? 'list', ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="ficha" id="fvd-form-ficha" value="<?= htmlspecialchars($fichaFiltro ?? '', ENT_QUOTES, 'UTF-8') ?>">
-        <?php if ($fvdRevFilt): ?><input type="hidden" name="revision_delegado" id="fvd-form-revision-delegado" value="1"><?php endif; ?>
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block;font-weight:600">Cédula</label>
             <input id="fvd-atleta-cedula" class="fvd-input" type="search" name="cedula" value="<?= htmlspecialchars($cedula, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. 30399011" style="max-width:11rem" autocomplete="off">
@@ -50,24 +40,8 @@ $fvdEsSuper = \AuthService::isSuperAdmin();
         </div>
         <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Buscar</button>
         <a href="<?= htmlspecialchars($selfUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
-        <?php if ($fvdEsSuper): ?>
-            <?php if (!$fvdRevFilt): ?>
-                <a href="<?= htmlspecialchars($selfUrl . '?action=list&revision_delegado=1', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box;font-weight:600;border-color:var(--fvd-amarillo);color:var(--fvd-amarillo)">Altas delegado (pend. FVD)</a>
-            <?php else: ?>
-                <a href="<?= htmlspecialchars($selfUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Quitar filtro delegado</a>
-            <?php endif; ?>
-        <?php endif; ?>
     </form>
     <div class="fvd-atletas-ficha-toolbar fvd-only-ficha-tab no-print" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-        <div>
-            <label for="fvd-ficha-filtro" style="font-size:.75rem;color:var(--fvd-muted);display:block;font-weight:600">Filtro ficha / carnet</label>
-            <select id="fvd-ficha-filtro" class="fvd-input" style="min-width:12rem">
-                <option value=""<?= ($fichaFiltro ?? '') === '' ? ' selected' : '' ?>>Todos</option>
-                <option value="sin_carnet"<?= ($fichaFiltro ?? '') === 'sin_carnet' ? ' selected' : '' ?>>Pendiente solicitud carnet (carnet=0)</option>
-                <option value="carnet_solicitado"<?= in_array(($fichaFiltro ?? ''), ['carnet_solicitado', 'carnet_emitido'], true) ? ' selected' : '' ?>>Carnet solicitado (carnet=1)</option>
-                <option value="ficha_vencida"<?= ($fichaFiltro ?? '') === 'ficha_vencida' ? ' selected' : '' ?>>Ficha vencida (+365 días sin actualizar)</option>
-            </select>
-        </div>
         <button type="button" class="fvd-input" id="fvd-carnets-lote" style="width:auto;padding:6px 12px" title="Abre vista de impresión con los seleccionados">Imprimir carnets (selección)</button>
         <div class="fvd-atletas-report-links no-print" style="flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px">
             <?php
@@ -139,10 +113,8 @@ $fvdEsSuper = \AuthService::isSuperAdmin();
 <?php
 $cedArg = $cedula !== '' ? '&cedula=' . rawurlencode($cedula) : '';
 $qArg = $q !== '' ? '&q=' . rawurlencode($q) : '';
-$fichaArg = ($fichaFiltro ?? '') !== '' ? '&ficha=' . rawurlencode((string) $fichaFiltro) : '';
 $tabArg = ($fvd_atletas_tab ?? 'list') === 'ficha' ? '&tab=ficha' : '';
-$revArg = !empty($fvd_revision_delegado_filtro) ? '&revision_delegado=1' : '';
-$filterArg = $cedArg . $qArg . $fichaArg . $tabArg . $revArg;
+$filterArg = $cedArg . $qArg . $tabArg;
 $p = (int) $result['page'];
 $pages = (int) $result['pages'];
 ?>
@@ -162,16 +134,13 @@ $pages = (int) $result['pages'];
     var carnetsBase = <?= json_encode($carnetsUrlBase, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var rootEl = document.getElementById('fvd-atletas-root');
     var formTab = document.getElementById('fvd-form-tab');
-    var formFicha = document.getElementById('fvd-form-ficha');
     var cedulaEl = document.getElementById('fvd-atleta-cedula');
     var qEl = document.getElementById('fvd-atleta-q');
-    var fichaFiltroEl = document.getElementById('fvd-ficha-filtro');
     var table = document.getElementById('fvd-tabla-atletas');
     var tbody = table ? table.querySelector('tbody') : null;
     var pager = document.getElementById('fvd-atletas-pager');
     var hint = document.getElementById('fvd-atletas-live-hint');
     var btnLote = document.getElementById('fvd-carnets-lote');
-    var revisionDelegado = <?= !empty($fvd_revision_delegado_filtro) ? 'true' : 'false' ?>;
     var fetchPage = function () {};
 
     function applyAtletasTableView(mode) {
@@ -207,12 +176,6 @@ $pages = (int) $result['pages'];
         if (formTab) {
             formTab.value = mode;
         }
-        if (!isFicha && fichaFiltroEl) {
-            fichaFiltroEl.value = '';
-            if (formFicha) {
-                formFicha.value = '';
-            }
-        }
         if (apiUrl && tbody && pager && table && cedulaEl && qEl) {
             fetchPage(1);
         }
@@ -243,15 +206,6 @@ $pages = (int) $result['pages'];
         });
     }
 
-    if (fichaFiltroEl && formFicha) {
-        fichaFiltroEl.addEventListener('change', function () {
-            formFicha.value = fichaFiltroEl.value;
-            if (apiUrl && tbody && pager) {
-                fetchPage(1);
-            }
-        });
-    }
-
     if (!cedulaEl || !qEl) {
         return;
     }
@@ -261,12 +215,9 @@ $pages = (int) $result['pages'];
             return '';
         }
         var sep = exportUrl.indexOf('?') >= 0 ? '&' : '?';
-        var ficha = (fichaFiltroEl && rootEl && rootEl.classList.contains('fvd-atletas-tab-ficha')) ? fichaFiltroEl.value : '';
         return exportUrl + sep + 'format=' + encodeURIComponent(format)
             + '&cedula=' + encodeURIComponent(cedulaEl.value.trim())
-            + '&q=' + encodeURIComponent(qEl.value.trim())
-            + (ficha ? '&ficha=' + encodeURIComponent(ficha) : '')
-            + (revisionDelegado ? '&revision_delegado=1' : '');
+            + '&q=' + encodeURIComponent(qEl.value.trim());
     }
 
     if (apiUrl && tbody && pager && table) {
@@ -294,12 +245,6 @@ $pages = (int) $result['pages'];
             p.set('q', qEl.value.trim());
             var tab = rootEl && rootEl.classList.contains('fvd-atletas-tab-ficha') ? 'ficha' : 'list';
             p.set('tab', tab);
-            if (tab === 'ficha' && fichaFiltroEl) {
-                p.set('ficha', fichaFiltroEl.value);
-            }
-            if (revisionDelegado) {
-                p.set('revision_delegado', '1');
-            }
             return p.toString();
         }
 

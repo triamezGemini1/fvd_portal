@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
-require_once FVD_PROJECT_ROOT . '/src/Services/FvdAdminRevisionPendienteService.php';
-
 use FvdPortal\Services\QueryHelper;
 
 fvd_admin_require_roles();
@@ -70,9 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'tras
 $fvd_page_title = 'Atletas';
 $rawAction = isset($_GET['action']) ? trim((string) $_GET['action']) : '';
 $impliesAtletasList = isset($_GET['tab']) || isset($_GET['page']) || isset($_GET['cedula'])
-    || (isset($_GET['q']) && trim((string) $_GET['q']) !== '')
-    || (isset($_GET['ficha']) && trim((string) $_GET['ficha']) !== '')
-    || (isset($_GET['revision_delegado']) && (string) $_GET['revision_delegado'] === '1');
+    || (isset($_GET['q']) && trim((string) $_GET['q']) !== '');
 if ($rawAction === '') {
     $action = $impliesAtletasList ? 'list' : 'form';
 } else {
@@ -253,19 +249,6 @@ if ($action === 'form') {
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $cedula = isset($_GET['cedula']) ? trim((string) $_GET['cedula']) : '';
 $q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
-$fvd_revision_delegado_filtro = AuthService::isSuperAdmin()
-    && isset($_GET['revision_delegado'])
-    && (string) $_GET['revision_delegado'] === '1';
-if ($fvd_revision_delegado_filtro) {
-    \FvdPortal\Services\FvdAdminRevisionPendienteService::ensureAltaDesdeDelegadoColumn(fvd_db());
-}
-$fichaFiltro = isset($_GET['ficha']) ? trim((string) $_GET['ficha']) : '';
-if (!in_array($fichaFiltro, ['sin_carnet', 'carnet_solicitado', 'carnet_emitido', 'ficha_vencida', ''], true)) {
-    $fichaFiltro = '';
-}
-if ($fichaFiltro === 'carnet_emitido') {
-    $fichaFiltro = 'carnet_solicitado';
-}
 $fvd_atletas_tab = isset($_GET['tab']) && $_GET['tab'] === 'ficha' ? 'ficha' : 'list';
 $fvd_puede_traspaso = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 $perPage = 12;
@@ -273,10 +256,8 @@ $perPage = 12;
 $paged = QueryHelper::selectPaginado(
     'atletas',
     [
-        '__cedula'              => $cedula,
-        '__nombre'              => $q,
-        '__ficha_filtro'        => $fichaFiltro,
-        '__revision_delegado'   => $fvd_revision_delegado_filtro ? '1' : '0',
+        '__cedula' => $cedula,
+        '__nombre' => $q,
     ],
     $page,
     $perPage,

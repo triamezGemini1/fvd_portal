@@ -294,17 +294,17 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
                         <span class="fvd-pf-deuda-panel__sep" aria-hidden="true">|</span>
                         <span class="fvd-pf-deuda-panel__metric"><span class="fvd-pf-deuda-panel__lbl">Deuda total</span> <span class="fvd-pf-deuda-panel__val" id="fvd-deuda-total"><?php
                             if ($modoDeuda === 'eur') {
-                                echo $tieneTotalEurDeuda ? htmlspecialchars(number_format($deudaTotalEur, 6, ',', '.'), ENT_QUOTES, 'UTF-8') : '—';
+                                echo $tieneTotalEurDeuda ? htmlspecialchars(number_format($deudaTotalEur, 2, ',', '.'), ENT_QUOTES, 'UTF-8') : '—';
                             } else {
                                 echo htmlspecialchars(number_format($deudaTotal, 2, ',', '.'), ENT_QUOTES, 'UTF-8');
                             }
                         ?></span></span>
                         <span class="fvd-pf-deuda-panel__sep" aria-hidden="true">|</span>
-                        <span class="fvd-pf-deuda-panel__metric"><span class="fvd-pf-deuda-panel__lbl">Pagado acumulado</span> <span class="fvd-pf-deuda-panel__val" id="fvd-deuda-pagado"><?= $modoDeuda === 'eur' ? htmlspecialchars(number_format($pagadoEur, 6, ',', '.'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(number_format($pagadoBs, 2, ',', '.'), ENT_QUOTES, 'UTF-8') ?></span></span>
+                        <span class="fvd-pf-deuda-panel__metric"><span class="fvd-pf-deuda-panel__lbl">Pagado acumulado</span> <span class="fvd-pf-deuda-panel__val" id="fvd-deuda-pagado"><?= $modoDeuda === 'eur' ? htmlspecialchars(number_format($pagadoEur, 2, ',', '.'), ENT_QUOTES, 'UTF-8') : htmlspecialchars(number_format($pagadoBs, 2, ',', '.'), ENT_QUOTES, 'UTF-8') ?></span></span>
                         <span class="fvd-pf-deuda-panel__sep" aria-hidden="true">|</span>
                         <span class="fvd-pf-deuda-panel__metric"><span class="fvd-pf-deuda-panel__lbl">Pendiente</span> <span class="fvd-pf-deuda-panel__val" id="fvd-deuda-pendiente"><?php
                             if ($modoDeuda === 'eur') {
-                                echo $pendEur !== null ? htmlspecialchars(number_format($pendEur, 6, ',', '.'), ENT_QUOTES, 'UTF-8') : '—';
+                                echo $pendEur !== null ? htmlspecialchars(number_format($pendEur, 2, ',', '.'), ENT_QUOTES, 'UTF-8') : '—';
                             } else {
                                 echo htmlspecialchars(number_format($pendBs, 2, ',', '.'), ENT_QUOTES, 'UTF-8');
                             }
@@ -455,7 +455,7 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
         }
         var bs = parseNum(bsEl);
         if (!isNaN(bs)) {
-            eurEl.value = (bs / t).toFixed(6);
+            eurEl.value = (bs / t).toFixed(2);
         }
     }
 
@@ -522,15 +522,15 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
                     : 'Indique la deuda total en EUR en el módulo de deudas (campo monto EUR) para calcular el pendiente. El pagado mostrado es la suma de EUR registrados en los recibos.';
             }
             if (tEl) {
-                tEl.textContent = data.tiene_total_eur_deuda ? formatEs(data.monto_total_deuda_eur, 6) : '—';
+                tEl.textContent = data.tiene_total_eur_deuda ? formatEs(data.monto_total_deuda_eur, 2) : '—';
             }
             if (pEl) {
-                pEl.textContent = formatEs(data.pagado_eur, 6);
+                pEl.textContent = formatEs(data.pagado_eur, 2);
             }
             var pendE = data.pendiente_eur;
             var pendNum = typeof pendE === 'number' && !isNaN(pendE) ? pendE : null;
             if (penEl) {
-                penEl.textContent = pendNum !== null ? formatEs(pendNum, 6) : '—';
+                penEl.textContent = pendNum !== null ? formatEs(pendNum, 2) : '—';
             }
             if (refBsEl) {
                 var dBs = typeof data.monto_total_deuda === 'number' ? data.monto_total_deuda : 0;
@@ -547,7 +547,7 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
                 var bsEl2 = document.getElementById('monto_bs');
                 var tasa2 = getTasa();
                 if (eurEl2 && pendNum !== null && pendNum > 0) {
-                    eurEl2.value = pendNum.toFixed(6);
+                    eurEl2.value = pendNum.toFixed(2);
                     lastFx = 'eur';
                     if (tasa2 > 0 && bsEl2) {
                         syncBsFromEur();

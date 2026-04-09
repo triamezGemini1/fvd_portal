@@ -13,12 +13,12 @@ $tipo = isset($_GET['tipo']) ? trim((string) $_GET['tipo']) : 'pendientes';
 if ($tipo === 'emitidos') {
     $tipo = 'solicitados';
 }
-$ficha = $tipo === 'solicitados' ? 'carnet_solicitado' : 'sin_carnet';
+$carnetEq = $tipo === 'solicitados' ? 1 : 0;
 $titulo = $tipo === 'solicitados'
     ? 'Carnets solicitados (atletas.carnet = 1)'
     : 'Elaboración de carnets — pendientes (atletas.carnet = 0)';
 
-$rows = QueryHelper::selectAtletasAdminAll('', '', fvd_db(), $ficha);
+$rows = QueryHelper::selectAtletasAdminAll('', '', fvd_db(), $carnetEq);
 $fvd_page_title = 'Reporte carnets';
 $selfReport = admin_module_url('atletas/reporte_carnets.php');
 

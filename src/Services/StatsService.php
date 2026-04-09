@@ -7,6 +7,7 @@ namespace FvdPortal\Services;
 use PDO;
 use PDOException;
 
+
 /**
  * Estadísticas rápidas (COUNT / GROUP BY) con alcance regional vía QueryHelper.
  * Sin caché: cada consulta lee el estado actual de la BD (p. ej. tras traspasos).
@@ -240,6 +241,129 @@ final class StatsService
     }
 
     /**
+     * Última fila de tarifas (`costos` ordenado por fecha).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function ultimaTarifaCostos(PDO $pdo): ?array
+    {
+        try {
+            $st = $pdo->query(
+                'SELECT id, fecha, afiliacion, anualidad, carnets, traspasos, inscripciones
+                FROM costos ORDER BY fecha DESC, id DESC LIMIT 1'
+            );
+            $row = $st ? $st->fetch(PDO::FETCH_ASSOC) : false;
+        } catch (PDOException $e) {
+            error_log('[StatsService] ultimaTarifaCostos: ' . $e->getMessage());
+
+            return null;
+        }
+
+        return $row === false ? null : $row;
+    }
+
+    /**
+     * Conteos en `atletas` para estimados: anualidad solo con <code>anualidad=1</code> y <code>afiliacion=1</code>;
+     * inscripción con <code>inscripcion=1</code> y <code>afiliacion=0</code> (sin duplicar con afiliado).
+     * Resto de conceptos: marca = 1. Montos = conteo × tarifa vigente.
+     * Misma regla que la generación de deuda: última fila de `costos`.
+     *
+     * @return array{
+     *   tarifa: array<string, mixed>|null,
+     *   totales: array{
+     *     counts: array{total_atletas:int,afiliacion:int,anualidad:int,carnet:int,traspaso:int,inscripcion:int},
+     *     montos: array{afiliacion:float,anualidad:float,carnet:float,traspaso:float,inscripcion:float},
+     *     monto_total: float
+     *   },
+     *   por_asociacion: list<array<string, mixed>> (solo se rellena si la sesión es administrador FVD; si no, lista vacía)
+     * }
+     */
+    public static function indicadoresServicioConCostosEstimados(PDO $pdo): array
+    {
+        require_once __DIR__ . '/QueryHelper.php';
+
+        $tarifa = self::ultimaTarifaCostos($pdo);
+        $countsTot = QueryHelper::aggregateIndicadoresAtletasTotales($pdo);
+        $rowsAsoc = [];
+        $authSvc = dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
+        if (is_file($authSvc)) {
+            require_once $authSvc;
+            \AuthService::ensureSession();
+            if (\AuthService::isSuperAdmin()) {
+                $rowsAsoc = QueryHelper::aggregateIndicadoresAtletasPorAsociacion($pdo);
+            }
+        }
+
+        $totMontos = self::montosIndicadoresDesdeTarifa($tarifa, $countsTot);
+        $porAsoc = [];
+        foreach ($rowsAsoc as $r) {
+            $c = [
+                'total_atletas' => (int) ($r['total_atletas'] ?? 0),
+                'afiliacion'    => (int) ($r['afiliacion'] ?? 0),
+                'anualidad'     => (int) ($r['anualidad'] ?? 0),
+                'carnet'        => (int) ($r['carnet'] ?? 0),
+                'traspaso'      => (int) ($r['traspaso'] ?? 0),
+                'inscripcion'   => (int) ($r['inscripcion'] ?? 0),
+            ];
+            $m = self::montosIndicadoresDesdeTarifa($tarifa, $c);
+            $porAsoc[] = array_merge($r, [
+                'montos'      => $m['montos'],
+                'monto_total' => $m['monto_total'],
+            ]);
+        }
+
+        return [
+            'tarifa' => $tarifa,
+            'totales' => [
+                'counts'      => $countsTot,
+                'montos'      => $totMontos['montos'],
+                'monto_total' => $totMontos['monto_total'],
+            ],
+            'por_asociacion' => $porAsoc,
+        ];
+    }
+
+    /**
+     * @param array{total_atletas?:int,afiliacion?:int,anualidad?:int,carnet?:int,traspaso?:int,inscripcion?:int} $counts
+     * @return array{montos: array{afiliacion:float,anualidad:float,carnet:float,traspaso:float,inscripcion:float}, monto_total: float}
+     */
+    private static function montosIndicadoresDesdeTarifa(?array $tarifa, array $counts): array
+    {
+        $z = [
+            'afiliacion'  => 0.0,
+            'anualidad'   => 0.0,
+            'carnet'      => 0.0,
+            'traspaso'    => 0.0,
+            'inscripcion' => 0.0,
+        ];
+        if ($tarifa === null) {
+            return ['montos' => $z, 'monto_total' => 0.0];
+        }
+
+        $pa = (float) ($tarifa['afiliacion'] ?? 0);
+        $pan = (float) ($tarifa['anualidad'] ?? 0);
+        $pc = (float) ($tarifa['carnets'] ?? 0);
+        $pt = (float) ($tarifa['traspasos'] ?? 0);
+        $pi = (float) ($tarifa['inscripciones'] ?? 0);
+
+        $na = (int) ($counts['afiliacion'] ?? 0);
+        $nan = (int) ($counts['anualidad'] ?? 0);
+        $nc = (int) ($counts['carnet'] ?? 0);
+        $nt = (int) ($counts['traspaso'] ?? 0);
+        $ni = (int) ($counts['inscripcion'] ?? 0);
+
+        $z['afiliacion'] = $na * $pa;
+        $z['anualidad'] = $nan * $pan;
+        $z['carnet'] = $nc * $pc;
+        $z['traspaso'] = $nt * $pt;
+        $z['inscripcion'] = $ni * $pi;
+
+        $total = $z['afiliacion'] + $z['anualidad'] + $z['carnet'] + $z['traspaso'] + $z['inscripcion'];
+
+        return ['montos' => $z, 'monto_total' => $total];
+    }
+
+    /**
      * Resumen en una sola carga (opcional).
      *
      * @return array{
@@ -248,18 +372,20 @@ final class StatsService
      *   ultimos_30_dias: int,
      *   crecimiento_mensual: list,
      *   torta_asociacion: array{labels:list,counts:list},
-     *   ultimos_atletas: list
+     *   ultimos_atletas: list,
+     *   indicadores_costos: array
      * }
      */
     public static function snapshotDashboard(PDO $pdo): array
     {
         return [
-            'activos_inactivos'  => self::atletasActivosInactivos($pdo),
-            'top_asociaciones'   => self::topAsociacionesPorAtletas($pdo, 5),
-            'ultimos_30_dias'    => self::conteoAtletasUltimosDias($pdo, 30),
+            'activos_inactivos'   => self::atletasActivosInactivos($pdo),
+            'top_asociaciones'    => self::topAsociacionesPorAtletas($pdo, 5),
+            'ultimos_30_dias'     => self::conteoAtletasUltimosDias($pdo, 30),
             'crecimiento_mensual' => self::crecimientoMensualAtletas($pdo, 12),
-            'torta_asociacion'   => self::atletasPorAsociacionParaTorta($pdo, 7),
-            'ultimos_atletas'    => self::ultimosAtletasRegistrados($pdo, 8),
+            'torta_asociacion'    => self::atletasPorAsociacionParaTorta($pdo, 7),
+            'ultimos_atletas'     => self::ultimosAtletasRegistrados($pdo, 8),
+            'indicadores_costos'  => self::indicadoresServicioConCostosEstimados($pdo),
         ];
     }
 
@@ -437,35 +563,15 @@ final class StatsService
     }
 
     /**
-     * Inscripciones del torneo en el ámbito (asociación) actual.
+     * Inscripciones del torneo en el ámbito: atletas con <code>inscripcion = 1</code> y <code>torneo_id</code> (única fuente para estadísticas).
      */
     public static function conteoInscripcionesTorneoAmbito(PDO $pdo, int $torneoId): int
     {
-        if ($torneoId <= 0) {
-            return 0;
-        }
-        $params = [':tid' => $torneoId];
-        $qh = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
-        if (!\class_exists('QueryHelper', false)) {
-            require_once $qh;
-        }
-        $scope = \QueryHelper::asociacionScopeSql('it.asociacion_id', $params);
-        $sql = 'SELECT COUNT(*) FROM inscripcion_torneo it WHERE it.torneo_id = :tid' . $scope;
-
-        try {
-            $st = $pdo->prepare($sql);
-            self::executeNamed($st, $params);
-
-            return (int) $st->fetchColumn();
-        } catch (PDOException $e) {
-            error_log('[StatsService] conteoInscripcionesTorneoAmbito: ' . $e->getMessage());
-
-            return 0;
-        }
+        return self::conteoInscripcionesTorneoAmbitoBandera($pdo, $torneoId);
     }
 
     /**
-     * Inscritos del torneo en el ámbito (asociación) contando bandera en atletas (delegados).
+     * Inscritos del torneo en el ámbito contando bandera en <code>atletas</code>.
      */
     public static function conteoInscripcionesTorneoAmbitoBandera(PDO $pdo, int $torneoId): int
     {
@@ -498,7 +604,8 @@ final class StatsService
      *   carnet: array{pendiente:int,solicitado:int},
      *   torneo_id: int|null,
      *   torneo_nombre: string,
-     *   inscripciones_torneo: int
+     *   inscripciones_torneo: int,
+     *   indicadores_costos: array
      * }
      */
     public static function snapshotDelegadoPanel(PDO $pdo): array
@@ -527,10 +634,9 @@ final class StatsService
             'torneo_id'             => $tid,
             'torneo_nombre'         => $nom,
             'inscripciones_torneo'  => $tid !== null
-                ? (\AuthService::isDelegadoAsociacion()
-                    ? self::conteoInscripcionesTorneoAmbitoBandera($pdo, (int) $tid)
-                    : self::conteoInscripcionesTorneoAmbito($pdo, (int) $tid))
+                ? self::conteoInscripcionesTorneoAmbito($pdo, (int) $tid)
                 : 0,
+            'indicadores_costos'    => self::indicadoresServicioConCostosEstimados($pdo),
         ];
     }
 

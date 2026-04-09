@@ -64,9 +64,11 @@ if ($fvdEsDelegadoPanel) {
 }
 
 require_once __DIR__ . '/services/FvdDashboardStats.php';
+require_once $projRoot . '/src/Services/StatsService.php';
 
 $fvd_page_title = 'Panel general';
 $stats = FvdDashboardStats::counts();
+$fvdIndicadoresCostos = \FvdPortal\Services\StatsService::indicadoresServicioConCostosEstimados(fvd_db());
 $urlNuevoTorneo = $appBase . '/modules/torneos/index.php?action=form';
 $urlRegistrarAtleta = $appBase . '/modules/atletas/index.php';
 
@@ -76,24 +78,36 @@ $fvdPuedeGestionar = AuthService::checkAccess([
 ]);
 $fvdEsAdminFvd = AuthService::isSuperAdmin();
 
-if (!function_exists('fvd_master_module_url')) {
+if (!function_exists('fvd_master_module_url') || !function_exists('admin_module_url')) {
     require_once $projRoot . '/config/paths.php';
 }
+$fvdIndicadoresCostosVariant = 'full';
+$fvdReporteIndicadoresUrl = function_exists('admin_module_url') ? admin_module_url('atletas/reporte_indicadores.php') : null;
 
 require __DIR__ . '/includes/layout_header.php';
 ?>
 
 <div class="fvd-dash">
-    <h1><?= $fvdEsAdminFvd ? 'Panel FVD — administración general' : 'Panel general' ?></h1>
     <?php if ($fvdEsAdminFvd): ?>
-    <p class="fvd-dash__intro" style="max-width:36rem">
+    <header class="fvd-dash__admin-head" aria-label="Cabecera del panel">
+        <img
+            class="fvd-dash__admin-head-logo"
+            src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>"
+            width="120"
+            height="40"
+            alt="Federación Venezolana de Dominó"
+            decoding="async"
+        >
+        <h1 class="fvd-dash__admin-title">Panel FVD — administración general</h1>
+    </header>
+    <p class="fvd-dash__intro fvd-dash__intro--after-admin-head" style="max-width:36rem">
         Todas las operaciones se gestionan desde el <strong>menú lateral</strong>: despliegue cada bloque (Asociaciones, Atletas, Torneos, Traspasos/carnets, Finanzas, Inscripciones e informes) y elija la opción correspondiente.
     </p>
-    <div class="fvd-dash-fvd-identity" aria-label="Identidad institucional FVD">
-        <img class="fvd-dash-fvd-identity__logo" src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>" width="480" height="160" alt="" decoding="async">
-        <p class="fvd-dash-fvd-identity__legend">Federación Venezolana de Dominó</p>
-    </div>
+    <?php
+    require __DIR__ . '/includes/partial_indicadores_costos_dashboard.php';
+    ?>
     <?php else: ?>
+    <h1>Panel general</h1>
     <p class="fvd-dash__intro">
         Federación Venezolana de Dominó — vista consolidada según su perfil y ámbito regional.
     </p>
@@ -151,6 +165,9 @@ require __DIR__ . '/includes/layout_header.php';
             </div>
         </article>
     </div>
+    <?php
+    require __DIR__ . '/includes/partial_indicadores_costos_dashboard.php';
+    ?>
     <?php endif; ?>
 
     <?php if (!$fvdEsAdminFvd && $fvdPuedeGestionar): ?>

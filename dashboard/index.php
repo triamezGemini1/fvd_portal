@@ -107,6 +107,18 @@ require $fvdMaster . '/includes/layout_header.php';
         </article>
     </div>
 
+    <?php
+    $fvdIndicadoresCostos = isset($dash['indicadores_costos']) && is_array($dash['indicadores_costos'])
+        ? $dash['indicadores_costos']
+        : [];
+    $fvdIndicadoresCostosVariant = 'full';
+    if (!function_exists('admin_module_url')) {
+        require_once dirname(__DIR__) . '/config/paths.php';
+    }
+    $fvdReporteIndicadoresUrl = function_exists('admin_module_url') ? admin_module_url('atletas/reporte_indicadores.php') : null;
+    require dirname(__DIR__) . '/fvdmasteradmin/includes/partial_indicadores_costos_dashboard.php';
+    ?>
+
     <section class="fvd-dash-analytics__charts" aria-label="Gráficos">
         <div class="fvd-chart-panel">
             <h2 class="fvd-chart-panel__title">Atletas por asociación</h2>

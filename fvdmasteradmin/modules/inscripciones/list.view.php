@@ -50,6 +50,56 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
 
 <?php if ($fvdRepTorneos !== [] && $tSel > 0 && $aSel > 0): ?>
 
+<?php
+$fvdRepStatsPorAsoc = $fvdRepStatsPorAsoc ?? [];
+$fmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
+?>
+<?php if (AuthService::isSuperAdmin() && $fvdRepStatsPorAsoc !== []): ?>
+<section class="fvd-card fvd-rep-asoc-resumen" style="padding:14px;margin-bottom:1rem;overflow-x:auto" aria-label="Estadísticas por asociación en el torneo">
+    <h2 style="margin:0 0 8px;font-size:1.05rem">Resumen por asociación (torneo #<?= (int) $tSel ?>)</h2>
+    <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--fvd-muted);max-width:48rem">
+        Conteos desde <code>atletas</code> con este <code>torneo_id</code> y <code>asociacion</code>: inscritos (<code>inscripcion=1</code>), carnet y afiliación. Montos desde <code>deuda_asociaciones</code> y pagos en <code>relacion_pagos</code>. Use el filtro superior para fijar la asociación activa en informes PDF.
+    </p>
+    <table class="fvd-mod-table" style="font-size:0.8125rem;min-width:52rem">
+        <thead>
+        <tr>
+            <th scope="col">Asociación</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Inscritos</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Carnet</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Afiliación</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Deuda Bs ref.</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Deuda EUR</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Pagado EUR</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Saldo EUR</th>
+            <th scope="col"></th>
+        </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($fvdRepStatsPorAsoc as $sr): ?>
+            <?php
+            $aidR = (int) ($sr['asociacion_id'] ?? 0);
+            $eurOk = ($sr['monto_total_eur'] ?? null) !== null && (float) $sr['monto_total_eur'] > 0;
+            $saldo = $eurOk ? ($sr['saldo_eur'] ?? null) : null;
+            ?>
+            <tr class="<?= $aidR === $aSel ? 'fvd-rep-asoc-resumen__row--sel' : '' ?>">
+                <td><?= htmlspecialchars($sr['asoc_nombre'] !== '' ? $sr['asoc_nombre'] : ('#' . $aidR), ENT_QUOTES, 'UTF-8') ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= (int) ($sr['n_inscritos'] ?? 0) ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= (int) ($sr['n_carnets'] ?? 0) ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= (int) ($sr['n_afiliados'] ?? 0) ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $fmtN((float) ($sr['monto_total_bs'] ?? 0)) ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $eurOk ? $fmtN((float) $sr['monto_total_eur']) . ' €' : '—' ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $fmtN((float) ($sr['pagado_eur'] ?? 0)) ?> €</td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $saldo !== null ? $fmtN((float) $saldo) . ' €' : '—' ?></td>
+                <td style="white-space:nowrap">
+                    <a href="<?= htmlspecialchars($fvdUrlSelf . '?torneo_id=' . $tSel . '&asociacion_id=' . $aidR, ENT_QUOTES, 'UTF-8') ?>">Filtrar</a>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</section>
+<?php endif; ?>
+
 <style>
 .fvd-rep-two-col {
     display: grid;
@@ -153,11 +203,12 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
     border-color: var(--fvd-amarillo, rgba(251,191,36,.45));
     background: rgba(251,191,36,.1);
 }
+.fvd-rep-asoc-resumen__num { text-align: right; font-variant-numeric: tabular-nums; }
+.fvd-rep-asoc-resumen__row--sel td { background: rgba(251,191,36,.12); }
 </style>
 
 <?php
 $fvdRepStats = $fvdRepStats ?? null;
-$fmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
 ?>
 <?php if (is_array($fvdRepStats)): ?>
 <div class="fvd-rep-stats" aria-label="Estadísticas de la asociación en este torneo">

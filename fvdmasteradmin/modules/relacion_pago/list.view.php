@@ -45,7 +45,7 @@ $fvdFmtNum = static function ($value, int $decimals): string {
                 <td><?= htmlspecialchars((string) ($r['asoc_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars((string) ($r['torneo_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars($fvdFmtNum($r['monto_dolares'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars($fvdFmtNum($r['tasa_cambio'] ?? null, 4), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($fvdFmtNum($r['tasa_cambio'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars($fvdFmtNum($r['monto_total'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
                 <td style="white-space:nowrap">
                     <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>

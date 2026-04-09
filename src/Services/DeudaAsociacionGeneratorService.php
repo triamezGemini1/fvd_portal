@@ -101,7 +101,13 @@ final class DeudaAsociacionGeneratorService
 
         $selects = [];
         foreach (self::ATLETA_MARCAS_CONCEPTO as $colAtleta => $alias) {
-            $selects[] = 'COALESCE(SUM(CASE WHEN COALESCE(a.`' . $colAtleta . '`, 0) = 1 THEN 1 ELSE 0 END), 0) AS `' . $alias . '`';
+            if ($colAtleta === 'anualidad') {
+                $selects[] = 'COALESCE(SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END), 0) AS `' . $alias . '`';
+            } elseif ($colAtleta === 'inscripcion') {
+                $selects[] = 'COALESCE(SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END), 0) AS `' . $alias . '`';
+            } else {
+                $selects[] = 'COALESCE(SUM(CASE WHEN COALESCE(a.`' . $colAtleta . '`, 0) = 1 THEN 1 ELSE 0 END), 0) AS `' . $alias . '`';
+            }
         }
         $sql = 'SELECT ' . implode(",\n            ", $selects) . '
             FROM atletas a
