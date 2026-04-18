@@ -97,8 +97,9 @@ $urlPanel = $appBase . '/fvdmasteradmin/index.php';
 $urlPagosMod = '';
 $urlPagoNuevo = '';
 if (function_exists('fvd_master_module_url') && $aid > 0) {
-    $urlPagosMod = fvd_master_module_url('relacion_pago/index.php?aid=' . $aid);
-    $urlPagoNuevo = fvd_master_module_url('relacion_pago/index.php?action=form&asociacion_id=' . $aid);
+    $rpQs = 'aid=' . $aid . '&ref=rep_asoc&rid=' . $aid;
+    $urlPagosMod = fvd_master_module_url('relacion_pago/index.php?' . $rpQs);
+    $urlPagoNuevo = fvd_master_module_url('relacion_pago/index.php?action=form&asociacion_id=' . $aid . '&ref=rep_asoc&rid=' . $aid);
 }
 $urlEditarAsoc = function_exists('admin_module_url') ? admin_module_url('asociaciones/index.php?action=form&id=' . $aid) : '';
 
@@ -252,7 +253,7 @@ if ($detalle !== '') {
         <p style="margin:0 0 10px;font-size:.72rem;color:var(--fvd-muted,#94a3b8);line-height:1.45">
             Todo lo mostrado en este apartado corresponde <strong>exclusivamente</strong> a esta asociación activa en la consulta
             (<strong><?= htmlspecialchars($asocNombre, ENT_QUOTES, 'UTF-8') ?></strong>, <code>asociacion_id</code> = <?= (int) $aid ?>):
-            filas de <code>relacion_pagos</code> con ese mismo <code>asociacion_id</code>. Los enlaces al módulo abren el listado o el alta con esa asociación ya acotada.
+            filas de <code>relacion_pagos</code> con ese mismo <code>asociacion_id</code>. Los enlaces al módulo abren el listado o el alta con esa asociación acotada y permiten <strong>volver a este reporte</strong> o al <strong>panel general</strong>.
         </p>
         <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
             <?php if ($urlPagosMod !== ''): ?>
@@ -280,7 +281,7 @@ if ($detalle !== '') {
                     <?php foreach ($pagos as $p):
                         $pid = (int) ($p['id'] ?? 0);
                         $urlRec = function_exists('fvd_master_module_url')
-                            ? fvd_master_module_url('relacion_pago/index.php?action=form&id=' . $pid)
+                            ? fvd_master_module_url('relacion_pago/index.php?action=form&id=' . $pid . '&ref=rep_asoc&rid=' . $aid)
                             : '';
                         ?>
                         <tr>

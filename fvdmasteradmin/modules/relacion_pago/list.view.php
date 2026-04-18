@@ -1,6 +1,12 @@
 <?php
 /** @var array $result */
 /** @var string $selfUrl */
+/** @var array<string, int|string> $fvdRpPreservar */
+$fvdRpPreservar = isset($fvdRpPreservar) && is_array($fvdRpPreservar) ? $fvdRpPreservar : [];
+$fvdReporteOrigenUrl = isset($fvdReporteOrigenUrl) ? $fvdReporteOrigenUrl : null;
+$fvdRpPanelUrl = isset($fvdRpPanelUrl) ? (string) $fvdRpPanelUrl : '';
+$fvdRpQuitarFiltroAidUrl = isset($fvdRpQuitarFiltroAidUrl) ? (string) $fvdRpQuitarFiltroAidUrl : $selfUrl;
+
 $fvdFmtNum = static function ($value, int $decimals): string {
     if ($value === '' || $value === null) {
         return '';
@@ -14,10 +20,18 @@ $fvdFmtNum = static function ($value, int $decimals): string {
 <?php
 $fvdFiltroAsociacionId = isset($fvdFiltroAsociacionId) ? (int) $fvdFiltroAsociacionId : 0;
 ?>
+<div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 0.75rem">
+    <?php if ($fvdReporteOrigenUrl !== null && $fvdReporteOrigenUrl !== ''): ?>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-size:.8rem" href="<?= htmlspecialchars($fvdReporteOrigenUrl, ENT_QUOTES, 'UTF-8') ?>">← Reporte financiero (origen)</a>
+    <?php endif; ?>
+    <?php if ($fvdRpPanelUrl !== ''): ?>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-size:.8rem" href="<?= htmlspecialchars($fvdRpPanelUrl, ENT_QUOTES, 'UTF-8') ?>">← Panel general</a>
+    <?php endif; ?>
+</div>
 <?php if ($fvdFiltroAsociacionId > 0): ?>
     <p class="fvd-mod-msg" style="margin:0 0 0.75rem;font-size:0.82rem;background:rgba(37,99,235,.12);border-color:#2563eb;color:#1e3a8a">
-        Listado filtrado: solo pagos con <code>asociacion_id</code> = <strong><?= (int) $fvdFiltroAsociacionId ?></strong>.
-        <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="color:#1d4ed8;text-decoration:underline">Quitar filtro</a>
+        Listado acotado a la asociación activa en consulta: solo pagos con <code>asociacion_id</code> = <strong><?= (int) $fvdFiltroAsociacionId ?></strong>.
+        <a href="<?= htmlspecialchars($fvdRpQuitarFiltroAidUrl, ENT_QUOTES, 'UTF-8') ?>" style="color:#1d4ed8;text-decoration:underline">Quitar filtro de asociación</a>
     </p>
 <?php endif; ?>
 <p class="fvd-mod-msg" style="color:#334155;font-size:0.9rem;margin:0 0 0.75rem;max-width:52rem">
@@ -30,10 +44,11 @@ $fvdFiltroAsociacionId = isset($fvdFiltroAsociacionId) ? (int) $fvdFiltroAsociac
 
 <div class="fvd-mod-toolbar">
     <?php
-    $urlNuevoPago = $selfUrl . '?action=form';
+    $qNuevo = array_merge(['action' => 'form'], $fvdRpPreservar);
     if ($fvdFiltroAsociacionId > 0) {
-        $urlNuevoPago .= '&asociacion_id=' . (int) $fvdFiltroAsociacionId;
+        $qNuevo['asociacion_id'] = $fvdFiltroAsociacionId;
     }
+    $urlNuevoPago = $selfUrl . '?' . http_build_query($qNuevo);
     ?>
     <a href="<?= htmlspecialchars($urlNuevoPago, ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Registrar pago</a>
 </div>
@@ -63,7 +78,11 @@ $fvdFiltroAsociacionId = isset($fvdFiltroAsociacionId) ? (int) $fvdFiltroAsociac
                 <td><?= htmlspecialchars($fvdFmtNum($r['tasa_cambio'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars($fvdFmtNum($r['monto_total'] ?? null, 2), ENT_QUOTES, 'UTF-8') ?></td>
                 <td style="white-space:nowrap">
-                    <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>
+                    <?php
+                    $qVer = array_merge(['action' => 'form', 'id' => (int) $r['id']], $fvdRpPreservar);
+                    $urlVer = $selfUrl . '?' . http_build_query($qVer);
+                    ?>
+                    <a href="<?= htmlspecialchars($urlVer, ENT_QUOTES, 'UTF-8') ?>">Ver</a>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -77,10 +96,14 @@ $fvdFiltroAsociacionId = isset($fvdFiltroAsociacionId) ? (int) $fvdFiltroAsociac
 <?php
 $p = (int) $result['page'];
 $pages = (int) $result['pages'];
-$qsBase = $fvdFiltroAsociacionId > 0 ? 'aid=' . (int) $fvdFiltroAsociacionId . '&' : '';
+$qsPager = function (int $pageNum) use ($selfUrl, $fvdRpPreservar): string {
+    $q = array_merge($fvdRpPreservar, ['page' => $pageNum]);
+
+    return $selfUrl . '?' . http_build_query($q);
+};
 ?>
 <nav class="fvd-mod-pager">
     <span><?= (int) $result['total'] ?> reg. · pág. <?= $p ?>/<?= $pages ?></span>
-    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($selfUrl . '?' . $qsBase . 'page=' . ($p - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
-    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($selfUrl . '?' . $qsBase . 'page=' . ($p + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
+    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($qsPager($p - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
+    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($qsPager($p + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
 </nav>

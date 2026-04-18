@@ -250,6 +250,40 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
 </style>
 
 <div class="fvd-pf-form-center">
+    <?php
+    $fvdRpPanelUrl = isset($fvdRpPanelUrl) ? (string) $fvdRpPanelUrl : '';
+    $fvdReporteOrigenUrl = isset($fvdReporteOrigenUrl) ? $fvdReporteOrigenUrl : null;
+    $fvdRpRetornoRef = isset($fvdRpRetornoRef) ? (string) $fvdRpRetornoRef : '';
+    $fvdRpRetornoRid = isset($fvdRpRetornoRid) ? (int) $fvdRpRetornoRid : 0;
+    $aidVolver = (int) ($r['asociacion_id'] ?? 0);
+    if ($aidVolver <= 0 && isset($_GET['asociacion_id'])) {
+        $aidVolver = (int) $_GET['asociacion_id'];
+    }
+    $fvdVolverUrl = $selfUrl;
+    if ($fvdReporteOrigenUrl !== null && $fvdReporteOrigenUrl !== '') {
+        $fvdVolverUrl = $fvdReporteOrigenUrl;
+    } else {
+        $qv = [];
+        if ($aidVolver > 0) {
+            $qv['aid'] = $aidVolver;
+        }
+        if ($fvdRpRetornoRef === 'rep_asoc' && $fvdRpRetornoRid > 0) {
+            $qv['ref'] = 'rep_asoc';
+            $qv['rid'] = $fvdRpRetornoRid;
+        }
+        if ($qv !== []) {
+            $fvdVolverUrl = $selfUrl . '?' . http_build_query($qv);
+        }
+    }
+    ?>
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 1rem">
+        <?php if ($fvdReporteOrigenUrl !== null && $fvdReporteOrigenUrl !== ''): ?>
+            <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-size:.8rem" href="<?= htmlspecialchars($fvdReporteOrigenUrl, ENT_QUOTES, 'UTF-8') ?>">← Reporte financiero (origen)</a>
+        <?php endif; ?>
+        <?php if ($fvdRpPanelUrl !== ''): ?>
+            <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-size:.8rem" href="<?= htmlspecialchars($fvdRpPanelUrl, ENT_QUOTES, 'UTF-8') ?>">← Panel general</a>
+        <?php endif; ?>
+    </div>
     <div class="fvd-deuda-detalle-titulo">
         <h1><?= $fvdSoloConsulta ? 'Consulta de pago' : 'Registrar pago' ?></h1>
         <?php if ($fvdSoloConsulta): ?>
@@ -273,6 +307,10 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
         <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : ''), ENT_QUOTES, 'UTF-8') ?>" id="fvd-form-relacion-pago"<?= $fvdSoloConsulta ? ' onsubmit="return false"' : '' ?>>
             <?php if (!$fvdSoloConsulta): ?>
                 <input type="hidden" name="_action" value="save">
+            <?php endif; ?>
+            <?php if ($fvdRpRetornoRef === 'rep_asoc' && $fvdRpRetornoRid > 0): ?>
+                <input type="hidden" name="_retorno_ref" value="rep_asoc">
+                <input type="hidden" name="_retorno_rid" value="<?= (int) $fvdRpRetornoRid ?>">
             <?php endif; ?>
 
             <?php if ($pfSinTorneoActivo): ?>
@@ -391,7 +429,7 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
                 <?php if (!$fvdSoloConsulta): ?>
                     <button type="submit"<?= $pfSinTorneoActivo ? ' disabled' : '' ?>>Guardar</button>
                 <?php endif; ?>
-                <a class="fvd-deuda-btn fvd-deuda-btn--volver" href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver</a>
+                <a class="fvd-deuda-btn fvd-deuda-btn--volver" href="<?= htmlspecialchars($fvdVolverUrl, ENT_QUOTES, 'UTF-8') ?>">Volver</a>
             </div>
         </form>
     </div>

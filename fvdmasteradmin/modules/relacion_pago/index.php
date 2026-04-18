@@ -9,7 +9,12 @@ require_once __DIR__ . '/Controller.php';
 $ctrl = new RelacionPagoController();
 
 $selfUrl = fvd_module_url('relacion_pago/index.php');
+$fvdRpAppBase = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+$fvdRpPanelUrl = $fvdRpAppBase . '/fvdmasteradmin/index.php';
 $fvd_error = '';
+
+$rpRef = isset($_GET['ref']) ? trim((string) $_GET['ref']) : '';
+$rpRid = isset($_GET['rid']) ? max(0, (int) $_GET['rid']) : 0;
 
 if (($_GET['action'] ?? '') === 'deuda_resumen' && ($_GET['fmt'] ?? '') === 'json') {
     header('Content-Type: application/json; charset=utf-8');
@@ -40,7 +45,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
             exit;
         }
         $ctrl->save($sid, $_POST);
-        header('Location: ' . $selfUrl);
+        $retRef = trim((string) ($_POST['_retorno_ref'] ?? ''));
+        $retRid = (int) ($_POST['_retorno_rid'] ?? 0);
+        if ($retRef === 'rep_asoc' && $retRid > 0) {
+            header('Location: ' . $fvdRpAppBase . '/fvdmasteradmin/asociacion_reporte_financiero.php?id=' . $retRid);
+            exit;
+        }
+        $aidPost = (int) ($_POST['asociacion_id'] ?? 0);
+        $loc = $selfUrl;
+        $qs = [];
+        if ($aidPost > 0) {
+            $qs['aid'] = $aidPost;
+        }
+        $loc .= $qs !== [] ? ('?' . http_build_query($qs)) : '';
+        header('Location: ' . $loc);
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();
@@ -75,6 +93,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
             }
         }
         $fvd_page_title = 'Relación de pagos';
+        $fvdRpRetornoRef = trim((string) ($_POST['_retorno_ref'] ?? ''));
+        $fvdRpRetornoRid = (int) ($_POST['_retorno_rid'] ?? 0);
+        if ($fvdRpRetornoRef !== 'rep_asoc' || $fvdRpRetornoRid <= 0) {
+            $fvdRpRetornoRef = '';
+            $fvdRpRetornoRid = 0;
+        }
+        $fvdReporteOrigenUrl = ($fvdRpRetornoRef === 'rep_asoc' && $fvdRpRetornoRid > 0)
+            ? $fvdRpAppBase . '/fvdmasteradmin/asociacion_reporte_financiero.php?id=' . $fvdRpRetornoRid
+            : null;
         require FVD_MASTER_ROOT . '/includes/layout_header.php';
         include __DIR__ . '/form.view.php';
         require FVD_MASTER_ROOT . '/includes/layout_footer.php';
@@ -118,6 +145,11 @@ if ($action === 'form') {
             $fvdDeudaInicial = $ctrl->deudaResumenParaRecibo((int) $fvdTorneoRecibo['torneo_id'], $aidInit);
         }
     }
+    $fvdRpRetornoRef = ($rpRef === 'rep_asoc' && $rpRid > 0) ? 'rep_asoc' : '';
+    $fvdRpRetornoRid = ($fvdRpRetornoRef !== '') ? $rpRid : 0;
+    $fvdReporteOrigenUrl = ($fvdRpRetornoRef === 'rep_asoc' && $fvdRpRetornoRid > 0)
+        ? $fvdRpAppBase . '/fvdmasteradmin/asociacion_reporte_financiero.php?id=' . $fvdRpRetornoRid
+        : null;
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/form.view.php';
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';
@@ -127,6 +159,26 @@ if ($action === 'form') {
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $filtroAid = isset($_GET['aid']) ? max(0, (int) $_GET['aid']) : 0;
 $result = $ctrl->paginateList($page, 15, $filtroAid);
+
+$fvdRpPreservar = [];
+if ($filtroAid > 0) {
+    $fvdRpPreservar['aid'] = $filtroAid;
+}
+if ($rpRef === 'rep_asoc' && $rpRid > 0) {
+    $fvdRpPreservar['ref'] = 'rep_asoc';
+    $fvdRpPreservar['rid'] = $rpRid;
+}
+$fvdRpPreservarQs = $fvdRpPreservar === [] ? '' : http_build_query($fvdRpPreservar);
+$fvdReporteOrigenUrl = ($rpRef === 'rep_asoc' && $rpRid > 0)
+    ? $fvdRpAppBase . '/fvdmasteradmin/asociacion_reporte_financiero.php?id=' . $rpRid
+    : null;
+$fvdRpQuitarFiltroAidUrl = $selfUrl;
+$qsSinAid = [];
+if ($rpRef === 'rep_asoc' && $rpRid > 0) {
+    $qsSinAid['ref'] = 'rep_asoc';
+    $qsSinAid['rid'] = $rpRid;
+}
+$fvdRpQuitarFiltroAidUrl .= $qsSinAid !== [] ? ('?' . http_build_query($qsSinAid)) : '';
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 $fvdFiltroAsociacionId = $filtroAid;
