@@ -390,7 +390,8 @@ table.fvd-mod-table {
   margin: 0 0 0.35rem;
   width: 100%;
   font-weight: 700;
-  font-size: calc(1.35rem * 1.5);
+  /* Base 1.35rem × 1.5, +80% sobre ese tamaño */
+  font-size: calc(1.35rem * 1.5 * 1.8);
   line-height: 1.25;
   color: var(--fvd-amarillo, var(--fvd-dorado, #fff200));
   letter-spacing: 0.02em;
@@ -419,9 +420,13 @@ table.fvd-mod-table {
   background: rgba(0, 0, 0, 0.08);
   box-shadow: 0 0 0 1px rgba(255, 242, 0, 0.12);
 }
+
 .fvd-tf-form__actions {
   justify-content: center;
   margin-top: 1rem;
+}
+.fvd-tf-grupo-wrap {
+  grid-column: 1 / -1;
 }
 .fvd-tf-grid.fvd-tf-grid--form {
   max-width: none;

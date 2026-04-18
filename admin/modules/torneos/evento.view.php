@@ -6,7 +6,7 @@
 /** @var bool $inscOk */
 /** @var int $id */
 /** @var string $fvd_error */
-/** @var array<string,int> $torneoPanelStats */
+/** @var array<string,int> $torneoPanelStats inscripciones_torneo y banderas = conteos con valor 1; atletas_en_ambito = filas del torneo */
 /** @var string $torneoNotifFlash */
 /** @var string $torneoWaUrl */
 
@@ -117,8 +117,8 @@ $fvdClaseLab = [1 => 'Individual', 2 => 'Parejas', 3 => 'Equipos'][(int) ($t['cl
         <div class="fvd-mis-panel__strip-col">
             <span class="fvd-mis-panel__strip-label">Convocatoria</span>
             <div class="fvd-mis-panel__badges">
-                <div class="fvd-mis-badge fvd-mis-badge--emerald" title="Invitaciones registradas"><span class="fvd-mis-badge__k">Inv.</span><span class="fvd-mis-badge__v"><?= (int) $fvdEvResInv ?></span></div>
-                <div class="fvd-mis-badge fvd-mis-badge--blue" title="Asociaciones con inscritos"><span class="fvd-mis-badge__k">Asoc+</span><span class="fvd-mis-badge__v"><?= (int) $fvdEvResAsocInsc ?></span></div>
+                <div class="fvd-mis-badge fvd-mis-badge--emerald" title="Invitaciones enviadas (convocatoria con fecha registrada)"><span class="fvd-mis-badge__k">Inv.</span><span class="fvd-mis-badge__v"><?= (int) $fvdEvResInv ?></span></div>
+                <div class="fvd-mis-badge fvd-mis-badge--blue" title="Asociaciones con al menos un inscrito en este torneo"><span class="fvd-mis-badge__k">Asoc+</span><span class="fvd-mis-badge__v"><?= (int) $fvdEvResAsocInsc ?></span></div>
             </div>
         </div>
         <div class="fvd-mis-panel__strip-col">
@@ -129,23 +129,22 @@ $fvdClaseLab = [1 => 'Individual', 2 => 'Parejas', 3 => 'Equipos'][(int) ($t['cl
         <div class="fvd-mis-panel__strip-col">
             <span class="fvd-mis-panel__strip-label">Inscripciones al torneo</span>
             <div class="fvd-mis-panel__badges">
-                <div class="fvd-mis-badge fvd-mis-badge--rose" title="Filas en inscripcion_torneo"><span class="fvd-mis-badge__k">Ins.</span><span class="fvd-mis-badge__v"><?= (int) ($tp['inscripciones_torneo'] ?? 0) ?></span></div>
+                <div class="fvd-mis-badge fvd-mis-badge--rose" title="Atletas con bandera inscripción = 1 en este torneo"><span class="fvd-mis-badge__k">Ins.</span><span class="fvd-mis-badge__v"><?= (int) ($tp['inscripciones_torneo'] ?? 0) ?></span></div>
                 <div class="fvd-mis-badge fvd-mis-badge--amber" title="Suma por asociación"><span class="fvd-mis-badge__k">Σ</span><span class="fvd-mis-badge__v"><?= (int) $fvdEvResSum ?></span></div>
             </div>
         </div>
     </div>
 
-    <p class="fvd-mis-card__hint" style="margin:0 0 0.5rem">Conteos de afiliación, carnet, anualidad y traspaso: ámbito de su rol sobre <code class="fvd-torneo-evento__code">atletas</code> (0 = pendiente).</p>
+    <p class="fvd-mis-card__hint" style="margin:0 0 0.5rem">Conteos sobre atletas de <strong>este torneo</strong> (<code class="fvd-torneo-evento__code">torneo_id</code>): banderas en <strong>1</strong> (inscripción, afiliación, anualidad, carnet, traspaso). Convocatoria: solo invitaciones ya enviadas.</p>
 
     <div class="fvd-mis-panel__mini" aria-label="Indicadores operativos">
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Ins. torneo</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['inscripciones_torneo'] ?? 0), 0, ',', '.') ?></span></div>
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Inv. / asoc.</span><span class="fvd-mis-mini__v"><?= (int) $fvdEvResInv ?> / <?= (int) $fvdEvTotalAsoc ?></span></div>
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Afiliación</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['afiliacion_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Anualidad</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['anualidad_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Carnet</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['carnet_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Traspaso</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['traspaso_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Ins. maestro</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['inscripcion_maestro_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
-        <div class="fvd-mis-mini"><span class="fvd-mis-mini__k">Atletas ámbito</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['atletas_en_ambito'] ?? 0), 0, ',', '.') ?></span></div>
+        <div class="fvd-mis-mini" title="Atletas con inscripción = 1"><span class="fvd-mis-mini__k">Ins. torneo</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['inscripciones_torneo'] ?? 0), 0, ',', '.') ?></span></div>
+        <div class="fvd-mis-mini" title="Solo invitaciones ya enviadas (registro en convocatoria); una por asociación alcanzada"><span class="fvd-mis-mini__k">Inv. / asoc.</span><span class="fvd-mis-mini__v"><?= (int) $fvdEvResInv ?></span></div>
+        <div class="fvd-mis-mini" title="Afiliación = 1"><span class="fvd-mis-mini__k">Afiliación</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['afiliacion_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
+        <div class="fvd-mis-mini" title="Anualidad = 1"><span class="fvd-mis-mini__k">Anualidad</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['anualidad_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
+        <div class="fvd-mis-mini" title="Carnet = 1"><span class="fvd-mis-mini__k">Carnet</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['carnet_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
+        <div class="fvd-mis-mini" title="Traspaso = 1"><span class="fvd-mis-mini__k">Traspaso</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['traspaso_pendiente'] ?? 0), 0, ',', '.') ?></span></div>
+        <div class="fvd-mis-mini" title="Todos los atletas de este torneo (ámbito de rol)"><span class="fvd-mis-mini__k">Atletas (torneo)</span><span class="fvd-mis-mini__v"><?= number_format((int) ($tp['atletas_en_ambito'] ?? 0), 0, ',', '.') ?></span></div>
     </div>
 
     <div class="fvd-mis-panel__grid">

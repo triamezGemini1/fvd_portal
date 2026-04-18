@@ -33,15 +33,34 @@ class RelacionPagoController extends FvdModuleController
         'monto_total', 'monto_dolares', 'referencia', 'banco', 'observaciones',
     ];
 
-    public function paginateList(int $page, int $perPage): array
+    /**
+     * @param int $filtroAsociacionId Si es &gt; 0, limita a esa asociación (super admin o misma asociación que la sesión).
+     */
+    public function paginateList(int $page, int $perPage, int $filtroAsociacionId = 0): array
     {
         $params = [];
-        $countSql = 'SELECT COUNT(*) FROM relacion_pagos r WHERE 1=1';
+        $filtroSql = '';
+        if ($filtroAsociacionId > 0) {
+            $ok = false;
+            if (AuthService::isSuperAdmin()) {
+                $ok = true;
+            } else {
+                $mine = AuthService::idAsociacion();
+                if ($mine !== null && (int) $mine === $filtroAsociacionId) {
+                    $ok = true;
+                }
+            }
+            if ($ok) {
+                $filtroSql = ' AND r.asociacion_id = :fvd_rp_filtro_aid ';
+                $params[':fvd_rp_filtro_aid'] = $filtroAsociacionId;
+            }
+        }
+        $countSql = 'SELECT COUNT(*) FROM relacion_pagos r WHERE 1=1' . $filtroSql;
         $dataSql = 'SELECT r.*, a.nombre AS asoc_nombre, t.nombre AS torneo_nombre
             FROM relacion_pagos r
             LEFT JOIN asociaciones a ON r.asociacion_id = a.id
             LEFT JOIN torneosact t ON r.torneo_id = t.torneo
-            WHERE 1=1
+            WHERE 1=1' . $filtroSql . '
             ORDER BY r.fecha DESC';
 
         return self::paginateWithAsociacionScope($this->pdo, $countSql, $dataSql, $params, $page, $perPage, self::SCOPE_COL);

@@ -8,6 +8,7 @@ declare(strict_types=1);
  * @var array $fvdIndicadoresCostos resultado de StatsService::indicadoresServicioConCostosEstimados
  * @var string $fvdIndicadoresCostosVariant 'delegado'|'full'
  * @var string|null $fvdReporteIndicadoresUrl enlace opcional al reporte detallado
+ * @var string $fvdAsocReporteFinancieroUrl base URL del informe por asociación (solo super admin; vacío si no aplica)
  */
 
 if (!isset($fvdIndicadoresCostos) || !is_array($fvdIndicadoresCostos)) {
@@ -28,10 +29,9 @@ $counts = is_array($tot['counts'] ?? null) ? $tot['counts'] : [];
 $montoGrand = (float) ($tot['monto_total'] ?? 0);
 $porAsoc = is_array($ic['por_asociacion'] ?? null) ? $ic['por_asociacion'] : [];
 
-$fvdAsocDetailApiUrl = isset($fvdAsocDetailApiUrl) ? (string) $fvdAsocDetailApiUrl : '';
-$fvdIndCols = IndicadoresTablaDefs::columnasMetricas();
-$fvdAsocDetailColspan = 4 + count($fvdIndCols);
-$countsVals = IndicadoresTablaDefs::valoresMetricasInt($counts, 'indicadores dashboard resumen');
+$fvdAsocReporteFinancieroUrl = isset($fvdAsocReporteFinancieroUrl) ? (string) $fvdAsocReporteFinancieroUrl : '';
+$fvdIndCols = IndicadoresTablaDefs::columnasMetricasContable();
+$countsVals = IndicadoresTablaDefs::valoresMetricasInt($counts, 'indicadores dashboard resumen', $fvdIndCols);
 
 $fmtN = static function (float $v): string {
     return \function_exists('fvd_format_contable') ? fvd_format_contable($v) : number_format($v, 2, ',', '.');
@@ -88,8 +88,8 @@ $linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)'
     <?php if ($porAsoc !== []): ?>
     <h3 style="margin:0 0 8px;font-size:.85rem">Por asociación</h3>
     <p style="margin:0 0 8px;font-size:.72rem;color:<?= htmlspecialchars($mutedColor, ENT_QUOTES, 'UTF-8') ?>">
-        <?php if ($fvdAsocDetailApiUrl !== '' && $variant === 'full'): ?>
-            Use <strong>Ver ficha</strong> para desplegar datos de contacto, deudas por torneo y pagos recientes, con enlaces a cada expediente.
+        <?php if ($fvdAsocReporteFinancieroUrl !== '' && $variant === 'full'): ?>
+            Use <strong>Reporte financiero</strong> para abrir el informe completo: resumen, listados por renglón y pagos.
         <?php endif; ?>
     </p>
     <div style="overflow-x:auto;max-height:min(48vh,520px);overflow-y:auto">
@@ -102,8 +102,8 @@ $linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)'
                 <th scope="col" style="text-align:right" title="<?= htmlspecialchars($col['title'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($col['labelShort'], ENT_QUOTES, 'UTF-8') ?></th>
                 <?php endforeach; ?>
                 <th scope="col" style="text-align:right">Total est.</th>
-                <?php if ($fvdAsocDetailApiUrl !== '' && $variant === 'full'): ?>
-                <th scope="col" style="white-space:nowrap">Ficha</th>
+                <?php if ($fvdAsocReporteFinancieroUrl !== '' && $variant === 'full'): ?>
+                <th scope="col" style="white-space:nowrap">Informe</th>
                 <?php endif; ?>
             </tr>
             </thead>
@@ -112,7 +112,7 @@ $linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)'
                 <?php
                 $mt = (float) ($pa['monto_total'] ?? 0);
                 $paId = (int) ($pa['asociacion_id'] ?? 0);
-                $paVals = IndicadoresTablaDefs::valoresMetricasInt($pa, 'indicadores dashboard asoc id=' . $paId);
+                $paVals = IndicadoresTablaDefs::valoresMetricasInt($pa, 'indicadores dashboard asoc id=' . $paId, $fvdIndCols);
                 ?>
                 <tr>
                     <td style="white-space:nowrap"><?= $paId ?></td>
@@ -121,138 +121,16 @@ $linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)'
                     <td style="text-align:right"><?= (int) ($paVals[$col['key']] ?? 0) ?></td>
                     <?php endforeach; ?>
                     <td style="text-align:right;font-weight:600"><?= $fmtN($mt) ?></td>
-                    <?php if ($fvdAsocDetailApiUrl !== '' && $variant === 'full'): ?>
+                    <?php if ($fvdAsocReporteFinancieroUrl !== '' && $variant === 'full'): ?>
                     <td style="white-space:nowrap">
-                        <button type="button" class="fvd-ic-dash__btn-detalle fvd-input" style="padding:4px 10px;font-size:.75rem;cursor:pointer;width:auto"
-                            data-asoc-id="<?= (int) $paId ?>" aria-expanded="false" aria-controls="fvd-asoc-detail-<?= (int) $paId ?>">Ver ficha</button>
+                        <a class="fvd-input" style="display:inline-block;padding:4px 10px;font-size:.75rem;text-decoration:none;color:inherit;border:1px solid rgba(255,255,255,0.2);border-radius:6px"
+                            href="<?= htmlspecialchars($fvdAsocReporteFinancieroUrl . '?id=' . (int) $paId, ENT_QUOTES, 'UTF-8') ?>">Reporte financiero</a>
                     </td>
                     <?php endif; ?>
                 </tr>
-                <?php if ($fvdAsocDetailApiUrl !== '' && $variant === 'full'): ?>
-                <tr class="fvd-asoc-dash-detail" id="fvd-asoc-detail-<?= (int) $paId ?>" hidden>
-                    <td colspan="<?= (int) $fvdAsocDetailColspan ?>" style="background:rgba(0,0,0,.12);padding:10px 12px;vertical-align:top">
-                        <div class="fvd-asoc-dash-detail__inner" data-loaded="0" data-asoc-id="<?= (int) $paId ?>" style="font-size:.78rem;line-height:1.45;color:#e2e8f0">
-                            Pulse «Ver ficha» para cargar datos.
-                        </div>
-                    </td>
-                </tr>
-                <?php endif; ?>
             <?php endforeach; ?>
             </tbody>
         </table>
     </div>
-    <?php if ($fvdAsocDetailApiUrl !== '' && $variant === 'full' && $porAsoc !== []): ?>
-    <script>
-    (function () {
-        var api = <?= json_encode($fvdAsocDetailApiUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-        function esc(s) {
-            if (s == null) return '';
-            var d = document.createElement('div');
-            d.textContent = String(s);
-            return d.innerHTML;
-        }
-        function fmtNum(v) {
-            var n = parseFloat(v);
-            if (isNaN(n)) return '—';
-            return n.toFixed(2).replace('.', ',');
-        }
-        function buildHtml(j) {
-            var a = j.asociacion || {};
-            var u = j.urls || {};
-            var h = '';
-            h += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">';
-            h += '<strong style="font-size:.85rem">Asociación #' + esc(a.id) + '</strong>';
-            if (u.editar_asociacion) {
-                h += '<a href="' + esc(u.editar_asociacion) + '" style="color:#facc15;text-decoration:underline">Editar ficha (CRUD)</a>';
-            }
-            if (u.lista_deudas) {
-                h += '<a href="' + esc(u.lista_deudas) + '" style="color:#facc15;text-decoration:underline">Módulo deudas</a>';
-            }
-            if (u.lista_pagos) {
-                h += '<a href="' + esc(u.lista_pagos) + '" style="color:#facc15;text-decoration:underline">Módulo pagos</a>';
-            }
-            h += '</div>';
-            h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:12px;font-size:.76rem">';
-            var lab = { nombre: 'Nombre', delegado: 'Delegado', telefono: 'Teléfono', email: 'Email', direccion: 'Dirección', numreg: 'Nº registro' };
-            ['nombre', 'delegado', 'telefono', 'email', 'direccion', 'numreg'].forEach(function (k) {
-                if (a[k] != null && String(a[k]).trim() !== '') {
-                    h += '<div><span style="opacity:.75">' + esc(lab[k] || k) + ':</span> ' + esc(a[k]) + '</div>';
-                }
-            });
-            h += '</div>';
-            h += '<h4 style="margin:10px 0 6px;font-size:.8rem">Deudas por torneo</h4>';
-            if (!j.deudas || !j.deudas.length) {
-                h += '<p style="margin:0;opacity:.85">Sin filas en deuda para esta asociación.</p>';
-            } else {
-                h += '<div style="overflow-x:auto"><table class="fvd-mod-table" style="font-size:.72rem"><thead><tr>';
-                h += '<th>Torneo</th><th style="text-align:right">Total</th><th style="text-align:right">EUR</th><th></th></tr></thead><tbody>';
-                j.deudas.forEach(function (d) {
-                    h += '<tr><td>' + esc(d.torneo_nombre || ('ID ' + d.torneo_id)) + '</td>';
-                    h += '<td style="text-align:right">' + fmtNum(d.monto_total) + '</td>';
-                    h += '<td style="text-align:right">' + (d.monto_total_eur != null ? fmtNum(d.monto_total_eur) : '—') + '</td>';
-                    h += '<td style="white-space:nowrap">';
-                    if (d.url_detalle) {
-                        h += '<a href="' + esc(d.url_detalle) + '" style="color:#facc15">Detalle / conceptos</a>';
-                    }
-                    h += '</td></tr>';
-                });
-                h += '</tbody></table></div>';
-            }
-            h += '<h4 style="margin:12px 0 6px;font-size:.8rem">Pagos recientes</h4>';
-            if (!j.pagos || !j.pagos.length) {
-                h += '<p style="margin:0;opacity:.85">Sin pagos registrados para esta asociación.</p>';
-            } else {
-                h += '<div style="overflow-x:auto"><table class="fvd-mod-table" style="font-size:.72rem"><thead><tr>';
-                h += '<th>Fecha</th><th>Torneo</th><th style="text-align:right">EUR</th><th style="text-align:right">Bs ref.</th><th></th></tr></thead><tbody>';
-                j.pagos.forEach(function (p) {
-                    h += '<tr><td>' + esc(p.fecha) + '</td><td>' + esc(p.torneo_nombre || ('ID ' + p.torneo_id)) + '</td>';
-                    h += '<td style="text-align:right">' + fmtNum(p.monto_dolares) + '</td>';
-                    h += '<td style="text-align:right">' + fmtNum(p.monto_total) + '</td>';
-                    h += '<td style="white-space:nowrap">';
-                    if (p.url_detalle) {
-                        h += '<a href="' + esc(p.url_detalle) + '" style="color:#facc15">Ver recibo</a>';
-                    }
-                    h += '</td></tr>';
-                });
-                h += '</tbody></table></div>';
-            }
-            return h;
-        }
-        document.querySelectorAll('.fvd-ic-dash__btn-detalle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var id = btn.getAttribute('data-asoc-id');
-                var row = document.getElementById('fvd-asoc-detail-' + id);
-                if (!row) return;
-                var inner = row.querySelector('.fvd-asoc-dash-detail__inner');
-                var open = !row.hidden;
-                if (open) {
-                    row.hidden = true;
-                    btn.setAttribute('aria-expanded', 'false');
-                    btn.textContent = 'Ver ficha';
-                    return;
-                }
-                row.hidden = false;
-                btn.setAttribute('aria-expanded', 'true');
-                btn.textContent = 'Ocultar';
-                if (inner.getAttribute('data-loaded') === '1') return;
-                inner.innerHTML = 'Cargando…';
-                fetch(api + '?id=' + encodeURIComponent(id), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
-                    .then(function (r) { return r.json(); })
-                    .then(function (j) {
-                        inner.setAttribute('data-loaded', '1');
-                        if (!j.ok) {
-                            inner.textContent = j.error || 'Error al cargar.';
-                            return;
-                        }
-                        inner.innerHTML = buildHtml(j);
-                    })
-                    .catch(function () {
-                        inner.textContent = 'No se pudo cargar el detalle.';
-                    });
-            });
-        });
-    })();
-    </script>
-    <?php endif; ?>
     <?php endif; ?>
 </section>

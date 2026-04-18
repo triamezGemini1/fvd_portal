@@ -19,7 +19,10 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
         <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Ir</button>
         <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
     </form>
+    <?php if ($fvd_es_fvd): ?>
+    <a href="<?= htmlspecialchars($selfUrl . '?action=relacion_grupo', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Relacionar campeonatos</a>
     <a href="<?= htmlspecialchars($selfUrl . '?action=form', ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nuevo torneo</a>
+    <?php endif; ?>
 </div>
 
 <div class="fvd-mod-table-wrap">
@@ -33,7 +36,7 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
             <th>Organización</th>
             <th>Estatus</th>
             <?php if ($fvd_es_fvd): ?><th>Admin.</th><?php endif; ?>
-            <th></th>
+            <?php if ($fvd_es_fvd): ?><th></th><?php endif; ?>
         </tr>
         </thead>
         <tbody>
@@ -47,16 +50,16 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
                 <td><?= (int) ($r['estatus'] ?? 0) ?></td>
                 <?php if ($fvd_es_fvd): ?>
                 <td style="white-space:nowrap"><a href="<?= htmlspecialchars($selfUrl . '?action=evento&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>">Admin torneo</a></td>
-                <?php endif; ?>
                 <td style="white-space:nowrap;font-size:0.8125rem">
                     <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>
                     &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
                     &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar torneo?');">Eliminar</a>
                 </td>
+                <?php endif; ?>
             </tr>
         <?php endforeach; ?>
         <?php if ($result['rows'] === []): ?>
-            <tr><td colspan="<?= $fvd_es_fvd ? '8' : '7' ?>" style="padding:12px">Sin registros.</td></tr>
+            <tr><td colspan="<?= $fvd_es_fvd ? '8' : '6' ?>" style="padding:12px">Sin registros.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

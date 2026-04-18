@@ -60,15 +60,31 @@ final class IndicadoresTablaDefs
     }
 
     /**
+     * Columnas con costo estimado en tarifa: excluye el conteo total de filas en `atletas` («Atletas»), que no tiene partida en `costos`.
+     *
+     * @return list<array{key:string,label:string,labelShort:string,title:string}>
+     */
+    public static function columnasMetricasContable(): array
+    {
+        return \array_values(\array_filter(
+            self::columnasMetricas(),
+            static fn (array $c): bool => ($c['key'] ?? '') !== 'total_atletas'
+        ));
+    }
+
+    /**
      * Extrae enteros por columna de métrica; registra en log si falta alguna clave esperada.
      *
      * @param array<string, mixed> $fila
+     * @param list<array{key:string,label:string,labelShort:string,title:string}>|null $columnas Si es null, usa {@see columnasMetricas()}.
+     *
      * @return array<string, int>
      */
-    public static function valoresMetricasInt(array $fila, string $contexto = ''): array
+    public static function valoresMetricasInt(array $fila, string $contexto = '', ?array $columnas = null): array
     {
         $out = [];
-        foreach (self::columnasMetricas() as $col) {
+        $cols = $columnas ?? self::columnasMetricas();
+        foreach ($cols as $col) {
             $k = $col['key'];
             if (!\array_key_exists($k, $fila)) {
                 $ctx = $contexto !== '' ? $contexto . ': ' : '';

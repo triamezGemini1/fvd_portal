@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 /** @var ?array $row */
-/** @var list<array<string,mixed>> $asociaciones */
-/** @var string $selfUrl */
-/** @var int $fvd_torneo_org_id */
-/** @var string $fvd_torneo_org_nombre */
+/** @var string $selfUrl URL base del módulo torneos */
+/** @var int $fvd_torneo_org_id 0 = sin fila vinculada en asociaciones (nombre exacto en BD) */
 
 $r = $row ?? [];
 $isEdit = $row !== null;
@@ -33,11 +31,10 @@ $vCostotor = isset($r['costotor']) ? (string) $r['costotor'] : '0';
 $vPareclub = isset($r['pareclub']) && $r['pareclub'] !== '' && $r['pareclub'] !== null ? (string) (int) $r['pareclub'] : '0';
 $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== null ? (string) (int) $r['estatus'] : '0';
 
-$federacionNombre = $fvd_torneo_org_nombre !== '' ? $fvd_torneo_org_nombre : 'Organización';
 ?>
 
 <div class="fvd-tf-form-page">
-    <p class="fvd-tf-federacion-name"><?= htmlspecialchars($federacionNombre, ENT_QUOTES, 'UTF-8') ?></p>
+    <p class="fvd-tf-federacion-name"><?= htmlspecialchars(FvdAdminService::ASOCIACION_NOMBRE_FEDERACION_TORNEOS, ENT_QUOTES, 'UTF-8') ?></p>
     <h1 class="fvd-tf-form-title"><?= $isEdit ? 'Editar torneo' : 'Nuevo torneo' ?></h1>
 
     <?php if (!empty($fvd_error ?? '')): ?>
@@ -47,7 +44,7 @@ $federacionNombre = $fvd_torneo_org_nombre !== '' ? $fvd_torneo_org_nombre : 'Or
     <form class="fvd-tf-form fvd-tf-form--framed" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['torneo'] : ''), ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="_action" value="save">
         <?php if ($isEdit): ?><input type="hidden" name="torneo" value="<?= (int) $r['torneo'] ?>"><?php endif; ?>
-        <input type="hidden" name="organizacion_id" value="<?= (int) $fvd_torneo_org_id ?>">
+        <input type="hidden" name="organizacion_id" value="<?= $fvd_torneo_org_id > 0 ? (string) (int) $fvd_torneo_org_id : '' ?>">
 
         <?php if ($fvdEsAdminGeneral): ?>
         <input type="hidden" name="publicar_landing" value="1">
@@ -71,16 +68,36 @@ $federacionNombre = $fvd_torneo_org_nombre !== '' ? $fvd_torneo_org_nombre : 'Or
                 <input class="fvd-input" id="lugar" name="lugar" value="<?= htmlspecialchars((string) ($r['lugar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
             </div>
 
-            <?php if ($fvdEsAdminGeneral): ?>
             <div>
-                <label for="grupo_evento_id">ID grupo de evento (opcional)</label>
+                <label for="tipo">Tipo</label>
+                <select class="fvd-input" id="tipo" name="tipo" style="max-width:14rem">
+                    <?php foreach ([1 => 'Torneo', 2 => 'Campeonato'] as $k => $lab): ?>
+                        <option value="<?= $k ?>" <?= $tipoVal === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="clase">Modalidad (clase)</label>
+                <select class="fvd-input" id="clase" name="clase" style="max-width:14rem">
+                    <?php foreach ([1 => 'Individual', 2 => 'Parejas', 3 => 'Equipos'] as $k => $lab): ?>
+                        <option value="<?= $k ?>" <?= ((int) ($r['clase'] ?? 1) === $k) ? 'selected' : '' ?>><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <?php if ($fvdEsAdminGeneral && $isEdit): ?>
+            <div id="fvd_grupo_evento_wrap" class="fvd-tf-grupo-wrap"<?= $tipoVal === 2 ? '' : ' style="display:none"' ?>>
+                <label for="grupo_evento_id">ID grupo de evento (campeonatos)</label>
                 <input class="fvd-input" type="number" min="1" id="grupo_evento_id" name="grupo_evento_id" style="max-width:14rem"
-                    placeholder="Mismo ID = circuito vinculado"
+                    placeholder="Ej. 1"
                     value="<?= isset($r['grupo_evento_id']) && (int) ($r['grupo_evento_id'] ?? 0) > 0 ? (int) $r['grupo_evento_id'] : '' ?>">
                 <small style="display:block;font-size:0.7rem;color:var(--fvd-muted,#94a3b8);margin-top:4px">
-                    Torneos con el mismo número comparten selector en el panel del delegado (p. ej. por género o categoría).
+                    También puede usar <a href="<?= htmlspecialchars($selfUrl . '?action=relacion_grupo', ENT_QUOTES, 'UTF-8') ?>">Relacionar campeonatos</a> para elegir varios el mismo día y asignar el grupo automáticamente. Aquí puede corregir el número a mano si hace falta.
                 </small>
             </div>
+            <?php endif; ?>
+
+            <?php if ($fvdEsAdminGeneral): ?>
             <div>
                 <label class="fvd-tf-check-readonly" style="cursor:pointer">
                     <input type="checkbox" name="apertura_anual" value="1" <?= !empty($r['apertura_anual']) ? 'checked' : '' ?>>
@@ -98,23 +115,6 @@ $federacionNombre = $fvd_torneo_org_nombre !== '' ? $fvd_torneo_org_nombre : 'Or
                 </label>
             </div>
             <?php endif; ?>
-
-            <div>
-                <label for="tipo">Tipo</label>
-                <select class="fvd-input" id="tipo" name="tipo" style="max-width:14rem">
-                    <?php foreach ([1 => 'Torneo', 2 => 'Campeonato'] as $k => $lab): ?>
-                        <option value="<?= $k ?>" <?= $tipoVal === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label for="clase">Modalidad (clase)</label>
-                <select class="fvd-input" id="clase" name="clase" style="max-width:14rem">
-                    <?php foreach ([1 => 'Individual', 2 => 'Parejas', 3 => 'Equipos'] as $k => $lab): ?>
-                        <option value="<?= $k ?>" <?= ((int) ($r['clase'] ?? 1) === $k) ? 'selected' : '' ?>><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
 
             <div class="fvd-tf-metrics-row">
                 <div class="fvd-tf-metric">
@@ -177,7 +177,7 @@ $federacionNombre = $fvd_torneo_org_nombre !== '' ? $fvd_torneo_org_nombre : 'Or
         </div>
 
         <div class="fvd-mod-actions fvd-tf-form__actions">
-            <button type="submit"<?= ($fvdEsAdminGeneral && $fvd_torneo_org_id <= 0) ? ' disabled' : '' ?>>Guardar</button>
+            <button type="submit">Guardar</button>
             <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver</a>
         </div>
     </form>
@@ -190,3 +190,19 @@ $federacionNombre = $fvd_torneo_org_nombre !== '' ? $fvd_torneo_org_nombre : 'Or
     window.filePreview.init('afiche', 'fvd_preview_afiche', 'image', { previewSize: 200 });
 })();
 </script>
+<?php if ($fvdEsAdminGeneral && $isEdit): ?>
+<script>
+(function () {
+    var tipo = document.getElementById('tipo');
+    var wrap = document.getElementById('fvd_grupo_evento_wrap');
+    var inp = document.getElementById('grupo_evento_id');
+    if (!tipo || !wrap) return;
+    function sync() {
+        var esCamp = tipo.value === '2';
+        wrap.style.display = esCamp ? '' : 'none';
+        if (!esCamp && inp) inp.value = '';
+    }
+    tipo.addEventListener('change', sync);
+})();
+</script>
+<?php endif; ?>

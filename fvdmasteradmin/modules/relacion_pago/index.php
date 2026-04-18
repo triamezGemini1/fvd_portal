@@ -88,6 +88,14 @@ $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 
 if ($action === 'form') {
     $row = $ctrl->find($id);
+    $preAsoc = isset($_GET['asociacion_id']) ? max(0, (int) $_GET['asociacion_id']) : 0;
+    if ($id === null && $row === null && $preAsoc > 0) {
+        $puedePre = AuthService::isSuperAdmin()
+            || (AuthService::idAsociacion() !== null && (int) AuthService::idAsociacion() === $preAsoc);
+        if ($puedePre) {
+            $row = ['asociacion_id' => $preAsoc];
+        }
+    }
     $asociaciones = $ctrl->listAsociacionesForSelect();
     if ($id !== null && $row === null) {
         $fvdTorneoRecibo = null;
@@ -117,8 +125,10 @@ if ($action === 'form') {
 }
 
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
-$result = $ctrl->paginateList($page, 15);
+$filtroAid = isset($_GET['aid']) ? max(0, (int) $_GET['aid']) : 0;
+$result = $ctrl->paginateList($page, 15, $filtroAid);
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
+$fvdFiltroAsociacionId = $filtroAid;
 include __DIR__ . '/list.view.php';
 require FVD_MASTER_ROOT . '/includes/layout_footer.php';

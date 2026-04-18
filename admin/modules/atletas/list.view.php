@@ -15,7 +15,27 @@
 /** @var array<string,mixed>|null $fvd_asociacion_header */
 /** @var list<array<string,mixed>> $fvd_asociaciones_list_filter */
 /** @var bool $fvd_atletas_puede_elegir_alcance true = admin FVD: selector federación / asociación con listado completo */
+/** @var bool $fvd_atletas_puede_reset_marcadores */
+/** @var string $fvd_atletas_reset_msg */
+/** @var int $fvd_atletas_reset_n */
+/** @var string $fvd_atletas_reset_campo */
+/** @var array<string, int|string> $fvd_atletas_widget */
 $atletasFormNuevoUrl = $selfUrl . '?action=form';
+$fvd_atletas_widget = isset($fvd_atletas_widget) && is_array($fvd_atletas_widget) ? $fvd_atletas_widget : [
+    'etiqueta' => '', 'total_atletas' => 0, 'total_afiliados' => 0,
+    'sexo_m' => 0, 'sexo_f' => 0, 'sexo_sin' => 0, 'torneos' => 0, 'participacion' => 0,
+];
+$fvd_atletas_puede_reset_marcadores = $fvd_atletas_puede_reset_marcadores ?? false;
+$fvd_atletas_reset_msg = $fvd_atletas_reset_msg ?? '';
+$fvd_atletas_reset_n = isset($fvd_atletas_reset_n) ? (int) $fvd_atletas_reset_n : 0;
+$fvd_atletas_reset_campo = $fvd_atletas_reset_campo ?? '';
+$fvd_atletas_reset_etiquetas = [
+    'carnet' => 'carnet',
+    'traspaso' => 'traspaso',
+    'anualidad' => 'anualidad',
+    'afiliacion' => 'afiliación',
+    'inscripcion' => 'inscripción (+ torneo_id)',
+];
 $appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
 $fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
 $fvd_atletas_show_asociacion_col = $fvd_atletas_show_asociacion_col ?? true;
@@ -28,6 +48,36 @@ $nOpcionesAsoc = count($fvd_asociaciones_list_filter);
 require_once FVD_PROJECT_ROOT . '/fvdmasteradmin/includes/fvd_asociacion_helpers.php';
 ?>
 <h1 class="fvd-atletas-title">Atletas</h1>
+
+<section class="fvd-atletas-widget no-print" aria-label="Estadísticas del contexto" style="margin:0 0 14px;padding:12px 14px;border-radius:10px;border:1px solid var(--fvd-border, #334155);background:linear-gradient(135deg, rgba(46,48,146,.25) 0%, rgba(15,23,42,.6) 100%);max-width:56rem">
+    <h2 style="margin:0 0 10px;font-size:.95rem;font-weight:700;color:var(--fvd-amarillo, #fff200)">Estadísticas — <?= htmlspecialchars((string) ($fvd_atletas_widget['etiqueta'] ?? ''), ENT_QUOTES, 'UTF-8') ?></h2>
+    <p style="margin:0 0 10px;font-size:.68rem;color:var(--fvd-muted);line-height:1.4">Cifras alineadas con este listado (tipo «general» sin bajas; sin filtrar por cédula/nombre). Torneos: eventos en <code>torneosact</code> donde la asociación es organizadora. Participación: inscripciones en <code>inscripcion_torneo</code> (o marcador en <code>atletas</code> si la tabla no existe).</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(9.5rem, 1fr));gap:10px;font-size:.8rem">
+        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
+            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Atletas</div>
+            <div style="font-size:1.35rem;font-weight:800;color:#e2e8f0"><?= number_format((int) ($fvd_atletas_widget['total_atletas'] ?? 0), 0, ',', '.') ?></div>
+        </div>
+        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
+            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Afiliados (marc.)</div>
+            <div style="font-size:1.35rem;font-weight:800;color:#86efac"><?= number_format((int) ($fvd_atletas_widget['total_afiliados'] ?? 0), 0, ',', '.') ?></div>
+        </div>
+        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
+            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Género M / F / —</div>
+            <div style="font-weight:700;color:#e2e8f0;line-height:1.35">
+                <?= (int) ($fvd_atletas_widget['sexo_m'] ?? 0) ?> &nbsp;/&nbsp; <?= (int) ($fvd_atletas_widget['sexo_f'] ?? 0) ?> &nbsp;/&nbsp; <?= (int) ($fvd_atletas_widget['sexo_sin'] ?? 0) ?>
+            </div>
+        </div>
+        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
+            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Torneos</div>
+            <div style="font-size:1.35rem;font-weight:800;color:#93c5fd"><?= number_format((int) ($fvd_atletas_widget['torneos'] ?? 0), 0, ',', '.') ?></div>
+        </div>
+        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
+            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Participación</div>
+            <div style="font-size:1.35rem;font-weight:800;color:#fcd34d"><?= number_format((int) ($fvd_atletas_widget['participacion'] ?? 0), 0, ',', '.') ?></div>
+        </div>
+    </div>
+</section>
+
 <?php
 if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ?? 0) > 0):
     $ahLogo = isset($fvd_asociacion_header['logo']) ? fvd_asociacion_logo_public_url($appBaseAtletas !== '' ? $appBaseAtletas : '', FVD_PROJECT_ROOT, (string) $fvd_asociacion_header['logo']) : null;
@@ -46,6 +96,14 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
 <?php endif; ?>
 <p class="fvd-atletas-intro no-print hide-on-13" style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 0.75rem">Busque por <strong>cédula</strong> (coincidencia por inicio) o refine por nombre. La tabla se actualiza al escribir (espera breve). Pantalla optimizada para 13".</p>
 <?php if (!empty($fvd_error ?? '')): ?><p class="fvd-mod-msg"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+<?php if ($fvd_atletas_reset_msg === 'reset_ok'): ?>
+    <p class="fvd-mod-msg no-print" style="margin:0 0 .75rem;background:rgba(22,163,74,.15);border-color:#15803d">
+        Reinicio aplicado: <strong><?= (int) $fvd_atletas_reset_n ?></strong> fila(s) en
+        <code><?= htmlspecialchars((string) ($fvd_atletas_reset_etiquetas[$fvd_atletas_reset_campo] ?? $fvd_atletas_reset_campo), ENT_QUOTES, 'UTF-8') ?></code>.
+    </p>
+<?php elseif ($fvd_atletas_reset_msg === 'reset_err'): ?>
+    <p class="fvd-mod-msg no-print" style="margin:0 0 .75rem">No se pudo completar el reinicio.</p>
+<?php endif; ?>
 
 <div id="fvd-atletas-root" class="fvd-atletas-root">
 
@@ -126,6 +184,35 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
     </div>
     <a href="<?= htmlspecialchars($atletasFormNuevoUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary no-print" style="text-decoration:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center">Nuevo atleta</a>
 </div>
+
+<?php if ($fvd_atletas_puede_reset_marcadores): ?>
+<section class="no-print fvd-atletas-reset-marcadores" aria-label="Reinicio masivo de marcadores" style="margin:0 0 12px;padding:12px 14px;border-radius:8px;border:2px solid #991b1b;background:rgba(127,29,29,.18)">
+    <h2 style="margin:0 0 6px;font-size:1rem;font-weight:800;color:#fecaca">Reiniciar marcadores (poner en 0)</h2>
+    <p style="margin:0 0 10px;font-size:.72rem;color:var(--fvd-muted);line-height:1.45">
+        Masivo sobre <code>atletas</code> en su <strong>alcance de sesión</strong> (FVD: todos; asociación/delegado: solo ese club).
+        <strong>Inscripción</strong> también pone <code>torneo_id = 0</code>.
+    </p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <?php
+        $accionesResetList = [
+            ['carnet', 'Reset carnets', '¿Poner en 0 el marcador de carnet en todos los atletas de su alcance?'],
+            ['traspaso', 'Reset traspasos', '¿Poner en 0 el marcador de traspaso en todos los atletas de su alcance?'],
+            ['anualidad', 'Reset anualidad', '¿Poner en 0 el marcador de anualidad en todos los atletas de su alcance?'],
+            ['afiliacion', 'Reset afiliación', '¿Poner en 0 el marcador de afiliación en todos los atletas de su alcance?'],
+            ['inscripcion', 'Reset inscripciones', '¿Poner en 0 inscripción y torneo_id en todos los atletas de su alcance?'],
+        ];
+        foreach ($accionesResetList as $arL):
+            [$mkL, $mlabL, $mconfirmL] = $arL;
+        ?>
+        <form method="post" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="margin:0" onsubmit="return confirm(<?= htmlspecialchars(json_encode($mconfirmL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);">
+            <input type="hidden" name="_action" value="reset_marcador_atletas">
+            <input type="hidden" name="marcador" value="<?= htmlspecialchars($mkL, ENT_QUOTES, 'UTF-8') ?>">
+            <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px;font-size:.75rem;cursor:pointer;background:#7f1d1d;color:#fecaca;border-color:#991b1b"><?= htmlspecialchars($mlabL, ENT_QUOTES, 'UTF-8') ?></button>
+        </form>
+        <?php endforeach; ?>
+    </div>
+</section>
+<?php endif; ?>
 
 <div class="fvd-atletas-view-seg no-print" role="tablist" aria-label="Vista de columnas">
     <button type="button" class="fvd-atletas-seg__btn fvd-atletas-seg__btn--on" data-fvd-atletas-view="basic" role="tab">Vista básica (contacto)</button>

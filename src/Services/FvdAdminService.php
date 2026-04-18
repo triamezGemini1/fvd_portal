@@ -29,6 +29,9 @@ final class FvdAdminService
     /** Baja lógica: no se elimina la fila; no debe figurar en listados normales. */
     public const ATLETA_ESTATUS_BAJA = 2;
 
+    /** Nombre exacto en `asociaciones.nombre` para vincular `torneosact.organizacion_id` al guardar (mismo texto en el encabezado del formulario). */
+    public const ASOCIACION_NOMBRE_FEDERACION_TORNEOS = 'Federación Venezolana de Dominó';
+
     /** Categoría por edad: LIBRE (≥18 años). */
     public const ATLETA_CATEG_LIBRE = 1;
 
@@ -812,14 +815,14 @@ final class FvdAdminService
             LEFT JOIN asociaciones o ON t.organizacion_id = o.id
             WHERE 1=1' . $search . ' ORDER BY t.fechator DESC';
 
-        return QueryHelper::paginateWithAsociacionScope(
+        // Los torneos de esta app son siempre de la FVD (organizador nacional); no filtrar por asociación regional.
+        return QueryHelper::paginate(
             $this->pdo,
             $countSql,
             $dataSql,
             $params,
             $page,
-            $perPage,
-            't.organizacion_id'
+            $perPage
         );
     }
 
@@ -829,8 +832,7 @@ final class FvdAdminService
             return null;
         }
         $params = [':t' => $torneo];
-        $scope = QueryHelper::asociacionScopeSql('t.organizacion_id', $params);
-        $sql = 'SELECT t.* FROM torneosact t WHERE t.torneo = :t ' . $scope;
+        $sql = 'SELECT t.* FROM torneosact t WHERE t.torneo = :t';
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
         $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -839,40 +841,30 @@ final class FvdAdminService
     }
 
     /**
-     * @return list<array<string,mixed>>
+     * Alta, edición y borrado de torneos (tabla torneosact): solo administrador general FVD.
      */
-    /**
-     * ID de la asociación que representa a la Federación Venezolana de Dominó (organizador nacional).
-     */
-    public function torneosOrganizacionFederacionId(): int
+    public function torneosRequireFvdAdminForGestion(): void
     {
-        $exact = [
-            'Federación Venezolana de Dominó',
-            'FEDERACIÓN VENEZOLANA DE DOMINÓ',
-            'Federación Venezolana del Dominó',
-        ];
-        foreach ($exact as $nom) {
-            $st = $this->pdo->prepare('SELECT id FROM asociaciones WHERE TRIM(nombre) = :n LIMIT 1');
-            $st->execute([':n' => $nom]);
-            $id = $st->fetchColumn();
-            if ($id !== false && (int) $id > 0) {
-                return (int) $id;
-            }
+        if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
+            http_response_code(403);
+            exit('Solo el administrador general FVD puede gestionar torneos.');
         }
-        $st = $this->pdo->query(
-            "SELECT id FROM asociaciones WHERE UPPER(TRIM(nombre)) LIKE '%FEDERACI%'
-             AND UPPER(TRIM(nombre)) LIKE '%VENEZOLANA%' AND UPPER(TRIM(nombre)) LIKE '%DOMIN%'
-             ORDER BY id ASC LIMIT 1"
-        );
-        $id = $st ? $st->fetchColumn() : false;
+    }
+
+    /**
+     * ID en `asociaciones` cuyo `nombre` coincide exactamente (tras TRIM) con el nombre de federación configurado en el servicio.
+     * Si no existe esa fila, devuelve null (el torneo puede guardarse con `organizacion_id` NULL).
+     */
+    public function torneosOrganizacionFederacionId(): ?int
+    {
+        $st = $this->pdo->prepare('SELECT id FROM asociaciones WHERE TRIM(nombre) = :n LIMIT 1');
+        $st->execute([':n' => self::ASOCIACION_NOMBRE_FEDERACION_TORNEOS]);
+        $id = $st->fetchColumn();
         if ($id !== false && (int) $id > 0) {
             return (int) $id;
         }
 
-        throw new RuntimeException(
-            'No se encontró en la tabla asociaciones un registro para la Federación Venezolana de Dominó. ' .
-            'Cree o renombre la asociación nacional para que coincida con ese nombre.'
-        );
+        return null;
     }
 
     public function torneosListAsociacionesForSelect(): array
@@ -908,6 +900,8 @@ final class FvdAdminService
      */
     public function torneosSave(?int $torneoId, array $post, array $files): int
     {
+        $this->torneosRequireFvdAdminForGestion();
+
         $data = [];
         foreach (self::TORNEOS_PERSIST as $col) {
             if (in_array($col, ['invitacion', 'afiche', 'clavetor', 'publicar_landing'], true)) {
@@ -934,27 +928,16 @@ final class FvdAdminService
         } else {
             unset($data['apertura_anual']);
         }
-        if ($torneoId !== null && !array_key_exists('grupo_evento_id', $post)) {
-            unset($data['grupo_evento_id']);
-        }
 
+        $data['publicar_landing'] = 1;
+        $data['organizacion_id'] = $this->torneosOrganizacionFederacionId();
+
+        // Grupo de evento: solo tras crear el torneo y solo para campeonatos (varios el mismo día).
         if ($torneoId === null) {
-            $data['publicar_landing'] = 1;
-        } elseif (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-            $data['publicar_landing'] = 1;
-        } else {
-            $prevPub = $this->torneosFind($torneoId);
-            $data['publicar_landing'] = (int) ($prevPub['publicar_landing'] ?? 0);
+            $data['grupo_evento_id'] = null;
         }
-
-        if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-            $data['organizacion_id'] = $this->torneosOrganizacionFederacionId();
-        } elseif (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
-            $mine = AuthService::idAsociacion();
-            if ($mine === null) {
-                throw new RuntimeException('Sin asociación asignada.');
-            }
-            $data['organizacion_id'] = $mine;
+        if ((int) ($data['tipo'] ?? 0) !== 2) {
+            $data['grupo_evento_id'] = null;
         }
 
         $uploadDir = $this->projectRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
@@ -975,7 +958,6 @@ final class FvdAdminService
             if ($prev === null) {
                 throw new InvalidArgumentException('Torneo no encontrado.');
             }
-            $this->enforceAsociacionId(isset($prev['organizacion_id']) ? (int) $prev['organizacion_id'] : null);
             $data['clavetor'] = $prev['clavetor'];
             $data['invitacion'] = $prev['invitacion'];
             $data['afiche'] = $prev['afiche'];
@@ -1063,14 +1045,13 @@ final class FvdAdminService
 
     public function torneosDelete(int $torneo): void
     {
+        $this->torneosRequireFvdAdminForGestion();
         $prev = $this->torneosFind($torneo);
         if ($prev === null) {
             return;
         }
-        $this->enforceAsociacionId(isset($prev['organizacion_id']) ? (int) $prev['organizacion_id'] : null);
         $params = [':t' => $torneo];
-        $scope = QueryHelper::asociacionScopeSql('t.organizacion_id', $params);
-        $sql = 'DELETE FROM torneosact t WHERE t.torneo = :t ' . $scope;
+        $sql = 'DELETE FROM torneosact t WHERE t.torneo = :t';
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
     }
@@ -1156,8 +1137,8 @@ final class FvdAdminService
     }
 
     /**
-     * Métricas operativas para el panel de administración del torneo (ámbito según rol / QueryHelper).
-     * Pendiente = campo entero en 0 en tabla atletas (convención del sistema legado).
+     * Métricas del panel de evento del torneo: solo atletas con `torneo_id` = este evento.
+     * Conteos de banderas = filas con valor 1 (no pendientes con 0).
      *
      * @return array{
      *   inscripciones_torneo: int,
@@ -1165,8 +1146,7 @@ final class FvdAdminService
      *   afiliacion_pendiente: int,
      *   anualidad_pendiente: int,
      *   carnet_pendiente: int,
-     *   traspaso_pendiente: int,
-     *   inscripcion_maestro_pendiente: int
+     *   traspaso_pendiente: int
      * }
      */
     public function torneosPanelEstadisticas(int $torneoId): array
@@ -1178,16 +1158,9 @@ final class FvdAdminService
             'anualidad_pendiente' => 0,
             'carnet_pendiente' => 0,
             'traspaso_pendiente' => 0,
-            'inscripcion_maestro_pendiente' => 0,
         ];
-        if ($this->torneosInscripcionTorneoTableExists()) {
-            try {
-                $st = $this->pdo->prepare('SELECT COUNT(*) FROM inscripcion_torneo WHERE torneo_id = :t');
-                $st->execute([':t' => $torneoId]);
-                $out['inscripciones_torneo'] = (int) $st->fetchColumn();
-            } catch (Throwable $e) {
-                error_log('[torneosPanelEstadisticas inscripcion_torneo] ' . $e->getMessage());
-            }
+        if ($torneoId <= 0) {
+            return $out;
         }
 
         $flagMap = [
@@ -1195,26 +1168,36 @@ final class FvdAdminService
             'anualidad' => 'anualidad_pendiente',
             'carnet' => 'carnet_pendiente',
             'traspaso' => 'traspaso_pendiente',
-            'inscripcion' => 'inscripcion_maestro_pendiente',
         ];
 
         try {
-            $params = [];
+            $params = [':torneo_panel' => $torneoId];
             $scope = QueryHelper::asociacionScopeSql('atletas.asociacion', $params);
-            $st = $this->pdo->prepare('SELECT COUNT(*) FROM atletas WHERE 1=1' . $scope);
+            $base = 'atletas.torneo_id = :torneo_panel';
+
+            $st = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM atletas WHERE ' . $base . ' AND COALESCE(atletas.inscripcion, 0) = 1' . $scope
+            );
+            $st->execute($params);
+            $out['inscripciones_torneo'] = (int) $st->fetchColumn();
+
+            $params = [':torneo_panel' => $torneoId];
+            $scope = QueryHelper::asociacionScopeSql('atletas.asociacion', $params);
+            $st = $this->pdo->prepare('SELECT COUNT(*) FROM atletas WHERE ' . $base . $scope);
             $st->execute($params);
             $out['atletas_en_ambito'] = (int) $st->fetchColumn();
         } catch (Throwable $e) {
-            error_log('[torneosPanelEstadisticas atletas total] ' . $e->getMessage());
+            error_log('[torneosPanelEstadisticas atletas base] ' . $e->getMessage());
 
             return $out;
         }
 
         foreach ($flagMap as $col => $key) {
             try {
-                $p = [];
+                $p = [':torneo_panel' => $torneoId];
                 $sc = QueryHelper::asociacionScopeSql('atletas.asociacion', $p);
-                $sql = 'SELECT COUNT(*) FROM atletas WHERE COALESCE(atletas.' . $col . ', 0) = 0' . $sc;
+                $sql = 'SELECT COUNT(*) FROM atletas WHERE atletas.torneo_id = :torneo_panel AND COALESCE(atletas.'
+                    . $col . ', 0) = 1' . $sc;
                 $st = $this->pdo->prepare($sql);
                 $st->execute($p);
                 $out[$key] = (int) $st->fetchColumn();
@@ -1394,6 +1377,82 @@ final class FvdAdminService
         }
 
         return $cache;
+    }
+
+    /**
+     * Eventos de un día concreto para la pantalla de relación por grupo (torneos y campeonatos con asociación si existe).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function torneosRelacionGrupoCandidatosPorFecha(string $fechaYmd): array
+    {
+        if (!$this->torneosactGrupoEventoColumnExists()) {
+            return [];
+        }
+        try {
+            $d = new \DateTimeImmutable($fechaYmd . ' 00:00:00');
+        } catch (\Exception $e) {
+            return [];
+        }
+        $ymd = $d->format('Y-m-d');
+        $st = $this->pdo->prepare(
+            'SELECT t.torneo, t.nombre, t.lugar, DATE(t.fechator) AS fechator, t.tipo, t.grupo_evento_id,
+                    t.organizacion_id, o.nombre AS org_nombre
+             FROM torneosact t
+             LEFT JOIN asociaciones o ON o.id = t.organizacion_id
+             WHERE t.fechator IS NOT NULL AND DATE(t.fechator) = :d
+             ORDER BY t.tipo DESC, t.nombre ASC'
+        );
+        $st->execute([':d' => $ymd]);
+
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Asigna el mismo grupo_evento_id (nuevo) a varios campeonatos seleccionados.
+     *
+     * @param list<mixed> $torneoIds
+     */
+    public function torneosRelacionGrupoAplicar(array $torneoIds): int
+    {
+        $this->torneosRequireFvdAdminForGestion();
+        if (!$this->torneosactGrupoEventoColumnExists()) {
+            throw new RuntimeException('No existe la columna grupo_evento_id en torneosact.');
+        }
+        $ids = [];
+        foreach ($torneoIds as $x) {
+            $n = (int) $x;
+            if ($n > 0) {
+                $ids[$n] = $n;
+            }
+        }
+        $ids = array_values($ids);
+        if (count($ids) < 2) {
+            throw new InvalidArgumentException('Seleccione al menos dos campeonatos para vincular.');
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $st = $this->pdo->prepare("SELECT torneo, tipo FROM torneosact WHERE torneo IN ($ph)");
+        $st->execute($ids);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (count($rows) !== count($ids)) {
+            throw new InvalidArgumentException('Uno o más eventos no existen.');
+        }
+        foreach ($rows as $r) {
+            if ((int) ($r['tipo'] ?? 0) !== 2) {
+                throw new InvalidArgumentException('Solo se pueden vincular campeonatos (tipo Campeonato).');
+            }
+        }
+        $stMax = $this->pdo->query('SELECT COALESCE(MAX(grupo_evento_id), 0) FROM torneosact');
+        $next = (int) $stMax->fetchColumn() + 1;
+        if ($next <= 0) {
+            $next = 1;
+        }
+        $upd = $this->pdo->prepare('UPDATE torneosact SET grupo_evento_id = :g WHERE torneo = :id');
+        foreach ($ids as $tid) {
+            $upd->execute([':g' => $next, ':id' => $tid]);
+        }
+
+        return $next;
     }
 
     public function torneoGrupoEventoId(int $torneoId): ?int

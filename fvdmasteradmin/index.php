@@ -83,7 +83,7 @@ if (!function_exists('fvd_master_module_url') || !function_exists('admin_module_
 }
 $fvdIndicadoresCostosVariant = 'full';
 $fvdReporteIndicadoresUrl = function_exists('admin_module_url') ? admin_module_url('atletas/reporte_indicadores.php') : null;
-$fvdAsocDetailApiUrl = $appBase . '/fvdmasteradmin/asociacion_dashboard_detail.php';
+$fvdAsocReporteFinancieroUrl = $fvdEsAdminFvd ? ($appBase . '/fvdmasteradmin/asociacion_reporte_financiero.php') : '';
 
 require __DIR__ . '/includes/layout_header.php';
 ?>

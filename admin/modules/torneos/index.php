@@ -141,6 +141,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'relacion_grupo_aplicar') {
+    AuthService::ensureSession();
+    try {
+        $ids = $_POST['torneo_id'] ?? [];
+        if (!is_array($ids)) {
+            $ids = [];
+        }
+        $fechaRel = trim((string) ($_POST['fecha_relacion'] ?? ''));
+        if ($fechaRel === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRel)) {
+            $fechaRel = date('Y-m-d');
+        }
+        $gid = $svc->torneosRelacionGrupoAplicar($ids);
+        $_SESSION['fvd_torneo_relacion_flash'] = 'Relación aplicada: grupo de evento #' . $gid . ' asignado a los campeonatos seleccionados.';
+        header('Location: ' . $selfUrl . '?action=relacion_grupo&fecha=' . rawurlencode($fechaRel) . '&msg=ok');
+        exit;
+    } catch (Throwable $e) {
+        AuthService::ensureSession();
+        $_SESSION['fvd_torneo_relacion_err'] = $e->getMessage();
+        $fechaRel = trim((string) ($_POST['fecha_relacion'] ?? ''));
+        if ($fechaRel === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRel)) {
+            $fechaRel = date('Y-m-d');
+        }
+        error_log('[admin/torneos relacion_grupo] ' . $e->getMessage());
+        header('Location: ' . $selfUrl . '?action=relacion_grupo&fecha=' . rawurlencode($fechaRel));
+        exit;
+    }
+}
+
 $fvd_page_title = 'Torneos';
 $action = $_GET['action'] ?? 'list';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
@@ -426,23 +454,37 @@ if ($action === 'evento' && $id !== null && $id > 0) {
     exit;
 }
 
-if ($action === 'form') {
-    $row = $svc->torneosFind($id);
-    $asociaciones = $svc->torneosListAsociacionesForSelect();
-    $fvd_torneo_org_id = 0;
-    $fvd_torneo_org_nombre = '';
-    if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-        try {
-            $fvd_torneo_org_id = $svc->torneosOrganizacionFederacionId();
-        } catch (Throwable $e) {
-            $fvd_torneo_org_id = 0;
-            $fvd_error = ($fvd_error !== '' ? $fvd_error . ' ' : '') . $e->getMessage();
-        }
-        $fvd_torneo_org_nombre = 'Federación Venezolana de Dominó';
-    } elseif ($asociaciones !== []) {
-        $fvd_torneo_org_id = (int) ($asociaciones[0]['id'] ?? 0);
-        $fvd_torneo_org_nombre = (string) ($asociaciones[0]['nombre'] ?? 'Asociación');
+if ($action === 'relacion_grupo') {
+    AuthService::ensureSession();
+    $svc->torneosRequireFvdAdminForGestion();
+    $fechaRel = isset($_GET['fecha']) ? trim((string) $_GET['fecha']) : '';
+    if ($fechaRel === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRel)) {
+        $fechaRel = date('Y-m-d');
     }
+    $fvd_torneo_relacion_flash = '';
+    if (!empty($_SESSION['fvd_torneo_relacion_flash'])) {
+        $fvd_torneo_relacion_flash = (string) $_SESSION['fvd_torneo_relacion_flash'];
+        unset($_SESSION['fvd_torneo_relacion_flash']);
+    }
+    $fvd_torneo_relacion_err = '';
+    if (!empty($_SESSION['fvd_torneo_relacion_err'])) {
+        $fvd_torneo_relacion_err = (string) $_SESSION['fvd_torneo_relacion_err'];
+        unset($_SESSION['fvd_torneo_relacion_err']);
+    }
+    $relacionGrupoFilas = $svc->torneosRelacionGrupoCandidatosPorFecha($fechaRel);
+    $relacionGrupoColumnaOk = $svc->torneosactGrupoEventoColumnExists();
+    $fvd_page_title = 'Relacionar campeonatos (mismo día)';
+    require FVD_MASTER_ROOT . '/includes/layout_header.php';
+    include __DIR__ . '/relacion_grupo.view.php';
+    require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+    exit;
+}
+
+if ($action === 'form') {
+    $svc->torneosRequireFvdAdminForGestion();
+    $row = $svc->torneosFind($id);
+    $fvdTorneoOrg = $svc->torneosOrganizacionFederacionId();
+    $fvd_torneo_org_id = $fvdTorneoOrg ?? 0;
     if ($id !== null && $row === null) {
         http_response_code(404);
         $fvd_page_title = 'No encontrado';

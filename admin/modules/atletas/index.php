@@ -87,6 +87,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'tras
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'reset_marcador_atletas') {
+    $rolSesion = trim((string) (AuthService::role() ?? ''));
+    if (!in_array($rolSesion, [
+        AuthService::ROLE_FVD_ADMIN,
+        AuthService::ROLE_ASO_ADMIN,
+        AuthService::ROLE_DELEGADO_ASOC,
+    ], true)) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo 'Sin permiso para reiniciar marcadores.';
+        exit;
+    }
+    $campo = trim((string) ($_POST['marcador'] ?? ''));
+    try {
+        $n = $svc->atletasResetMarcadorMasivo($campo);
+        header('Location: ' . $selfUrl . '?action=list&msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo));
+    } catch (Throwable $e) {
+        error_log('[admin/atletas reset] ' . $e->getMessage());
+        header('Location: ' . $selfUrl . '?action=list&msg=reset_err');
+    }
+    exit;
+}
+
 $fvd_page_title = 'Atletas';
 $rawAction = isset($_GET['action']) ? trim((string) $_GET['action']) : '';
 $impliesAtletasList = isset($_GET['page']) || isset($_GET['cedula'])
@@ -349,6 +372,23 @@ $fvd_atletas_pager_html = PaginationView::navHtml(
     $paginationQueryParams,
     'fvd-atletas-pager'
 );
+
+$fvd_atletas_reset_msg = isset($_GET['msg']) ? trim((string) $_GET['msg']) : '';
+$fvd_atletas_reset_n = isset($_GET['n']) ? (int) $_GET['n'] : 0;
+$fvd_atletas_reset_campo = isset($_GET['campo']) ? trim((string) $_GET['campo']) : '';
+$fvd_atletas_puede_reset_marcadores = in_array(trim((string) (AuthService::role() ?? '')), [
+    AuthService::ROLE_FVD_ADMIN,
+    AuthService::ROLE_ASO_ADMIN,
+    AuthService::ROLE_DELEGADO_ASOC,
+], true);
+
+require_once FVD_PROJECT_ROOT . '/src/Services/StatsService.php';
+$fvd_atletas_widget = \FvdPortal\Services\StatsService::atletasModuloWidgetResumen(
+    fvd_db(),
+    $fvd_atletas_alcance,
+    $asociacionFiltroId
+);
+
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';
 require FVD_MASTER_ROOT . '/includes/layout_footer.php';

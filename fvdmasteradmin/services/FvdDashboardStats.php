@@ -27,7 +27,7 @@ class FvdDashboardStats
         return [
             'atletas' => self::scopedCount($pdo, 'SELECT COUNT(*) FROM atletas WHERE 1=1', 'atletas.asociacion'),
             'clubes'  => self::scopedCount($pdo, 'SELECT COUNT(*) FROM asociaciones WHERE 1=1', 'asociaciones.id'),
-            'torneos' => self::scopedCount($pdo, 'SELECT COUNT(*) FROM torneosact WHERE 1=1', 'torneosact.organizacion_id'),
+            'torneos' => self::unscopedCount($pdo, 'SELECT COUNT(*) FROM torneosact WHERE 1=1'),
         ];
     }
 
@@ -43,6 +43,19 @@ class FvdDashboardStats
             return (int) $stmt->fetchColumn();
         } catch (PDOException $e) {
             error_log('[FvdDashboardStats] count ' . $qualifiedColumn . ': ' . $e->getMessage());
+
+            return 0;
+        }
+    }
+
+    private static function unscopedCount(PDO $pdo, string $sql): int
+    {
+        try {
+            $stmt = $pdo->query($sql);
+
+            return (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            error_log('[FvdDashboardStats] unscopedCount: ' . $e->getMessage());
 
             return 0;
         }

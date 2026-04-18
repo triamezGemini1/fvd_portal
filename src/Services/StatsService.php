@@ -646,6 +646,129 @@ final class StatsService
     }
 
     /**
+     * Widget del listado de atletas: mismos límites de alcance que el listado (tipo «normal», sin cédula/nombre).
+     * Torneos: filas en <code>torneosact</code> (todos son eventos FVD; sin filtro regional por organizador).
+     * Participación: filas en <code>inscripcion_torneo</code> si existe; si no, atletas con <code>inscripcion = 1</code>.
+     *
+     * @param 'todos'|'asociacion' $alcance
+     *
+     * @return array{
+     *   etiqueta: string,
+     *   total_atletas: int,
+     *   total_afiliados: int,
+     *   sexo_m: int,
+     *   sexo_f: int,
+     *   sexo_sin: int,
+     *   torneos: int,
+     *   participacion: int
+     * }
+     */
+    public static function atletasModuloWidgetResumen(PDO $pdo, string $alcance, int $asociacionFiltroId): array
+    {
+        $out = [
+            'etiqueta'         => 'Resumen',
+            'total_atletas'    => 0,
+            'total_afiliados'  => 0,
+            'sexo_m'           => 0,
+            'sexo_f'           => 0,
+            'sexo_sin'         => 0,
+            'torneos'          => 0,
+            'participacion'    => 0,
+        ];
+        if (!in_array($alcance, ['todos', 'asociacion'], true)) {
+            $alcance = 'todos';
+        }
+
+        $legacyQh = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
+        if (!\class_exists('QueryHelper', false)) {
+            require_once $legacyQh;
+        }
+        if (!\class_exists('AuthService', false)) {
+            require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
+        }
+        require_once dirname(__DIR__, 2) . '/src/Services/QueryHelper.php';
+
+        $frag = \FvdPortal\Services\QueryHelper::atletasAdminListFragments('', '', $alcance, 'normal', $asociacionFiltroId);
+        $params = $frag['params'];
+        $sqlWhereAtletas = '1=1' . $frag['search'] . \QueryHelper::asociacionScopeSql('a.asociacion', $params);
+
+        try {
+            $sqlAgg = 'SELECT
+                COUNT(*) AS total_atletas,
+                SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_afiliados,
+                SUM(CASE WHEN COALESCE(a.sexo, 0) = 1 THEN 1 ELSE 0 END) AS sexo_m,
+                SUM(CASE WHEN COALESCE(a.sexo, 0) = 2 THEN 1 ELSE 0 END) AS sexo_f,
+                SUM(CASE WHEN COALESCE(a.sexo, 0) NOT IN (1, 2) THEN 1 ELSE 0 END) AS sexo_sin
+                FROM atletas a WHERE ' . $sqlWhereAtletas;
+            $st = $pdo->prepare($sqlAgg);
+            self::executeNamed($st, $params);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            if (is_array($row)) {
+                $out['total_atletas'] = (int) ($row['total_atletas'] ?? 0);
+                $out['total_afiliados'] = (int) ($row['total_afiliados'] ?? 0);
+                $out['sexo_m'] = (int) ($row['sexo_m'] ?? 0);
+                $out['sexo_f'] = (int) ($row['sexo_f'] ?? 0);
+                $out['sexo_sin'] = (int) ($row['sexo_sin'] ?? 0);
+            }
+        } catch (PDOException $e) {
+            error_log('[StatsService] atletasModuloWidgetResumen atletas: ' . $e->getMessage());
+        }
+
+        try {
+            $sqlT = 'SELECT COUNT(*) FROM torneosact t WHERE 1=1';
+            $stT = $pdo->prepare($sqlT);
+            $stT->execute();
+            $out['torneos'] = (int) $stT->fetchColumn();
+        } catch (PDOException $e) {
+            error_log('[StatsService] atletasModuloWidgetResumen torneos: ' . $e->getMessage());
+        }
+
+        $paramsI = [];
+        $extraIns = '';
+        if (\AuthService::isSuperAdmin() && $alcance === 'asociacion' && $asociacionFiltroId > 0) {
+            $paramsI[':wid_ins_asoc'] = $asociacionFiltroId;
+            $extraIns = ' AND it.asociacion_id = :wid_ins_asoc ';
+        }
+        try {
+            $sqlI = 'SELECT COUNT(*) FROM inscripcion_torneo it WHERE 1=1' . $extraIns . \QueryHelper::asociacionScopeSql('it.asociacion_id', $paramsI);
+            $stI = $pdo->prepare($sqlI);
+            self::executeNamed($stI, $paramsI);
+            $out['participacion'] = (int) $stI->fetchColumn();
+        } catch (PDOException $e) {
+            $fragF = \FvdPortal\Services\QueryHelper::atletasAdminListFragments('', '', $alcance, 'normal', $asociacionFiltroId);
+            $paramsF = $fragF['params'];
+            $whereF = '1=1' . $fragF['search'] . \QueryHelper::asociacionScopeSql('a.asociacion', $paramsF)
+                . ' AND COALESCE(a.inscripcion, 0) = 1 ';
+            try {
+                $sqlF = 'SELECT COUNT(*) FROM atletas a WHERE ' . $whereF;
+                $stF = $pdo->prepare($sqlF);
+                self::executeNamed($stF, $paramsF);
+                $out['participacion'] = (int) $stF->fetchColumn();
+            } catch (PDOException $e2) {
+                error_log('[StatsService] atletasModuloWidgetResumen participación fallback: ' . $e2->getMessage());
+            }
+        }
+
+        if ($alcance === 'asociacion' && $asociacionFiltroId > 0) {
+            $out['etiqueta'] = 'Asociación #' . $asociacionFiltroId;
+            try {
+                $stN = $pdo->prepare('SELECT nombre FROM asociaciones WHERE id = :id LIMIT 1');
+                $stN->execute([':id' => $asociacionFiltroId]);
+                $nom = $stN->fetchColumn();
+                if ($nom !== false && trim((string) $nom) !== '') {
+                    $out['etiqueta'] = trim((string) $nom);
+                }
+            } catch (PDOException $e) {
+                error_log('[StatsService] atletasModuloWidgetResumen nombre asoc: ' . $e->getMessage());
+            }
+        } else {
+            $out['etiqueta'] = 'Federación (todos los clubes)';
+        }
+
+        return $out;
+    }
+
+    /**
      * @param array<string, mixed> $params
      */
     private static function executeNamed(\PDOStatement $st, array $params): void
@@ -669,11 +792,71 @@ final class StatsService
     }
 
     /**
+     * Atletas de una asociación filtrados por métrica de indicadores (misma lógica que los conteos por bandera en 1).
+     *
+     * @param 'total_atletas'|'afiliacion'|'anualidad'|'carnet'|'traspaso'|'inscripcion' $metricKey
+     * @param bool $aplicarAlcanceSesion Si es false, solo se filtra por {@see $asociacionId} (p. ej. informe super admin por club concreto).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function listadoAtletasPorAsociacionMetrica(
+        PDO $pdo,
+        int $asociacionId,
+        string $metricKey,
+        int $limit = 800,
+        bool $aplicarAlcanceSesion = true
+    ): array {
+        $allowed = [
+            'total_atletas' => '',
+            'afiliacion'    => ' AND COALESCE(a.afiliacion, 0) = 1 ',
+            'anualidad'     => ' AND COALESCE(a.anualidad, 0) = 1 ',
+            'carnet'        => ' AND COALESCE(a.carnet, 0) = 1 ',
+            'traspaso'      => ' AND COALESCE(a.traspaso, 0) = 1 ',
+            'inscripcion'   => ' AND COALESCE(a.inscripcion, 0) = 1 ',
+        ];
+        if ($asociacionId <= 0 || !\array_key_exists($metricKey, $allowed)) {
+            return [];
+        }
+        $limit = max(1, min(5000, $limit));
+
+        $params = [':fvd_rep_aid' => $asociacionId];
+        $scope = '';
+        if ($aplicarAlcanceSesion) {
+            $qh = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
+            if (!\class_exists('QueryHelper', false)) {
+                require_once $qh;
+            }
+            $scope = \QueryHelper::asociacionScopeSql('a.asociacion', $params);
+        }
+        $extra = $allowed[$metricKey];
+
+        $sql = 'SELECT a.id, a.cedula, a.nombre, a.numfvd, a.estatus, a.torneo_id
+            FROM atletas a
+            WHERE a.asociacion = :fvd_rep_aid' . $extra . $scope . '
+            ORDER BY a.nombre ASC, a.id ASC
+            LIMIT ' . (int) $limit;
+
+        try {
+            $st = $pdo->prepare($sql);
+            self::executeNamed($st, $params);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('[StatsService] listadoAtletasPorAsociacionMetrica: ' . $e->getMessage());
+
+            return [];
+        }
+
+        return \is_array($rows) ? $rows : [];
+    }
+
+    /**
      * Datos consolidados para el panel admin: ficha de asociación, deudas por torneo y pagos recientes.
+     *
+     * @param bool $incluirDeudas Si es false, no se consulta `deuda_asociaciones` (p. ej. reportes que solo muestran pagos).
      *
      * @return array{asociacion: array<string, mixed>|null, deudas: list<array<string, mixed>>, pagos: list<array<string, mixed>>}|null
      */
-    public static function dashboardDetalleAsociacion(PDO $pdo, int $asociacionId): ?array
+    public static function dashboardDetalleAsociacion(PDO $pdo, int $asociacionId, bool $incluirDeudas = true): ?array
     {
         if ($asociacionId <= 0) {
             return null;
@@ -693,19 +876,21 @@ final class StatsService
 
         $deudas = [];
         $pagos = [];
-        try {
-            $sd = $pdo->prepare(
-                'SELECT d.*, t.nombre AS torneo_nombre
-                FROM deuda_asociaciones d
-                LEFT JOIN torneosact t ON d.torneo_id = t.torneo
-                WHERE d.asociacion_id = :aid
-                ORDER BY d.fecha_creacion DESC
-                LIMIT 50'
-            );
-            $sd->execute([':aid' => $asociacionId]);
-            $deudas = $sd->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        } catch (PDOException $e) {
-            error_log('[StatsService] dashboardDetalleAsociacion deudas: ' . $e->getMessage());
+        if ($incluirDeudas) {
+            try {
+                $sd = $pdo->prepare(
+                    'SELECT d.*, t.nombre AS torneo_nombre
+                    FROM deuda_asociaciones d
+                    LEFT JOIN torneosact t ON d.torneo_id = t.torneo
+                    WHERE d.asociacion_id = :aid
+                    ORDER BY d.fecha_creacion DESC
+                    LIMIT 50'
+                );
+                $sd->execute([':aid' => $asociacionId]);
+                $deudas = $sd->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            } catch (PDOException $e) {
+                error_log('[StatsService] dashboardDetalleAsociacion deudas: ' . $e->getMessage());
+            }
         }
         try {
             $sp = $pdo->prepare(
