@@ -36,9 +36,17 @@ class AuthService
     /** @var string Código interno del último fallo (solo para depuración con APP_DEBUG). */
     private static $lastLoginFailure = '';
 
+    /** @var string Mensaje de PDO si el fallo fue db_error (para APP_DEBUG / logs). */
+    private static $lastPdoErrorDetail = '';
+
     public static function getLastLoginFailure(): string
     {
         return self::$lastLoginFailure;
+    }
+
+    public static function getLastPdoErrorDetail(): string
+    {
+        return self::$lastPdoErrorDetail;
     }
 
     private static function setLoginFailure(string $code): void
@@ -333,6 +341,7 @@ class AuthService
     public static function attemptLogin(string $email, string $password): bool
     {
         self::$lastLoginFailure = '';
+        self::$lastPdoErrorDetail = '';
         $email = strtolower(trim($email));
         if ($email === '' || $password === '') {
             self::setLoginFailure('empty_input');
@@ -364,6 +373,7 @@ class AuthService
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('[fvdmasteradmin/AuthService] ' . $e->getMessage());
+            self::$lastPdoErrorDetail = $e->getMessage();
             self::setLoginFailure('db_error');
 
             return false;
@@ -411,6 +421,7 @@ class AuthService
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log('[fvdmasteradmin/AuthService delegado] ' . $e->getMessage());
+            self::$lastPdoErrorDetail = $e->getMessage();
             self::setLoginFailure('db_error');
 
             return false;

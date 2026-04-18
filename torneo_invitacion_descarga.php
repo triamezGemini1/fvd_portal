@@ -7,7 +7,7 @@ declare(strict_types=1);
  * - Sin parámetro extra: Content-Disposition attachment (descarga).
  * - ?inline=1 : Content-Disposition inline (lectura en el navegador al solicitarlo, p. ej. pestaña nueva).
  */
-require_once __DIR__ . '/fvdmasteradmin/bootstrap.php';
+require_once __DIR__ . '/includes/load_fvd_bootstrap.php';
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $inline = isset($_GET['inline']) && (string) $_GET['inline'] === '1';

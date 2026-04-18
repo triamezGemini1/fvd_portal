@@ -75,7 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $code = AuthService::getLastLoginFailure();
     if ($code === 'db_error') {
-        $error = 'No se pudo acceder a la base de datos de usuarios. Revise DB_* / FVD_DB_* en .env y que exista la tabla fvd_usuarios.';
+        $error = 'No se pudo acceder a la base de datos de usuarios. Compruebe en el servidor el archivo .env (DB_* o FVD_DB_*): host, nombre de base, usuario y contraseña. En phpMyAdmin debe existir la tabla fvd_usuarios (si no, ejecute fvdmasteradmin/sql/install_fvd_usuarios.sql en esa base).';
+        $dbg = strtolower((string) (function_exists('env') ? env('APP_DEBUG', '') : ''));
+        if (in_array($dbg, ['1', 'true', 'yes'], true)) {
+            $pdoMsg = AuthService::getLastPdoErrorDetail();
+            if ($pdoMsg !== '') {
+                $error .= ' Detalle: ' . htmlspecialchars($pdoMsg, ENT_QUOTES, 'UTF-8');
+            }
+        }
     } elseif ($code === 'user_inactive') {
         $error = 'Su cuenta aún no está habilitada. Si es atleta, solicite el acceso con el correo y el teléfono de su ficha (enlace abajo).';
     } else {

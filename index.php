@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/fvdmasteradmin/bootstrap.php';
+require_once __DIR__ . '/includes/load_fvd_bootstrap.php';
 require_once __DIR__ . '/includes/public_header.php';
 
 $topM = [];
@@ -20,9 +20,10 @@ try {
     $asociaciones = PublicSiteData::landingAsociacionesCardsQueryHelper(12);
     $enVivo = PublicSiteData::torneosEnVivo(8);
 } catch (Throwable $e) {
-    $dbError = 'No se pudieron cargar los datos. Revise la conexión en .env (FVD_DB_* / DB_*).';
+    error_log('[fvd_portal index.php] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    $dbError = 'No se pudieron cargar los datos. Compruebe que exista un archivo <code>.env</code> en la raíz del proyecto en el servidor con <strong>DB_HOST</strong>, <strong>DB_DATABASE</strong>, <strong>DB_USERNAME</strong> y <strong>DB_PASSWORD</strong> correctos (cPanel → MySQL). También puede usar <code>FVD_DB_*</code> si así lo tiene configurado. El detalle del error queda registrado en el log de PHP del hosting.';
     if (function_exists('env') && in_array(strtolower((string) env('APP_DEBUG', '')), ['1', 'true', 'yes'], true)) {
-        $dbError .= ' ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+        $dbError .= ' <span class="block mt-2 font-mono text-xs">' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</span>';
     }
 }
 

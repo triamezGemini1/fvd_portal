@@ -61,7 +61,7 @@ class Env {
             'APP_NAME' => 'Sistema FVD',
             'APP_ENV' => 'production',
             'APP_DEBUG' => 'false',
-            'APP_URL' => 'https://federacionvenezolanaadedomino.com',
+            'APP_URL' => 'https://federacionvenezolanadedomino.com',
             'APP_BASE_PATH' => '/fvd_portal',
             'DB_HOST' => 'localhost',
             'DB_DATABASE' => 'fvdmasteradmin',

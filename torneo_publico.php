@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/fvdmasteradmin/bootstrap.php';
+require_once __DIR__ . '/includes/load_fvd_bootstrap.php';
 require_once __DIR__ . '/includes/fvd_public_layout.php';
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;

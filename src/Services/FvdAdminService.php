@@ -80,6 +80,25 @@ final class FvdAdminService
     // ——— Asociaciones ———
 
     /**
+     * Condición SQL alineada con PublicSiteData: en BD puede haber estatus numérico (1/0),
+     * texto 'activo', o NULL/vacío (legacy). No usar solo "= 1" / "= 0".
+     */
+    private static function sqlAsociacionesWhereEstatus(string $filtroEstatus): string
+    {
+        $activa = '(asociaciones.estatus = 1 OR asociaciones.estatus = \'activo\' '
+            . 'OR asociaciones.estatus IS NULL '
+            . 'OR TRIM(COALESCE(CAST(asociaciones.estatus AS CHAR), \'\')) = \'\')';
+        if ($filtroEstatus === 'activas') {
+            return ' AND ' . $activa . ' ';
+        }
+        if ($filtroEstatus === 'inactivas') {
+            return ' AND NOT (' . $activa . ') ';
+        }
+
+        return '';
+    }
+
+    /**
      * @param 'todas'|'activas'|'inactivas' $filtroEstatus
      * @return array{total:int,page:int,per_page:int,pages:int,rows:list<array<string,mixed>>}
      */
@@ -91,11 +110,7 @@ final class FvdAdminService
             $params[':fq'] = '%' . $q . '%';
             $search = ' AND asociaciones.nombre LIKE :fq ';
         }
-        if ($filtroEstatus === 'activas') {
-            $search .= ' AND asociaciones.estatus = 1 ';
-        } elseif ($filtroEstatus === 'inactivas') {
-            $search .= ' AND asociaciones.estatus = 0 ';
-        }
+        $search .= self::sqlAsociacionesWhereEstatus($filtroEstatus);
         $countSql = 'SELECT COUNT(*) FROM asociaciones WHERE 1=1' . $search;
         $dataSql = 'SELECT id, nombre, delegado, telefono, email, estatus, logo, direccion, numreg FROM asociaciones WHERE 1=1'
             . $search . ' ORDER BY nombre ASC';

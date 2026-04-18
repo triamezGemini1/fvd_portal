@@ -29,7 +29,7 @@ $listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
         </div>
         <div>
             <label for="asoc-filtro-estado" style="font-size:.8125rem;color:var(--fvd-muted);display:block">Estatus</label>
-            <select class="fvd-input" id="asoc-filtro-estado" name="estado" style="max-width:12rem">
+            <select class="fvd-input" id="asoc-filtro-estado" name="estado" style="max-width:12rem" onchange="this.form.submit()">
                 <option value="todas"<?= $filtroEstatus === 'todas' ? ' selected' : '' ?>>Todas</option>
                 <option value="activas"<?= $filtroEstatus === 'activas' ? ' selected' : '' ?>>Activas</option>
                 <option value="inactivas"<?= $filtroEstatus === 'inactivas' ? ' selected' : '' ?>>Inactivas</option>
@@ -73,14 +73,18 @@ $listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
                 <td><?= htmlspecialchars((string) ($r['telefono'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars((string) ($r['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?php
-                    $estAs = (int) ($r['estatus'] ?? 0);
-                    echo $estAs === 1 ? 'Activa' : 'Inactiva';
+                    $estRaw = $r['estatus'] ?? null;
+                    $esActiva = $estRaw === 1 || $estRaw === '1'
+                        || (is_string($estRaw) && strcasecmp(trim($estRaw), 'activo') === 0)
+                        || $estRaw === null
+                        || trim((string) $estRaw) === '';
+                    echo $esActiva ? 'Activa' : 'Inactiva';
                 ?></td>
                 <td style="white-space:nowrap;font-size:0.8125rem">
                     <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>
                     &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
                     <?php if ($fvd_is_admin): ?>
-                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=toggle_estatus&id=' . (int) $r['id'] . $listQuerySuffix, ENT_QUOTES, 'UTF-8') ?>" title="Conmutar activa/inactiva" onclick="return confirm('¿<?= $estAs === 1 ? 'Desactivar' : 'Activar' ?> esta asociación?');"><?= $estAs === 1 ? 'Desactivar' : 'Activar' ?></a>
+                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=toggle_estatus&id=' . (int) $r['id'] . $listQuerySuffix, ENT_QUOTES, 'UTF-8') ?>" title="Conmutar activa/inactiva" onclick="return confirm('¿<?= $esActiva ? 'Desactivar' : 'Activar' ?> esta asociación?');"><?= $esActiva ? 'Desactivar' : 'Activar' ?></a>
                         &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar esta asociación?');">Eliminar</a>
                     <?php endif; ?>
                 </td>

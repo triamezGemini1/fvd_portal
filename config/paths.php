@@ -14,9 +14,44 @@ if (!defined('BASE_PATH')) {
     define('BASE_PATH', dirname(__DIR__));
 }
 
+/**
+ * Deduce el prefijo URL del proyecto (p. ej. /fvd_portal_beta) desde SCRIPT_NAME.
+ * Así CSS y assets cargan aunque el nombre de carpeta en hosting no coincida con APP_BASE_PATH.
+ *
+ * @return string '' si la app está en la raíz del dominio; p. ej. /fvd_portal_beta en subcarpeta
+ */
+function fvd_infer_web_base_path(): string
+{
+    if (PHP_SAPI === 'cli' || empty($_SERVER['SCRIPT_NAME'])) {
+        return '';
+    }
+    $sn = str_replace('\\', '/', (string) $_SERVER['SCRIPT_NAME']);
+    $markers = ['/fvdmasteradmin/', '/admin/modules/', '/admin/', '/modules/', '/dashboard/'];
+    foreach ($markers as $m) {
+        $p = strpos($sn, $m);
+        if ($p !== false) {
+            $base = substr($sn, 0, $p);
+
+            return $base === '' ? '' : rtrim($base, '/');
+        }
+    }
+    $dir = dirname($sn);
+    $dir = str_replace('\\', '/', $dir);
+    if ($dir === '/' || $dir === '.' || $dir === '') {
+        return '';
+    }
+
+    return rtrim($dir, '/');
+}
+
 // Base URL dinámica
 if (!defined('BASE_URL')) {
-    $base_path = env('APP_BASE_PATH', '/fvd_portal');
+    $useAuto = in_array(strtolower((string) env('APP_BASE_PATH_AUTO', '')), ['1', 'true', 'yes'], true);
+    if ($useAuto) {
+        $base_path = fvd_infer_web_base_path();
+    } else {
+        $base_path = env('APP_BASE_PATH', '/fvd_portal');
+    }
     define('BASE_URL', $base_path);
 }
 

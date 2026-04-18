@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/fvdmasteradmin/bootstrap.php';
+require_once __DIR__ . '/includes/load_fvd_bootstrap.php';
 require_once __DIR__ . '/includes/fvd_public_layout.php';
 
 $page = max(1, (int) ($_GET['p'] ?? 1));
