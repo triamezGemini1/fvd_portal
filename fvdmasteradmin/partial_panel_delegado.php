@@ -60,6 +60,10 @@ $urlDeudaForm = ($tidInt > 0 && $myAid !== null && (int) $myAid > 0)
 
 $urlRelacionPagos = fvd_module_url('relacion_pago/index.php');
 
+$urlTraspaso = $appBase . '/fvdmasteradmin/solicitud_traspaso.php';
+
+$urlDelegUltimaInvit = $appBase . '/fvdmasteradmin/delegado_entrar_torneo.php?ultima=1';
+
 
 
 $asocNombre = isset($fvd_topbar_asoc_nombre) ? (string) $fvd_topbar_asoc_nombre : '';
@@ -134,11 +138,39 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 <div class="fvd-deleg-alert-invites" role="status" aria-live="polite">
 
-    <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene <?= (int) $delegNotifNoVistas ?> notificación(es) sin abrir. Revise el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones a torneos</a> o el enlace <strong>Invitaciones</strong> en la barra superior.</span>
+    <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene <?= (int) $delegNotifNoVistas ?> notificación(es) sin abrir. Revise la <a href="#fvd-deleg-guia-inscripcion">guía vía web</a> y el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones a torneos</a>, o el enlace <strong>Invitaciones</strong> en la barra superior.</span>
 
 </div>
 
 <?php endif; ?>
+
+<section class="fvd-deleg-guia-web" id="fvd-deleg-guia-inscripcion" aria-label="Guía de inscripción vía web">
+
+    <h2 class="fvd-deleg-guia-web__h">Información vía web e inscripción al torneo</h2>
+
+    <p class="fvd-deleg-guia-web__lead">Las invitaciones y avisos de la FVD se muestran en <strong>este portal</strong><?php if (($delegNotifs ?? []) !== []): ?>: en el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones a torneos</a> y<?php else: ?> y<?php endif; ?> en el enlace <strong>Invitaciones</strong> de la barra superior. Puede usar el portal como fuente principal; el correo es complementario.</p>
+
+    <ol class="fvd-deleg-guia-web__ol">
+
+        <li><strong>Invitación:</strong> abra el <strong>PDF</strong> si está disponible y pulse <strong>Panel del torneo</strong> para fijar el torneo en contexto y continuar el flujo.<?php if (($delegNotifNoVistas ?? 0) > 0): ?> Si tiene avisos sin abrir, también puede <a href="<?= htmlspecialchars($urlDelegUltimaInvit, ENT_QUOTES, 'UTF-8') ?>">activar la última invitación sin abrir</a>.<?php endif; ?></li>
+
+        <li><strong>Fase 1</strong> (afiliación, carnets, traspasos): cuando la ventana del calendario lo permita, use <a href="<?= htmlspecialchars($urlRegistrarAtleta, ENT_QUOTES, 'UTF-8') ?>">Registrar atleta</a>, <a href="<?= htmlspecialchars($urlSolCarnet, ENT_QUOTES, 'UTF-8') ?>">Carnets</a> y <a href="<?= htmlspecialchars($urlTraspaso, ENT_QUOTES, 'UTF-8') ?>">Traspaso</a><?php if ($tidInt > 0): ?>, y las pantallas del torneo en contexto (<a href="<?= htmlspecialchars($urlTorneoInscripcion, ENT_QUOTES, 'UTF-8') ?>">Preparación</a>)<?php endif; ?>.<?php if ($delegVentana !== null): ?> <span class="fvd-deleg-guia-web__hint"><?= $delegPuedeFase1 ? 'Ventana de fase 1 abierta.' : 'Fase 1 aún no disponible según calendario.' ?></span><?php endif; ?></li>
+
+        <li><strong>Fase 2</strong> (inscripciones al torneo): <a href="<?= htmlspecialchars($urlInscripcionTorneoTabla, ENT_QUOTES, 'UTF-8') ?>">Inscripción al torneo</a> y <a href="<?= htmlspecialchars($urlReportesInscripciones, ENT_QUOTES, 'UTF-8') ?>">Reportes de inscripciones</a>.<?php if ($delegVentana !== null): ?> <span class="fvd-deleg-guia-web__hint"><?= $delegPuedeFase2 ? 'Ventana de fase 2 abierta.' : 'Fase 2 aún no disponible según calendario.' ?></span><?php endif; ?></li>
+
+    </ol>
+
+    <?php if ($delegVentana !== null): ?>
+
+    <p class="fvd-deleg-guia-web__estado"><strong>Calendario del torneo en contexto:</strong> <?= htmlspecialchars((string) ($delegVentana['etiqueta_fase'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+
+    <?php elseif ($tidInt > 0 && $tnom !== ''): ?>
+
+    <p class="fvd-deleg-guia-web__estado"><strong>Torneo en contexto:</strong> <?= htmlspecialchars($tnom, ENT_QUOTES, 'UTF-8') ?> — use el menú de inscripciones o una invitación para alinear fechas si no ve el estado del calendario.</p>
+
+    <?php endif; ?>
+
+</section>
 
 <?php if (($delegNotifs ?? []) !== []): ?>
 
@@ -146,7 +178,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
     <h2 class="fvd-deleg-notif-wrap__h">Invitaciones a torneos <?= ($delegNotifNoVistas ?? 0) > 0 ? ' (' . (int) $delegNotifNoVistas . ' sin abrir)' : '' ?></h2>
 
-    <p class="fvd-deleg-notif-wrap__p">Avisos de la FVD con PDF de invitación y acceso al panel del torneo.</p>
+    <p class="fvd-deleg-notif-wrap__p">Notificaciones <strong>vía web</strong> (solo en este portal): PDF de invitación y botón para abrir el panel del torneo y seguir con la preparación e inscripción.</p>
 
     <ul class="fvd-deleg-notif-wrap__ul">
 
@@ -490,6 +522,88 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 #fvd-deleg-torneos-invites {
 
     scroll-margin-top: 4.5rem;
+
+}
+
+#fvd-deleg-guia-inscripcion {
+
+    scroll-margin-top: 4.5rem;
+
+}
+
+.fvd-deleg-guia-web {
+
+    margin: 0 auto 1rem;
+
+    max-width: 72rem;
+
+    padding: 0.85rem 1rem;
+
+    border-radius: 10px;
+
+    border: 1px solid rgba(59, 130, 246, 0.35);
+
+    background: linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(219, 234, 254, 0.65));
+
+    color: #1e3a5f;
+
+    font-size: 0.8125rem;
+
+    line-height: 1.5;
+
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+
+}
+
+.fvd-deleg-guia-web__h {
+
+    font-size: 0.95rem;
+
+    margin: 0 0 0.5rem;
+
+    color: #1e3a8a;
+
+}
+
+.fvd-deleg-guia-web__lead { margin: 0 0 0.65rem; }
+
+.fvd-deleg-guia-web__lead a { color: #1d4ed8; font-weight: 600; }
+
+.fvd-deleg-guia-web__ol {
+
+    margin: 0 0 0.5rem;
+
+    padding-left: 1.25rem;
+
+}
+
+.fvd-deleg-guia-web__ol li { margin-bottom: 0.4rem; }
+
+.fvd-deleg-guia-web__ol a { color: #1d4ed8; font-weight: 600; }
+
+.fvd-deleg-guia-web__hint {
+
+    font-size: 0.75rem;
+
+    color: #475569;
+
+    font-weight: 500;
+
+}
+
+.fvd-deleg-guia-web__estado {
+
+    margin: 0;
+
+    padding: 0.5rem 0.65rem;
+
+    border-radius: 8px;
+
+    background: rgba(255, 255, 255, 0.65);
+
+    border: 1px solid rgba(59, 130, 246, 0.2);
+
+    font-size: 0.78rem;
 
 }
 

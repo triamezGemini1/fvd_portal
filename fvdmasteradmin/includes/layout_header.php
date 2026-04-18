@@ -928,7 +928,7 @@ header('Content-Type: text/html; charset=UTF-8');
             </div>
             <div class="fvd-topbar__actions">
                 <?php if ($fvd_topbar_deleg_notif_no_vistas > 0): ?>
-                <a class="fvd-topbar__notif-inv" href="<?= htmlspecialchars($fvdPanelUrl . '#fvd-deleg-torneos-invites', ENT_QUOTES, 'UTF-8') ?>" title="Invitaciones a torneos sin abrir">
+                <a class="fvd-topbar__notif-inv" href="<?= htmlspecialchars($fvdPanelUrl . '#fvd-deleg-guia-inscripcion', ENT_QUOTES, 'UTF-8') ?>" title="Notificaciones web — invitaciones a torneos sin abrir">
                     Invitaciones
                     <span class="fvd-topbar__notif-badge"><?= (int) $fvd_topbar_deleg_notif_no_vistas ?></span>
                 </a>
