@@ -26,7 +26,7 @@ $fmtInt = static function ($value): string {
 <h1>Finanzas — Estados de cuenta por torneo y asociación</h1>
 <p>Relación de <code>deuda_asociaciones</code>: una fila por torneo + asociación, con totales de conceptos (desde sincronización con <code>atletas</code>) y pagos acumulados.</p>
 <p style="font-size:0.8125rem;margin:8px 0 12px;line-height:1.45">
-    <a href="<?= htmlspecialchars($selfUrl . '?action=estadisticas_inscripcion', ENT_QUOTES, 'UTF-8') ?>">Estadísticas por torneo (<code>atletas</code>)</a>
+    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>">Estadísticas por torneo (<code>atletas</code>)</a>
     — conteos por asociación y renglón (banderas en <code>atletas</code>), sin calcular deudas. La sincronización de montos en esta pantalla usa la misma fuente.
 </p>
 <?php if (!empty($fvd_error)): ?><p class="fvd-mod-msg"><?= htmlspecialchars($fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
@@ -58,8 +58,13 @@ $fmtInt = static function ($value): string {
         <?php endif; ?>
         Para ver totales según la tabla de <strong>inscripciones</strong> (origen), use el enlace de estadísticas arriba.
     </p>
-    <form method="post" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="display:inline;margin:0" onsubmit="return confirm(<?= json_encode($confirmMasivo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>);">
+    <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl), ENT_QUOTES, 'UTF-8') ?>" style="display:inline;margin:0" onsubmit="return confirm(<?= json_encode($confirmMasivo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>);">
         <input type="hidden" name="_action" value="actualizar_deudas_masivo">
+        <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+        <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+        <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
         <button type="submit" class="fvd-btn fvd-btn--primary" style="padding:8px 18px;font-size:0.9rem">
             <?= $fvd_admin ? 'Sincronizar todas las asociaciones' : 'Sincronizar mi asociación' ?>
         </button>
@@ -97,16 +102,21 @@ $fmtInt = static function ($value): string {
                 <td><?= htmlspecialchars($fmtEur($r['pagado_eur'] ?? 0), ENT_QUOTES, 'UTF-8') ?></td>
                 <td title="<?= (($r['saldo_eur'] ?? null) === null) ? 'Defina deuda total EUR para calcular saldo.' : '' ?>"><?= htmlspecialchars($fmtEur($r['saldo_eur'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
                 <td style="white-space:normal;min-width:11rem">
-                    <a href="<?= htmlspecialchars($selfUrl . '?action=form&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id'], ENT_QUOTES, 'UTF-8') ?>">Ver detalle</a>
-                    <form method="post" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="display:inline;margin-left:6px">
+                    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id']), ENT_QUOTES, 'UTF-8') ?>">Ver detalle</a>
+                    <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl), ENT_QUOTES, 'UTF-8') ?>" style="display:inline;margin-left:6px">
                         <input type="hidden" name="_action" value="actualizar_deuda">
                         <input type="hidden" name="torneo_id" value="<?= (int) $r['torneo_id'] ?>">
                         <input type="hidden" name="asociacion_id" value="<?= (int) $r['asociacion_id'] ?>">
                         <input type="hidden" name="redirect" value="list">
+                        <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+                        <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+                        <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+                        <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+                        <?php endif; ?>
                         <button type="submit" class="fvd-btn fvd-btn--secondary" style="padding:4px 10px;font-size:0.85rem;vertical-align:middle" title="Recalcular montos desde atletas (destino portal), no desde inscripcion_torneo">Sincronizar</button>
                     </form>
                     <?php if ($fvd_admin): ?>
-                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar deuda?');">Eliminar</a>
+                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=delete&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id']), ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar deuda?');">Eliminar</a>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -118,9 +128,18 @@ $fmtInt = static function ($value): string {
     </table>
 </div>
 
-<?php $p = (int) $result['page']; $pages = (int) $result['pages']; ?>
+<?php
+$p = (int) $result['page'];
+$pages = (int) $result['pages'];
+$deudaRetArg = '';
+if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+    $deudaRetArg = '&ret=' . rawurlencode($_GET['ret']);
+} elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+    $deudaRetArg = '&return=' . rawurlencode($_GET['return']);
+}
+?>
 <nav class="fvd-mod-pager">
     <span><?= (int) $result['total'] ?> reg. · pág. <?= $p ?>/<?= $pages ?></span>
-    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
-    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
+    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p - 1) . $deudaRetArg, ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
+    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p + 1) . $deudaRetArg, ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
 </nav>

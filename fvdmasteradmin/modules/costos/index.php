@@ -13,7 +13,7 @@ $fvd_error = '';
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
     $ctrl->delete((int) $_GET['id']);
-    header('Location: ' . $selfUrl);
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl));
     exit;
 }
 
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
     try {
         $sid = isset($_POST['id']) && $_POST['id'] !== '' ? (int) $_POST['id'] : null;
         $ctrl->save($sid, $_POST);
-        header('Location: ' . $selfUrl);
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();

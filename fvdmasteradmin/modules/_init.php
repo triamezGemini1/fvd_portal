@@ -18,6 +18,10 @@ if (!function_exists('env')) {
     require_once FVD_MASTER_ROOT . '/config/db.php';
 }
 
+if (!function_exists('fvd_return_append_to_url')) {
+    require_once FVD_PROJECT_ROOT . '/config/paths.php';
+}
+
 if (!function_exists('fvd_module_url')) {
     /**
      * URL pública hacia un script bajo /modules/ (sin "fvdmasteradmin" en la ruta; rewrite → fvdmasteradmin/modules/).

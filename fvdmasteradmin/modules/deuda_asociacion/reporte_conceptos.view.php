@@ -8,8 +8,8 @@ $r = $row ?? [];
 $fvdReporteConceptosOk = $fvdReporteConceptosOk ?? false;
 $fvdReporteConceptoFiltro = $fvdReporteConceptoFiltro ?? null;
 $labels = DeudaAsociacionController::ETIQUETAS_CONCEPTO;
-$formUrl = $selfUrl . '?action=form&tid=' . (int) ($r['torneo_id'] ?? 0) . '&aid=' . (int) ($r['asociacion_id'] ?? 0);
-$reporteTodosUrl = $selfUrl . '?action=reporte_conceptos&tid=' . (int) ($r['torneo_id'] ?? 0) . '&aid=' . (int) ($r['asociacion_id'] ?? 0);
+$formUrl = fvd_return_append_to_url($selfUrl . '?action=form&tid=' . (int) ($r['torneo_id'] ?? 0) . '&aid=' . (int) ($r['asociacion_id'] ?? 0));
+$reporteTodosUrl = fvd_return_append_to_url($selfUrl . '?action=reporte_conceptos&tid=' . (int) ($r['torneo_id'] ?? 0) . '&aid=' . (int) ($r['asociacion_id'] ?? 0));
 $labelsToShow = ($fvdReporteConceptoFiltro !== null && isset($labels[$fvdReporteConceptoFiltro]))
     ? [$fvdReporteConceptoFiltro => $labels[$fvdReporteConceptoFiltro]]
     : $labels;
@@ -107,14 +107,14 @@ $labelsToShow = ($fvdReporteConceptoFiltro !== null && isset($labels[$fvdReporte
 
 <?php if ($row === null): ?>
     <p>La deuda no existe o no tiene permisos para verla.</p>
-    <p><a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al listado</a></p>
+    <p><a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver al listado</a></p>
 <?php elseif (!$fvdReporteConceptosOk): ?>
     <p>No se pudo generar el detalle por concepto.</p>
     <?php if (!empty($fvd_error)): ?>
         <p class="fvd-mod-msg"><?= htmlspecialchars($fvd_error, ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
     <p><a href="<?= htmlspecialchars($formUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al reporte de costos</a> ·
-        <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Listado de deudas</a></p>
+        <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Listado de deudas</a></p>
 <?php else: ?>
         <p class="fvd-deuda-reporte-lead">
             Listado de atletas que suman cada concepto (mismos criterios que el cálculo de deuda). Columnas: número FVD, nombre y cédula del registro.
@@ -161,7 +161,7 @@ $labelsToShow = ($fvdReporteConceptoFiltro !== null && isset($labels[$fvdReporte
 
         <div class="fvd-mod-actions" style="margin-top:1.25rem">
             <a href="<?= htmlspecialchars($formUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al reporte de costos</a>
-            <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Listado de deudas</a>
+            <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Listado de deudas</a>
         </div>
 <?php endif; ?>
 </div>

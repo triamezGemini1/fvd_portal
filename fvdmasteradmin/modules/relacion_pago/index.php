@@ -32,7 +32,7 @@ if (($_GET['action'] ?? '') === 'bcv_euro' && ($_GET['fmt'] ?? '') === 'json') {
 }
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
-    header('Location: ' . $selfUrl . '?msg=no_eliminar');
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?msg=no_eliminar'));
     exit;
 }
 
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
     try {
         $sid = isset($_POST['id']) && $_POST['id'] !== '' ? (int) $_POST['id'] : null;
         if ($sid !== null) {
-            header('Location: ' . $selfUrl . '?action=form&id=' . $sid . '&msg=no_edicion');
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=form&id=' . $sid . '&msg=no_edicion'));
             exit;
         }
         $ctrl->save($sid, $_POST);
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
             $qs['aid'] = $aidPost;
         }
         $loc .= $qs !== [] ? ('?' . http_build_query($qs)) : '';
-        header('Location: ' . $loc);
+        header('Location: ' . fvd_return_preserve_query_params($loc));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();
@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
         $idErr = isset($_POST['id']) && $_POST['id'] !== '' ? (int) $_POST['id'] : null;
         $row = $idErr ? $ctrl->find($idErr) : null;
         if ($idErr !== null && $row === null) {
-            header('Location: ' . $selfUrl);
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl));
             exit;
         }
         $asociaciones = $ctrl->listAsociacionesForSelect();
@@ -168,6 +168,7 @@ if ($rpRef === 'rep_asoc' && $rpRid > 0) {
     $fvdRpPreservar['ref'] = 'rep_asoc';
     $fvdRpPreservar['rid'] = $rpRid;
 }
+$fvdRpPreservar = fvd_return_merge_get_params($fvdRpPreservar);
 $fvdRpPreservarQs = $fvdRpPreservar === [] ? '' : http_build_query($fvdRpPreservar);
 $fvdReporteOrigenUrl = ($rpRef === 'rep_asoc' && $rpRid > 0)
     ? $fvdRpAppBase . '/fvdmasteradmin/asociacion_reporte_financiero.php?id=' . $rpRid
@@ -178,6 +179,7 @@ if ($rpRef === 'rep_asoc' && $rpRid > 0) {
     $qsSinAid['ref'] = 'rep_asoc';
     $qsSinAid['rid'] = $rpRid;
 }
+$qsSinAid = fvd_return_merge_get_params($qsSinAid);
 $fvdRpQuitarFiltroAidUrl .= $qsSinAid !== [] ? ('?' . http_build_query($qsSinAid)) : '';
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';

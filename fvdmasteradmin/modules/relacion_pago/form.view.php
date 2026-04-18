@@ -275,6 +275,7 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
             $fvdVolverUrl = $selfUrl . '?' . http_build_query($qv);
         }
     }
+    $fvdVolverUrl = fvd_return_append_to_url($fvdVolverUrl);
     ?>
     <div class="no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 1rem">
         <?php if ($fvdReporteOrigenUrl !== null && $fvdReporteOrigenUrl !== ''): ?>
@@ -304,13 +305,18 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
             <a href="<?= htmlspecialchars($fvdBcvTasasUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Abrir tipo de cambio oficial del BCV (euro y otras monedas)</a>
         </p>
 
-        <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : ''), ENT_QUOTES, 'UTF-8') ?>" id="fvd-form-relacion-pago"<?= $fvdSoloConsulta ? ' onsubmit="return false"' : '' ?>>
+        <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : '')), ENT_QUOTES, 'UTF-8') ?>" id="fvd-form-relacion-pago"<?= $fvdSoloConsulta ? ' onsubmit="return false"' : '' ?>>
             <?php if (!$fvdSoloConsulta): ?>
                 <input type="hidden" name="_action" value="save">
             <?php endif; ?>
             <?php if ($fvdRpRetornoRef === 'rep_asoc' && $fvdRpRetornoRid > 0): ?>
                 <input type="hidden" name="_retorno_ref" value="rep_asoc">
                 <input type="hidden" name="_retorno_rid" value="<?= (int) $fvdRpRetornoRid ?>">
+            <?php endif; ?>
+            <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+                <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+            <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+                <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
             <?php endif; ?>
 
             <?php if ($pfSinTorneoActivo): ?>

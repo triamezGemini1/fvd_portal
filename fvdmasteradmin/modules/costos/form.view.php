@@ -13,9 +13,14 @@ $isEdit = $row !== null;
     <p class="fvd-mod-msg fvd-costos-form-page__err"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
 
-    <form class="fvd-mod-form fvd-costos-form fvd-costos-form--framed" method="post" action="<?= htmlspecialchars($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : ''), ENT_QUOTES, 'UTF-8') ?>">
+    <form class="fvd-mod-form fvd-costos-form fvd-costos-form--framed" method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : '')), ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="_action" value="save">
         <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>"><?php endif; ?>
+        <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+        <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+        <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
 
         <div class="fvd-costos-row">
             <label for="fecha">Fecha vigencia</label>
@@ -31,7 +36,7 @@ $isEdit = $row !== null;
 
         <div class="fvd-mod-actions fvd-costos-form__actions">
             <button type="submit">Guardar</button>
-            <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver</a>
+            <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver</a>
         </div>
 
         <p class="fvd-costos-form-footnote" role="note">Estos montos serán calculados en base al cambio oficial del euro en el BCV.</p>

@@ -24,6 +24,11 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
     <p class="fvd-mod-msg">No hay torneos en el selector. Si es delegado, confirme que existan atletas del club con <code>torneo_id</code> o un evento activo en contexto.</p>
 <?php else: ?>
 <form method="get" action="<?= htmlspecialchars($fvdUrlSelf, ENT_QUOTES, 'UTF-8') ?>" class="fvd-card" style="padding:14px;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+    <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+    <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+    <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+    <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
     <div>
         <label style="font-size:0.75rem;color:var(--fvd-muted);display:block">Torneo</label>
         <select class="fvd-input" name="torneo_id" style="min-width:14rem">
@@ -91,7 +96,7 @@ $fmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
                 <td class="fvd-rep-asoc-resumen__num"><?= $fmtN((float) ($sr['pagado_eur'] ?? 0)) ?> €</td>
                 <td class="fvd-rep-asoc-resumen__num"><?= $saldo !== null ? $fmtN((float) $saldo) . ' €' : '—' ?></td>
                 <td style="white-space:nowrap">
-                    <a href="<?= htmlspecialchars($fvdUrlSelf . '?torneo_id=' . $tSel . '&asociacion_id=' . $aidR, ENT_QUOTES, 'UTF-8') ?>">Filtrar</a>
+                    <a href="<?= htmlspecialchars(fvd_return_append_to_url($fvdUrlSelf . '?torneo_id=' . $tSel . '&asociacion_id=' . $aidR), ENT_QUOTES, 'UTF-8') ?>">Filtrar</a>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -292,8 +297,8 @@ if (is_array($dRow)):
 
 <p class="fvd-rep-gestion">
     Gestión:
-    <a href="<?= htmlspecialchars($fvdUrlDeuda . '?action=form&tid=' . $tSel . '&aid=' . $aSel, ENT_QUOTES, 'UTF-8') ?>">Deuda / actualizar desde atletas</a>
-    · <a href="<?= htmlspecialchars($fvdUrlPagos, ENT_QUOTES, 'UTF-8') ?>">Relación de pagos</a>
+    <a href="<?= htmlspecialchars(fvd_return_append_to_url($fvdUrlDeuda . '?action=form&tid=' . $tSel . '&aid=' . $aSel), ENT_QUOTES, 'UTF-8') ?>">Deuda / actualizar desde atletas</a>
+    · <a href="<?= htmlspecialchars(fvd_return_append_to_url($fvdUrlPagos), ENT_QUOTES, 'UTF-8') ?>">Relación de pagos</a>
 </p>
 
 <div class="fvd-rep-two-col">
@@ -361,11 +366,11 @@ if (is_array($dRow)):
 </div>
 
 <?php elseif ($fvdRepTorneos !== [] && ($tSel <= 0 || $aSel <= 0)): ?>
-    <p class="fvd-mod-msg">No hay torneo o asociación seleccionable. Compruebe permisos o datos en <a href="<?= htmlspecialchars($fvdUrlInscTorneo, ENT_QUOTES, 'UTF-8') ?>">inscripciones por torneo</a>.</p>
+    <p class="fvd-mod-msg">No hay torneo o asociación seleccionable. Compruebe permisos o datos en <a href="<?= htmlspecialchars(fvd_return_append_to_url($fvdUrlInscTorneo), ENT_QUOTES, 'UTF-8') ?>">inscripciones por torneo</a>.</p>
 <?php endif; ?>
 
 <p style="font-size:0.8125rem;color:var(--fvd-muted)">
-    <a href="<?= htmlspecialchars($fvdUrlInscTorneo . ($tSel > 0 ? '?torneo_id=' . $tSel : ''), ENT_QUOTES, 'UTF-8') ?>">Tabla inscripcion_torneo</a>
-    · <a href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=list'), ENT_QUOTES, 'UTF-8') ?>">Módulo Atletas</a>
+    <a href="<?= htmlspecialchars(fvd_return_append_to_url($fvdUrlInscTorneo . ($tSel > 0 ? '?torneo_id=' . $tSel : '')), ENT_QUOTES, 'UTF-8') ?>">Tabla inscripcion_torneo</a>
+    · <a href="<?= htmlspecialchars(fvd_return_append_to_url(fvd_module_url('atletas/index.php?action=list')), ENT_QUOTES, 'UTF-8') ?>">Módulo Atletas</a>
 </p>
 

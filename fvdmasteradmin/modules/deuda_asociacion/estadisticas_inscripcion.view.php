@@ -24,6 +24,11 @@ $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 
 <form method="get" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="margin-bottom:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
     <input type="hidden" name="action" value="estadisticas_inscripcion">
+    <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+    <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+    <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+    <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
     <label style="display:flex;flex-direction:column;gap:4px;font-size:0.875rem">
         <span>Torneo</span>
         <select name="tid" required style="min-width:220px;padding:6px 8px">
@@ -35,7 +40,7 @@ $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
         </select>
     </label>
     <button type="submit" class="fvd-btn fvd-btn--primary" style="padding:8px 16px">Ver estadísticas</button>
-    <a class="fvd-btn fvd-btn--ghost" style="padding:8px 16px;text-decoration:none;display:inline-block" href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver a deudas</a>
+    <a class="fvd-btn fvd-btn--ghost" style="padding:8px 16px;text-decoration:none;display:inline-block" href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver a deudas</a>
 </form>
 
 <?php if ($tidStats > 0): ?>

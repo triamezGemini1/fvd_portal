@@ -13,14 +13,14 @@ $fvd_error = '';
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['tid'], $_GET['aid'])) {
     $ctrl->delete((int) $_GET['tid'], (int) $_GET['aid']);
-    header('Location: ' . $selfUrl);
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl));
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save') {
     try {
         $ctrl->save((int) $_POST['torneo_id'], (int) $_POST['asociacion_id'], $_POST);
-        header('Location: ' . $selfUrl);
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();
@@ -34,10 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'actu
         $aidPost = (int) ($_POST['asociacion_id'] ?? 0);
         $ctrl->actualizarDeudaDesdeAtletas($tidPost, $aidPost);
         if (($_POST['redirect'] ?? '') === 'list') {
-            header('Location: ' . $selfUrl . '?msg=deuda_actualizada');
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?msg=deuda_actualizada'));
             exit;
         }
-        header('Location: ' . $selfUrl . '?action=form&tid=' . $tidPost . '&aid=' . $aidPost . '&msg=deuda_actualizada');
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=form&tid=' . $tidPost . '&aid=' . $aidPost . '&msg=deuda_actualizada'));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'actu
     try {
         $res = $ctrl->sincronizarTodasLasDeudasDesdeAtletas();
         $_SESSION['fvd_deuda_masiva_result'] = $res;
-        header('Location: ' . $selfUrl . '?msg=deuda_masiva');
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?msg=deuda_masiva'));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();

@@ -13,7 +13,7 @@ if (!function_exists('fvd_format_contable')) {
 
 <?php if ($fvd_admin): ?>
 <div class="fvd-mod-toolbar">
-    <a href="<?= htmlspecialchars($selfUrl . '?action=form', ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nuevo</a>
+    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nuevo</a>
 </div>
 <?php endif; ?>
 
@@ -43,8 +43,8 @@ if (!function_exists('fvd_format_contable')) {
                 <td><?= htmlspecialchars(fvd_format_contable($r['inscripciones'] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
                 <td>
                     <?php if ($fvd_admin): ?>
-                        <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
-                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar?');">Eliminar</a>
+                        <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $r['id']), ENT_QUOTES, 'UTF-8') ?>">Editar</a>
+                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=delete&id=' . (int) $r['id']), ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar?');">Eliminar</a>
                     <?php else: ?>
                         —
                     <?php endif; ?>
@@ -58,9 +58,18 @@ if (!function_exists('fvd_format_contable')) {
     </table>
 </div>
 
-<?php $p = (int) $result['page']; $pages = (int) $result['pages']; ?>
+<?php
+$p = (int) $result['page'];
+$pages = (int) $result['pages'];
+$costosRetArg = '';
+if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+    $costosRetArg = '&ret=' . rawurlencode($_GET['ret']);
+} elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+    $costosRetArg = '&return=' . rawurlencode($_GET['return']);
+}
+?>
 <nav class="fvd-mod-pager">
     <span><?= (int) $result['total'] ?> reg. · pág. <?= $p ?>/<?= $pages ?></span>
-    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
-    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
+    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p - 1) . $costosRetArg, ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
+    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p + 1) . $costosRetArg, ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
 </nav>
