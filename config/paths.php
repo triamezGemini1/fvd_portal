@@ -188,4 +188,4 @@ function fvd_format_contable($value, string $empty = '—'): string
     return number_format((float) $value, 2, ',', '.');
 }
 
-
+require_once __DIR__ . '/fvd_navigation_return.php';

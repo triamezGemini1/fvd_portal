@@ -107,6 +107,11 @@ $formTpl = FVD_PROJECT_ROOT . '/templates/invitaciones/form.php';
 $p = (int) $result['page'];
 $pages = (int) $result['pages'];
 $estArg = $estadoFiltro !== '' ? '&estado=' . rawurlencode($estadoFiltro) : '';
+if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+    $estArg .= '&ret=' . rawurlencode($_GET['ret']);
+} elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+    $estArg .= '&return=' . rawurlencode($_GET['return']);
+}
 ?>
 <nav id="fvd-inv-pager" class="fvd-mod-pager no-print">
     <span><?= (int) $result['total'] ?> reg. · pág. <?= $p ?>/<?= $pages ?></span>

@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'torn
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
     $svc->torneosDelete((int) $_GET['id']);
-    header('Location: ' . $selfUrl);
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl));
     exit;
 }
 
@@ -130,10 +130,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
         $savedId = $svc->torneosSave($tid, $_POST, $_FILES);
         $wasNew = $tid === null;
         if ($wasNew && AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-            header('Location: ' . $selfUrl . '?action=evento&id=' . $savedId . '&msg=torneo_creado_invitaciones');
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $savedId . '&msg=torneo_creado_invitaciones'));
             exit;
         }
-        header('Location: ' . $selfUrl);
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();

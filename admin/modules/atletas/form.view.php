@@ -410,16 +410,25 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 </style>
 
 <?php
+if (!function_exists('fvd_return_preserve_query_params')) {
+    require_once FVD_PROJECT_ROOT . '/config/paths.php';
+}
 $fvdFormAction = $selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : '');
 if ($fvd_form_embed) {
     $fvdFormAction .= '&embed=1';
 }
+$fvdFormAction = fvd_return_preserve_query_params($fvdFormAction);
 ?>
 <div class="fvd-atleta-form-page<?= !empty($fvd_form_embed) ? ' fvd-atleta-form-page--embed' : '' ?>">
 <h1 class="fvd-atleta-form-page__title"><?= $isEdit ? 'Editar atleta' : 'Nuevo atleta' ?></h1>
 <form class="fvd-atleta-form fvd-atleta-form--framed" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($fvdFormAction, ENT_QUOTES, 'UTF-8') ?>"<?= $fvd_form_embed ? ' target="_parent"' : '' ?>>
     <input type="hidden" name="_action" value="save">
     <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>"><?php endif; ?>
+    <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+    <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+    <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+    <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
 
     <div class="fvd-atleta-form__top-grid<?= $isFvdAdmin ? '' : ' fvd-atleta-form__top-grid--scoped-asoc' ?>">
         <?php if ($isFvdAdmin): ?>

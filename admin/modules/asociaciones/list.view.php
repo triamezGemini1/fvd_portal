@@ -23,6 +23,11 @@ $listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
 <div class="fvd-mod-toolbar">
     <form method="get" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-admin-filter-form" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
         <input type="hidden" name="action" value="list">
+        <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+        <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+        <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block">Buscar por nombre</label>
             <input class="fvd-input" type="search" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Nombre" style="max-width:14rem">
@@ -39,7 +44,7 @@ $listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
         <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;align-self:flex-end;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
     </form>
     <?php if ($fvd_is_admin): ?>
-        <a href="<?= htmlspecialchars($selfUrl . '?action=form', ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nueva</a>
+        <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nueva</a>
     <?php endif; ?>
 </div>
 
@@ -77,11 +82,11 @@ $listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
                     echo $esActiva ? 'Activa' : 'Inactiva';
                 ?></td>
                 <td style="white-space:nowrap;font-size:0.8125rem">
-                    <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>
-                    &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
+                    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $r['id']), ENT_QUOTES, 'UTF-8') ?>">Ver</a>
+                    &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $r['id']), ENT_QUOTES, 'UTF-8') ?>">Editar</a>
                     <?php if ($fvd_is_admin): ?>
-                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=toggle_estatus&id=' . (int) $r['id'] . $listQuerySuffix, ENT_QUOTES, 'UTF-8') ?>" title="Conmutar activa/inactiva" onclick="return confirm('¿<?= $esActiva ? 'Desactivar' : 'Activar' ?> esta asociación?');"><?= $esActiva ? 'Desactivar' : 'Activar' ?></a>
-                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar esta asociación?');">Eliminar</a>
+                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=toggle_estatus&id=' . (int) $r['id'] . $listQuerySuffix), ENT_QUOTES, 'UTF-8') ?>" title="Conmutar activa/inactiva" onclick="return confirm('¿<?= $esActiva ? 'Desactivar' : 'Activar' ?> esta asociación?');"><?= $esActiva ? 'Desactivar' : 'Activar' ?></a>
+                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=delete&id=' . (int) $r['id']), ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar esta asociación?');">Eliminar</a>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -103,6 +108,7 @@ if ($q !== '') {
 if ($filtroEstatus !== 'todas') {
     $navBase['estado'] = $filtroEstatus;
 }
+$navBase = fvd_return_merge_get_params($navBase);
 $hrefAsocPage = function (int $pg) use ($selfUrl, $navBase): string {
     $params = $navBase;
     if ($pg > 1) {

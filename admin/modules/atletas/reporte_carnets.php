@@ -17,6 +17,9 @@ $selfReport = admin_module_url('atletas/reporte_carnets.php');
 
 require_once FVD_PROJECT_ROOT . '/fvdmasteradmin/includes/fvd_asociacion_helpers.php';
 
+$retOrigen = fvd_return_from_request();
+$atletasBackUrl = $retOrigen !== null ? $retOrigen : (fvd_crud_self_url('atletas') . '?action=list');
+
 $repOmitAsocCol = false;
 $repAsocNombreCorto = '';
 $repAsocLogoUrl = null;
@@ -75,9 +78,11 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         Igual que el resto de banderas en <code>atletas</code>, solo cuenta el valor <strong>1</strong>: indica solicitud / carnet registrado. Otros valores no se usan como criterio de informe.
         Total: <strong><?= count($rows) ?></strong>
     </p>
+    <?php if ($retOrigen === null): ?>
     <p class="no-print" style="margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:8px">
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars(fvd_crud_self_url('atletas') . '?action=list', ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
     </p>
+    <?php endif; ?>
     <div class="fvd-mod-table-wrap">
         <table class="fvd-mod-table tabla-atletas">
             <thead>

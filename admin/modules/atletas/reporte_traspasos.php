@@ -33,6 +33,9 @@ $st = fvd_db()->prepare($sql);
 $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+$retOrigen = fvd_return_from_request();
+$atletasBackUrl = $retOrigen !== null ? $retOrigen : (fvd_crud_self_url('atletas') . '?action=list');
+
 $fvd_page_title = 'Reporte traspasos';
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
@@ -41,9 +44,11 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
     <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 1rem">
         Movimientos registrados en <code>log_traspasos</code>; el atleta queda con <code>atletas.traspaso = 1</code>. Registros: <strong><?= count($rows) ?></strong> (máx. 500).
     </p>
+    <?php if ($retOrigen === null): ?>
     <p class="no-print" style="margin:0 0 1rem">
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars(fvd_crud_self_url('atletas') . '?action=list', ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
     </p>
+    <?php endif; ?>
     <div class="fvd-mod-table-wrap">
         <table class="fvd-mod-table tabla-atletas">
             <thead>

@@ -20,7 +20,7 @@
 /** @var int $fvd_atletas_reset_n */
 /** @var string $fvd_atletas_reset_campo */
 /** @var array<string, int|string> $fvd_atletas_widget */
-$atletasFormNuevoUrl = $selfUrl . '?action=form';
+$atletasFormNuevoUrl = fvd_return_append_to_url($selfUrl . '?action=form');
 $fvd_atletas_widget = isset($fvd_atletas_widget) && is_array($fvd_atletas_widget) ? $fvd_atletas_widget : [
     'etiqueta' => '', 'total_atletas' => 0, 'total_afiliados' => 0,
     'sexo_m' => 0, 'sexo_f' => 0, 'sexo_sin' => 0, 'torneos' => 0, 'participacion' => 0,
@@ -115,6 +115,11 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
 <div class="fvd-mod-toolbar no-print" style="flex-wrap:wrap;align-items:flex-end;gap:10px">
     <form method="get" action="" class="no-print" id="fvd-atletas-filter-form" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
         <input type="hidden" name="action" value="list">
+        <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+        <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+        <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
         <?php if ($fvd_atletas_puede_elegir_alcance): ?>
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block;font-weight:600">Alcance</label>
@@ -158,7 +163,7 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
             <input id="fvd-atleta-q" class="fvd-input" type="search" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Contiene…" style="max-width:12rem">
         </div>
         <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Buscar</button>
-        <a href="<?= htmlspecialchars($selfUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
+        <a href="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=list'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
     </form>
     <div class="fvd-atletas-report-links no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <?php
@@ -168,10 +173,10 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         $repBase = isset($atletasReportBaseUrl) && is_string($atletasReportBaseUrl) && $atletasReportBaseUrl !== ''
             ? $atletasReportBaseUrl
             : admin_module_url('atletas/');
-        $uRepAfiliacion = $repBase . 'reporte_indicadores.php?marcador=afiliacion';
-        $uRepSolCarnet = $repBase . 'reporte_carnets.php';
-        $uRepAfilAnual = $repBase . 'reporte_indicadores.php?marcador=afiliacion_anualidad';
-        $uRepTr = $repBase . 'reporte_traspasos.php';
+        $uRepAfiliacion = fvd_return_append_to_url($repBase . 'reporte_indicadores.php?marcador=afiliacion');
+        $uRepSolCarnet = fvd_return_append_to_url($repBase . 'reporte_carnets.php');
+        $uRepAfilAnual = fvd_return_append_to_url($repBase . 'reporte_indicadores.php?marcador=afiliacion_anualidad');
+        $uRepTr = fvd_return_append_to_url($repBase . 'reporte_traspasos.php');
         ?>
         <nav class="fvd-atletas-informes-nav no-print" aria-label="Informes y reportes" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid rgba(250,204,21,.38);background:rgba(15,23,42,.55);box-shadow:0 1px 0 rgba(255,255,255,.06) inset">
         <span class="fvd-atletas-informes-nav__label" style="font-size:.82rem;font-weight:800;color:var(--fvd-amarillo,#facc15);letter-spacing:.06em;text-transform:uppercase">Informes</span>
@@ -213,6 +218,11 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         <form method="post" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="margin:0" onsubmit="return confirm(<?= htmlspecialchars(json_encode($mconfirmL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);">
             <input type="hidden" name="_action" value="reset_marcador_atletas">
             <input type="hidden" name="marcador" value="<?= htmlspecialchars($mkL, ENT_QUOTES, 'UTF-8') ?>">
+            <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+            <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+            <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+            <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
             <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px;font-size:.75rem;cursor:pointer;background:#7f1d1d;color:#fecaca;border-color:#991b1b"><?= htmlspecialchars($mlabL, ENT_QUOTES, 'UTF-8') ?></button>
         </form>
         <?php endforeach; ?>

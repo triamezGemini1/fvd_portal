@@ -33,6 +33,15 @@ $fvdProjRoot = dirname($fvdRoot);
 if (!function_exists('url')) {
     require_once $fvdProjRoot . '/config/paths.php';
 }
+if (!function_exists('fvd_return_from_request')) {
+    require_once $fvdProjRoot . '/config/paths.php';
+}
+$fvd_return_nav_url = null;
+if (isset($fvd_page_return_url) && is_string($fvd_page_return_url) && $fvd_page_return_url !== '') {
+    $fvd_return_nav_url = fvd_return_sanitize($fvd_page_return_url);
+} else {
+    $fvd_return_nav_url = fvd_return_from_request();
+}
 require_once $fvdRoot . '/includes/fvd_brand.php';
 $fvd_brand_logo_url = fvd_brand_logo_public_url();
 $fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
@@ -649,6 +658,24 @@ header('Content-Type: text/html; charset=UTF-8');
             border-left: 3px solid var(--fvd-amarillo);
             padding-left: calc(0.75rem - 3px);
         }
+        .fvd-return-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--fvd-border);
+            background: rgba(15, 23, 42, 0.45);
+            font-size: 0.8125rem;
+        }
+        .fvd-return-bar a {
+            color: var(--fvd-amarillo);
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .fvd-return-bar a:hover { text-decoration: underline; }
         .fvd-main-wrap {
             flex: 1;
             max-width: var(--fvd-max);
@@ -886,3 +913,8 @@ header('Content-Type: text/html; charset=UTF-8');
     </header>
     <div class="fvd-main-wrap">
         <main class="fvd-main">
+        <?php if ($fvd_return_nav_url !== null && $fvd_return_nav_url !== ''): ?>
+            <nav class="fvd-return-bar no-print" aria-label="Volver al origen">
+                <a href="<?= htmlspecialchars($fvd_return_nav_url, ENT_QUOTES, 'UTF-8') ?>">← Volver al origen</a>
+            </nav>
+        <?php endif; ?>

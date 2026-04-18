@@ -22,14 +22,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rese
         echo 'Sin permiso para reiniciar marcadores.';
         exit;
     }
+    $retPost = isset($_POST['ret']) && is_string($_POST['ret']) ? fvd_return_sanitize($_POST['ret']) : null;
+    $qsRet = $retPost !== null ? '&ret=' . rawurlencode($retPost) : '';
     $campo = trim((string) ($_POST['marcador'] ?? ''));
     $svc = new FvdAdminService();
     try {
         $n = $svc->atletasResetMarcadorMasivo($campo);
-        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo));
+        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo) . $qsRet);
     } catch (Throwable $e) {
         error_log('[reporte_indicadores reset] ' . $e->getMessage());
-        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_err');
+        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_err' . $qsRet);
     }
     exit;
 }
@@ -121,6 +123,18 @@ $fvd_page_title = $marcadorFijo !== null
     : 'Indicadores de servicio (atletas)';
 $selfReport = fvd_atletas_reporte_indicadores_self_url();
 $atletasUrl = fvd_crud_self_url('atletas');
+$retOrigen = fvd_return_from_request();
+$atletasBackUrl = $retOrigen !== null ? $retOrigen : ($atletasUrl . '?action=list');
+$fvdRetPreserve = '';
+if ($retOrigen !== null) {
+    if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+        $fvdRetPreserve = $_GET['ret'];
+    } elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+        $fvdRetPreserve = $_GET['return'];
+    } else {
+        $fvdRetPreserve = rawurlencode($retOrigen);
+    }
+}
 $h1Reporte = $marcadorFijo !== null
     ? ($titulosPorMarcador[$marcadorFijo] ?? 'Indicadores (atletas)')
     : 'Atletas — indicadores de servicio (datos completos)';
@@ -204,6 +218,9 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
             <form method="post" action="<?= htmlspecialchars($selfReport, ENT_QUOTES, 'UTF-8') ?>" style="margin:0" onsubmit="return confirm(<?= htmlspecialchars(json_encode($mconfirm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);">
                 <input type="hidden" name="_action" value="reset_marcador_atletas">
                 <input type="hidden" name="marcador" value="<?= htmlspecialchars($mk, ENT_QUOTES, 'UTF-8') ?>">
+                <?php if ($fvdRetPreserve !== ''): ?>
+                <input type="hidden" name="ret" value="<?= htmlspecialchars($fvdRetPreserve, ENT_QUOTES, 'UTF-8') ?>">
+                <?php endif; ?>
                 <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px;font-size:.75rem;cursor:pointer;background:#7f1d1d;color:#fecaca;border-color:#991b1b"><?= htmlspecialchars($mlab, ENT_QUOTES, 'UTF-8') ?></button>
             </form>
             <?php endforeach; ?>
@@ -273,6 +290,9 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
     <?php endif; ?>
 
     <form method="get" action="" class="no-print" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:0 0 1rem">
+        <?php if ($fvdRetPreserve !== ''): ?>
+        <input type="hidden" name="ret" value="<?= htmlspecialchars($fvdRetPreserve, ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
         <?php if ($marcadorFijo !== null): ?>
         <input type="hidden" name="marcador" value="<?= htmlspecialchars($marcadorFijo, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="modo" value="cualquiera">
@@ -295,7 +315,14 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
             <input class="fvd-input" type="search" name="q" value="<?= htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') ?>" placeholder="Contiene…" style="max-width:12rem">
         </div>
         <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Aplicar</button>
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($selfReport, ENT_QUOTES, 'UTF-8') ?>">Restablecer</a>
+        <?php
+        $qsReset = [];
+        if ($fvdRetPreserve !== '') {
+            $qsReset['ret'] = $fvdRetPreserve;
+        }
+        $urlRestablecer = $selfReport . ($qsReset !== [] ? '?' . http_build_query($qsReset, '', '&', PHP_QUERY_RFC3986) : '');
+        ?>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($urlRestablecer, ENT_QUOTES, 'UTF-8') ?>">Restablecer</a>
         <?php
         $qsCsv = ['format' => 'csv', 'modo' => $modo];
         if ($cedula !== '') {
@@ -307,10 +334,15 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         if ($marcadorFijo !== null) {
             $qsCsv['marcador'] = $marcadorFijo;
         }
+        if ($fvdRetPreserve !== '') {
+            $qsCsv['ret'] = $fvdRetPreserve;
+        }
         $urlCsv = $selfReport . '?' . http_build_query($qsCsv, '', '&', PHP_QUERY_RFC3986);
         ?>
         <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:600" href="<?= htmlspecialchars($urlCsv, ENT_QUOTES, 'UTF-8') ?>">Descargar CSV</a>
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($atletasUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>">← Listado atletas</a>
+        <?php if ($retOrigen === null): ?>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>">← Listado atletas</a>
+        <?php endif; ?>
     </form>
 
     <section class="fvd-rep-indicadores__stats" aria-label="Resumen por indicador" style="margin:0 0 1rem;padding:12px;border-radius:8px;border:1px solid var(--fvd-border);background:rgba(255,255,255,0.04)">

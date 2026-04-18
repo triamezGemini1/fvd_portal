@@ -12,6 +12,11 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 <div class="fvd-mod-toolbar">
     <form method="get" action="" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
         <input type="hidden" name="action" value="list">
+        <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+        <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+        <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block">Buscar</label>
             <input class="fvd-input" type="search" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Nombre o lugar" style="max-width:14rem">
@@ -20,8 +25,8 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
         <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
     </form>
     <?php if ($fvd_es_fvd): ?>
-    <a href="<?= htmlspecialchars($selfUrl . '?action=relacion_grupo', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Relacionar campeonatos</a>
-    <a href="<?= htmlspecialchars($selfUrl . '?action=form', ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nuevo torneo</a>
+    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=relacion_grupo'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Relacionar campeonatos</a>
+    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nuevo torneo</a>
     <?php endif; ?>
 </div>
 
@@ -49,11 +54,11 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
                 <td><?= htmlspecialchars((string) ($r['org_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= (int) ($r['estatus'] ?? 0) ?></td>
                 <?php if ($fvd_es_fvd): ?>
-                <td style="white-space:nowrap"><a href="<?= htmlspecialchars($selfUrl . '?action=evento&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>">Admin torneo</a></td>
+                <td style="white-space:nowrap"><a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=evento&id=' . (int) $r['torneo']), ENT_QUOTES, 'UTF-8') ?>">Admin torneo</a></td>
                 <td style="white-space:nowrap;font-size:0.8125rem">
-                    <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>
-                    &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
-                    &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['torneo'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar torneo?');">Eliminar</a>
+                    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $r['torneo']), ENT_QUOTES, 'UTF-8') ?>">Ver</a>
+                    &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $r['torneo']), ENT_QUOTES, 'UTF-8') ?>">Editar</a>
+                    &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=delete&id=' . (int) $r['torneo']), ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar torneo?');">Eliminar</a>
                 </td>
                 <?php endif; ?>
             </tr>
@@ -67,6 +72,11 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 
 <?php
 $qArg = $q !== '' ? '&q=' . rawurlencode($q) : '';
+if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+    $qArg .= '&ret=' . rawurlencode($_GET['ret']);
+} elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+    $qArg .= '&return=' . rawurlencode($_GET['return']);
+}
 $p = (int) $result['page'];
 $pages = (int) $result['pages'];
 ?>

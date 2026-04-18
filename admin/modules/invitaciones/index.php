@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'invi
             $dias,
             $memo !== '' ? $memo : null
         );
-        header('Location: ' . $selfUrl . '?ok=1');
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?ok=1'));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();
@@ -73,6 +73,7 @@ $invitacionesSearchApiUrl = (str_contains($sn, '/fvdmasteradmin/modules/invitaci
         || (str_contains($sn, '/modules/invitaciones/') && !str_contains($sn, '/admin/modules/')))
     ? fvd_master_module_url('invitaciones/search_api.php')
     : admin_module_url('invitaciones/search_api.php');
+$invitacionesSearchApiUrl = fvd_return_preserve_query_params($invitacionesSearchApiUrl);
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';

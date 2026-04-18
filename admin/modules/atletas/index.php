@@ -18,7 +18,7 @@ $fvd_error = '';
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
     $svc->atletasDelete((int) $_GET['id']);
-    header('Location: ' . $selfUrl . '?action=list');
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list'));
     exit;
 }
 
@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'togg
     if ($tid > 0) {
         $svc->atletasToggleActivo($tid);
     }
-    header('Location: ' . $selfUrl . '?action=list');
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list'));
     exit;
 }
 
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'dar_
     if ($tid > 0) {
         $svc->atletasDarBaja($tid);
     }
-    header('Location: ' . $selfUrl . '?action=list');
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list'));
     exit;
 }
 
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rest
     if ($tid > 0) {
         $svc->atletasRestaurarDesdeBaja($tid);
     }
-    header('Location: ' . $selfUrl . '?action=list');
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list'));
     exit;
 }
 
@@ -54,9 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
         $sid = isset($_POST['id']) && $_POST['id'] !== '' ? (int) $_POST['id'] : null;
         $svc->atletasSave($sid, $_POST, $_FILES);
         if ($sid !== null) {
-            header('Location: ' . $selfUrl . '?action=form&id=' . $sid);
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=form&id=' . $sid));
         } else {
-            header('Location: ' . $selfUrl);
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl));
         }
         exit;
     } catch (Throwable $e) {
@@ -78,11 +78,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'tras
     $tdest = isset($_POST['asociacion_destino_id']) ? (int) $_POST['asociacion_destino_id'] : 0;
     try {
         \FvdPortal\Services\TraspasoService::ejecutar(fvd_db(), $taid, $tdest, AuthService::userId());
-        header('Location: ' . $selfUrl . '?action=list');
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list'));
         exit;
     } catch (Throwable $e) {
         $_SESSION['fvd_traspaso_error'] = $e->getMessage();
-        header('Location: ' . $selfUrl . '?action=traspaso&id=' . $taid);
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=traspaso&id=' . $taid));
         exit;
     }
 }
@@ -101,10 +101,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rese
     $campo = trim((string) ($_POST['marcador'] ?? ''));
     try {
         $n = $svc->atletasResetMarcadorMasivo($campo);
-        header('Location: ' . $selfUrl . '?action=list&msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo));
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list&msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo)));
     } catch (Throwable $e) {
         error_log('[admin/atletas reset] ' . $e->getMessage());
-        header('Location: ' . $selfUrl . '?action=list&msg=reset_err');
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list&msg=reset_err'));
     }
     exit;
 }
@@ -139,7 +139,7 @@ if ($action === 'lookup_cedula') {
         'found' => true,
         'id' => (int) $foundRow['id'],
         'nombre' => (string) ($foundRow['nombre'] ?? ''),
-        'redirect' => $selfUrl . '?action=form&id=' . (int) $foundRow['id'],
+        'redirect' => fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $foundRow['id']),
     ], JSON_UNESCAPED_UNICODE);
 
     exit;
@@ -350,6 +350,7 @@ $paginationQueryParams = [
 if ($fvd_atletas_alcance === 'asociacion' && $asociacionFiltroId > 0) {
     $paginationQueryParams['asociacion_id'] = $asociacionFiltroId;
 }
+$paginationQueryParams = fvd_return_merge_get_params($paginationQueryParams);
 
 $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
 $fvdAtletasSite = str_contains($sn, '/fvdmasteradmin/modules/atletas/')
@@ -357,9 +358,11 @@ $fvdAtletasSite = str_contains($sn, '/fvdmasteradmin/modules/atletas/')
 $atletasSearchApiUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/search_api.php')
     : admin_module_url('atletas/search_api.php');
+$atletasSearchApiUrl = fvd_return_preserve_query_params($atletasSearchApiUrl);
 $atletasExportUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/export.php')
     : admin_module_url('atletas/export.php');
+$atletasExportUrl = fvd_return_preserve_query_params($atletasExportUrl);
 $atletasReportBaseUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/')
     : admin_module_url('atletas/');

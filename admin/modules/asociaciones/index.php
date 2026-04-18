@@ -11,7 +11,7 @@ $fvd_error = '';
 
 if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
     $svc->asociacionesDelete((int) $_GET['id']);
-    header('Location: ' . $selfUrl);
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl));
     exit;
 }
 
@@ -33,7 +33,7 @@ if (($_GET['action'] ?? '') === 'toggle_estatus' && isset($_GET['id']) && AuthSe
     if ($qs !== []) {
         $redir .= '?' . http_build_query($qs);
     }
-    header('Location: ' . $redir);
+    header('Location: ' . fvd_return_preserve_query_params($redir));
     exit;
 }
 
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
     try {
         $id = isset($_POST['id']) && $_POST['id'] !== '' ? (int) $_POST['id'] : null;
         $svc->asociacionesSave($id, $_POST, $_FILES);
-        header('Location: ' . $selfUrl);
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl));
         exit;
     } catch (Throwable $e) {
         $fvd_error = $e->getMessage();
