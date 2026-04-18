@@ -51,7 +51,12 @@ if ($fvdEsDelegadoPanel) {
     $delegVentana = null;
     if ($tidCtx > 0) {
         try {
-            $delegVentana = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo($pdo, $tidCtx);
+            $aidVent = AuthService::idAsociacion();
+            $delegVentana = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo(
+                $pdo,
+                $tidCtx,
+                $aidVent !== null && (int) $aidVent > 0 ? (int) $aidVent : null
+            );
         } catch (Throwable $e) {
             $delegVentana = null;
         }
@@ -84,6 +89,7 @@ if (!function_exists('fvd_master_module_url') || !function_exists('admin_module_
 $fvdIndicadoresCostosVariant = 'full';
 $fvdReporteIndicadoresUrl = function_exists('admin_module_url') ? admin_module_url('atletas/reporte_indicadores.php') : null;
 $fvdAsocReporteFinancieroUrl = $fvdEsAdminFvd ? ($appBase . '/fvdmasteradmin/asociacion_reporte_financiero.php') : '';
+$fvdEsAdminAsoc = AuthService::role() === AuthService::ROLE_ASO_ADMIN;
 
 require __DIR__ . '/includes/layout_header.php';
 ?>
@@ -167,11 +173,33 @@ require __DIR__ . '/includes/layout_header.php';
         </article>
     </div>
     <?php
-    require __DIR__ . '/includes/partial_indicadores_costos_dashboard.php';
+    if ($fvdEsAdminAsoc) {
+        require_once __DIR__ . '/config/db.php';
+        if (!function_exists('admin_module_url')) {
+            require_once $projRoot . '/config/paths.php';
+        }
+        $pdo = fvd_db();
+        $aid = (int) (AuthService::idAsociacion() ?? 0);
+        if ($aid <= 0) {
+            echo '<p class="fvd-mod-msg">No se pudo determinar su asociación para el reporte financiero.</p>';
+        } else {
+            if (isset($_GET['detalle'])) {
+                $detalleRawDash = trim((string) $_GET['detalle']);
+                $metricasDash = ['afiliacion', 'anualidad', 'carnet', 'traspaso', 'inscripcion'];
+                $detalle = \in_array($detalleRawDash, $metricasDash, true) ? $detalleRawDash : '';
+            } else {
+                $detalle = 'anualidad';
+            }
+            $fvd_rep_fin_embed = true;
+            require __DIR__ . '/includes/partial_asociacion_reporte_financiero.php';
+        }
+    } else {
+        require __DIR__ . '/includes/partial_indicadores_costos_dashboard.php';
+    }
     ?>
     <?php endif; ?>
 
-    <?php if (!$fvdEsAdminFvd && $fvdPuedeGestionar): ?>
+    <?php if (!$fvdEsAdminFvd && $fvdPuedeGestionar && AuthService::role() !== AuthService::ROLE_ASO_ADMIN): ?>
     <section class="fvd-actions-panel" aria-label="Accesos rápidos">
         <h2>Accesos rápidos</h2>
         <div class="fvd-actions-row">

@@ -12,13 +12,16 @@ use PDOException;
 use RuntimeException;
 
 require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
+require_once __DIR__ . '/DelegadoTorneoNotifService.php';
 
 /**
  * Ventanas de acceso del delegado respecto a la fecha del torneo (fechator en torneosact).
  *
- * Fase 1 (día del torneo −15 … −7): afiliaciones, carnets, traspasos, altas de atletas.
+ * Fase 1 (calendario por defecto: día del torneo −15 … −7): afiliaciones, carnets, traspasos, altas de atletas.
+ * Cuando el club tiene convocatoria / notificación de invitación al torneo, la fase 1 puede abrirse **desde esa fecha**
+ * (tras crear el torneo e invitar), sin esperar la ventana −15 días.
  * Fase 2 (día del torneo −7 … −3): inscripciones, retiros y cambios en plantilla.
- * Fuera de esas ventanas: solo consulta y pagos (sin mutaciones operativas). Las estadísticas (tabla <code>atletas</code>, renglones afiliación, anualidad, carnet, traspaso, inscripción) siguen siendo consultables.
+ * Invitación tardía (tras −7 días): se mantiene una ventana corta de gestión administrativa hasta −3 días.
  */
 final class DelegadoTorneoVentanasService
 {
@@ -51,6 +54,49 @@ final class DelegadoTorneoVentanasService
     }
 
     /**
+     * Primera fecha (Y-m-d) en que el club quedó invitado / notificado al torneo (convocatoria o panel).
+     */
+    public static function fechaInicioGestionPorInvitacion(PDO $pdo, int $torneoId, int $asociacionId): ?string
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return null;
+        }
+        try {
+            $st = $pdo->prepare(
+                'SELECT DATE(MIN(c.invitado_en)) AS d
+                 FROM torneo_convocatoria_asoc c
+                 WHERE c.torneo_id = :t AND c.asociacion_id = :a AND c.invitado_en IS NOT NULL'
+            );
+            $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+            $d = $st->fetchColumn();
+            if ($d !== false && $d !== null && trim((string) $d) !== '') {
+                return substr((string) $d, 0, 10);
+            }
+        } catch (\Throwable $e) {
+            // tabla ausente u otro error: seguir con notificaciones
+        }
+
+        try {
+            DelegadoTorneoNotifService::ensureTable($pdo);
+            $st2 = $pdo->prepare(
+                'SELECT DATE(MIN(n.creado_en)) AS d
+                 FROM fvd_delegado_notif_torneo n
+                 INNER JOIN delegados d ON d.id = n.delegado_id AND d.asociacion_id = :a
+                 WHERE n.torneo_id = :t'
+            );
+            $st2->execute([':t' => $torneoId, ':a' => $asociacionId]);
+            $d2 = $st2->fetchColumn();
+            if ($d2 !== false && $d2 !== null && trim((string) $d2) !== '') {
+                return substr((string) $d2, 0, 10);
+            }
+        } catch (\Throwable $e) {
+            error_log('[DelegadoTorneoVentanasService] fechaInicioGestionPorInvitacion notif: ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
      * @return array{
      *   torneo_id:int,
      *   fechator:?string,
@@ -58,10 +104,11 @@ final class DelegadoTorneoVentanasService
      *   fase1_afiliados_carnets_traspasos:bool,
      *   fase2_inscripciones:bool,
      *   solo_consulta_y_pagos:bool,
-     *   etiqueta_fase:string
+     *   etiqueta_fase:string,
+     *   gestion_admin_desde_invitacion:bool
      * }
      */
-    public static function estadoParaTorneo(PDO $pdo, int $torneoId): array
+    public static function estadoParaTorneo(PDO $pdo, int $torneoId, ?int $asociacionId = null): array
     {
         if ($torneoId <= 0) {
             throw new InvalidArgumentException('Torneo no válido.');
@@ -78,6 +125,7 @@ final class DelegadoTorneoVentanasService
             'fase2_inscripciones' => false,
             'solo_consulta_y_pagos' => true,
             'etiqueta_fase' => 'Sin fecha de torneo: gestión restringida.',
+            'gestion_admin_desde_invitacion' => false,
         ];
 
         if ($fechator === null || $fechator === '') {
@@ -94,12 +142,39 @@ final class DelegadoTorneoVentanasService
         $d7 = $tTor->modify('-' . self::DIA_FASE1_FIN . ' days')->setTime(0, 0, 0);
         $d3 = $tTor->modify('-' . self::DIA_FASE2_FIN . ' days')->setTime(0, 0, 0);
 
-        $inFase1 = $today >= $d15 && $today <= $d7;
+        $inFase1Cal = $today >= $d15 && $today <= $d7;
         $inFase2 = $today >= $d7 && $today <= $d3;
+
+        $inFase1 = $inFase1Cal;
+        $gestionInv = false;
+
+        if ($asociacionId !== null && $asociacionId > 0 && self::aplicaRestriccionDelegado()) {
+            $invStr = self::fechaInicioGestionPorInvitacion($pdo, $torneoId, $asociacionId);
+            if ($invStr !== null) {
+                try {
+                    $invDt = new DateTimeImmutable($invStr . ' 00:00:00', $tz);
+                    $gestionInv = true;
+                    if ($invDt <= $d7) {
+                        $inFase1Inv = $today >= $invDt && $today <= $d7;
+                    } else {
+                        // Invitación recibida dentro del tramo final: permitir alta/carnets/traspasos hasta el cierre de inscripciones
+                        $inFase1Inv = $today >= $invDt && $today <= $d3;
+                    }
+                    $inFase1 = $inFase1 || $inFase1Inv;
+                } catch (\Exception $e) {
+                    // mantener solo calendario
+                }
+            }
+        }
+
         $soloConsulta = !$inFase1 && !$inFase2;
 
         $etiqueta = 'Periodo cerrado: solo consulta y pagos.';
-        if ($inFase1 && $inFase2) {
+        if ($gestionInv && $inFase1 && !$inFase1Cal && $inFase2) {
+            $etiqueta = 'Acceso por convocatoria/invitación: afiliaciones, carnets y traspasos; e inscripciones al torneo (fase 2).';
+        } elseif ($gestionInv && $inFase1 && !$inFase1Cal) {
+            $etiqueta = 'Acceso por convocatoria/invitación: puede registrar afiliados, solicitar carnets y traspasos según el calendario del torneo.';
+        } elseif ($inFase1 && $inFase2) {
             $etiqueta = 'Fase 1 y 2 (gestión ampliada): hasta el día ' . self::DIA_FASE2_FIN . ' antes del evento.';
         } elseif ($inFase1) {
             $etiqueta = 'Fase 1: afiliaciones, carnets y traspasos (hasta ' . self::DIA_FASE1_FIN . ' días antes del torneo).';
@@ -115,6 +190,7 @@ final class DelegadoTorneoVentanasService
             'fase2_inscripciones' => $inFase2,
             'solo_consulta_y_pagos' => $soloConsulta,
             'etiqueta_fase' => $etiqueta,
+            'gestion_admin_desde_invitacion' => $gestionInv && $inFase1 && !$inFase1Cal,
         ];
     }
 
@@ -135,16 +211,26 @@ final class DelegadoTorneoVentanasService
         }
     }
 
+    private static function delegadoAsociacionParaVentana(): ?int
+    {
+        if (!self::aplicaRestriccionDelegado()) {
+            return null;
+        }
+        $a = \AuthService::idAsociacion();
+
+        return $a !== null && (int) $a > 0 ? (int) $a : null;
+    }
+
     public static function assertPuedeFase1Administrativa(PDO $pdo, int $torneoId): void
     {
         if (!self::aplicaRestriccionDelegado()) {
             return;
         }
-        $st = self::estadoParaTorneo($pdo, $torneoId);
+        $st = self::estadoParaTorneo($pdo, $torneoId, self::delegadoAsociacionParaVentana());
         if (!$st['fase1_afiliados_carnets_traspasos']) {
             throw new RuntimeException(
-                'La fase 1 (afiliaciones, carnets y traspasos) solo está habilitada entre '
-                . self::DIA_FASE1_INICIO . ' y ' . self::DIA_FASE1_FIN . ' días antes de la fecha del torneo. '
+                'La fase 1 (afiliaciones, carnets y traspasos) está habilitada en la ventana habitual ('
+                . self::DIA_FASE1_INICIO . '–' . self::DIA_FASE1_FIN . ' días antes del torneo) o desde la fecha en que su asociación figure en la convocatoria / reciba la invitación en el panel. '
                 . 'Fuera de ese periodo solo puede consultar y registrar pagos.'
             );
         }
@@ -155,7 +241,7 @@ final class DelegadoTorneoVentanasService
         if (!self::aplicaRestriccionDelegado()) {
             return;
         }
-        $st = self::estadoParaTorneo($pdo, $torneoId);
+        $st = self::estadoParaTorneo($pdo, $torneoId, self::delegadoAsociacionParaVentana());
         if (!$st['fase2_inscripciones']) {
             throw new RuntimeException(
                 'Las inscripciones, retiros y cambios solo están habilitados entre '
@@ -181,7 +267,7 @@ final class DelegadoTorneoVentanasService
         if (!self::aplicaRestriccionDelegado()) {
             return;
         }
-        $st = self::estadoParaTorneo($pdo, $torneoId);
+        $st = self::estadoParaTorneo($pdo, $torneoId, self::delegadoAsociacionParaVentana());
         if (!$st['fase1_afiliados_carnets_traspasos'] && !$st['fase2_inscripciones']) {
             throw new RuntimeException(
                 'El periodo de gestión de atletas para este torneo ha finalizado. Solo puede consultar información y registrar pagos.'

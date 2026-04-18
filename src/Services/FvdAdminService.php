@@ -809,13 +809,27 @@ final class FvdAdminService
             $params[':fq'] = '%' . $q . '%';
             $search = ' AND (t.nombre LIKE :fq OR t.lugar LIKE :fq) ';
         }
-        $countSql = 'SELECT COUNT(*) FROM torneosact t WHERE 1=1' . $search;
+        $scopeAsoc = '';
+        if (AuthService::role() === AuthService::ROLE_ASO_ADMIN) {
+            $mine = AuthService::idAsociacion();
+            if ($mine === null || (int) $mine <= 0) {
+                return [
+                    'total' => 0,
+                    'page' => 1,
+                    'per_page' => $perPage,
+                    'pages' => 0,
+                    'rows' => [],
+                ];
+            }
+            $params[':org_scope'] = (int) $mine;
+            $scopeAsoc = ' AND t.organizacion_id = :org_scope ';
+        }
+        $countSql = 'SELECT COUNT(*) FROM torneosact t WHERE 1=1' . $search . $scopeAsoc;
         $dataSql = 'SELECT t.torneo, t.nombre, t.lugar, t.fechator, t.estatus, t.organizacion_id, o.nombre AS org_nombre
             FROM torneosact t
             LEFT JOIN asociaciones o ON t.organizacion_id = o.id
-            WHERE 1=1' . $search . ' ORDER BY t.fechator DESC';
+            WHERE 1=1' . $search . $scopeAsoc . ' ORDER BY t.fechator DESC';
 
-        // Los torneos de esta app son siempre de la FVD (organizador nacional); no filtrar por asociación regional.
         return QueryHelper::paginate(
             $this->pdo,
             $countSql,
@@ -841,7 +855,26 @@ final class FvdAdminService
     }
 
     /**
-     * Alta, edición y borrado de torneos (tabla torneosact): solo administrador general FVD.
+     * Alta, edición y borrado de torneos (tabla torneosact): administrador general FVD o administrador de asociación (solo torneos de su organización).
+     */
+    public function torneosRequireGestionTorneo(): void
+    {
+        $r = AuthService::role();
+        if ($r === AuthService::ROLE_FVD_ADMIN) {
+            return;
+        }
+        if ($r === AuthService::ROLE_ASO_ADMIN) {
+            $mine = AuthService::idAsociacion();
+            if ($mine !== null && (int) $mine > 0) {
+                return;
+            }
+        }
+        http_response_code(403);
+        exit('No tiene permiso para gestionar torneos.');
+    }
+
+    /**
+     * Operaciones solo FVD (p. ej. relacionar campeonatos por grupo).
      */
     public function torneosRequireFvdAdminForGestion(): void
     {
@@ -849,6 +882,43 @@ final class FvdAdminService
             http_response_code(403);
             exit('Solo el administrador general FVD puede gestionar torneos.');
         }
+    }
+
+    /**
+     * Si el usuario es administrador de asociación, el torneo debe tener `organizacion_id` = su asociación.
+     *
+     * @param array<string, mixed>|null $row Fila de {@see torneosFind} o null en alta.
+     */
+    public function torneosAssertCanGestionarTorneoRow(?array $row): void
+    {
+        if ($row === null) {
+            return;
+        }
+        if (AuthService::role() !== AuthService::ROLE_ASO_ADMIN) {
+            return;
+        }
+        $mine = AuthService::idAsociacion();
+        if ($mine === null || (int) ($row['organizacion_id'] ?? 0) !== (int) $mine) {
+            http_response_code(403);
+            exit('No puede gestionar este torneo.');
+        }
+    }
+
+    /**
+     * Organización al guardar: federación para FVD; asociación del usuario para administrador regional.
+     */
+    public function torneosOrganizacionIdParaGuardado(): ?int
+    {
+        if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+            return $this->torneosOrganizacionFederacionId();
+        }
+        if (AuthService::role() === AuthService::ROLE_ASO_ADMIN) {
+            $mine = AuthService::idAsociacion();
+
+            return $mine !== null && (int) $mine > 0 ? (int) $mine : null;
+        }
+
+        return null;
     }
 
     /**
@@ -900,7 +970,7 @@ final class FvdAdminService
      */
     public function torneosSave(?int $torneoId, array $post, array $files): int
     {
-        $this->torneosRequireFvdAdminForGestion();
+        $this->torneosRequireGestionTorneo();
 
         $data = [];
         foreach (self::TORNEOS_PERSIST as $col) {
@@ -930,7 +1000,7 @@ final class FvdAdminService
         }
 
         $data['publicar_landing'] = 1;
-        $data['organizacion_id'] = $this->torneosOrganizacionFederacionId();
+        $data['organizacion_id'] = $this->torneosOrganizacionIdParaGuardado();
 
         // Grupo de evento: solo tras crear el torneo y solo para campeonatos (varios el mismo día).
         if ($torneoId === null) {
@@ -958,6 +1028,7 @@ final class FvdAdminService
             if ($prev === null) {
                 throw new InvalidArgumentException('Torneo no encontrado.');
             }
+            $this->torneosAssertCanGestionarTorneoRow($prev);
             $data['clavetor'] = $prev['clavetor'];
             $data['invitacion'] = $prev['invitacion'];
             $data['afiche'] = $prev['afiche'];
@@ -1009,7 +1080,8 @@ final class FvdAdminService
      */
     private function torneosPostCreacionInvitacionesDelegados(int $newTorneoId): void
     {
-        if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN || $newTorneoId <= 0) {
+        $role = AuthService::role();
+        if ($newTorneoId <= 0 || ($role !== AuthService::ROLE_FVD_ADMIN && $role !== AuthService::ROLE_ASO_ADMIN)) {
             return;
         }
         if ($this->torneosConvocatoriaTableExists()) {
@@ -1034,7 +1106,8 @@ final class FvdAdminService
      */
     private function torneosPostSaveInvitarTodas(int $torneoId, array $post): void
     {
-        if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
+        $role = AuthService::role();
+        if ($role !== AuthService::ROLE_FVD_ADMIN && $role !== AuthService::ROLE_ASO_ADMIN) {
             return;
         }
         if (!$this->torneosConvocatoriaTableExists()) {
@@ -1045,11 +1118,12 @@ final class FvdAdminService
 
     public function torneosDelete(int $torneo): void
     {
-        $this->torneosRequireFvdAdminForGestion();
+        $this->torneosRequireGestionTorneo();
         $prev = $this->torneosFind($torneo);
         if ($prev === null) {
             return;
         }
+        $this->torneosAssertCanGestionarTorneoRow($prev);
         $params = [':t' => $torneo];
         $sql = 'DELETE FROM torneosact t WHERE t.torneo = :t';
         $st = $this->pdo->prepare($sql);
@@ -1134,6 +1208,32 @@ final class FvdAdminService
             http_response_code(403);
             exit('Solo el administrador general FVD puede usar el panel de evento.');
         }
+    }
+
+    /**
+     * Panel de evento, convocatorias, histórico y acciones masivas: FVD o administrador de la asociación organizadora del torneo.
+     */
+    public function torneosEventoRequireGestionPanel(int $torneoId): void
+    {
+        if ($torneoId <= 0) {
+            http_response_code(403);
+            exit('Torneo no válido.');
+        }
+        if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+            return;
+        }
+        if (AuthService::role() === AuthService::ROLE_ASO_ADMIN) {
+            $t = $this->torneosFind($torneoId);
+            if ($t === null) {
+                http_response_code(404);
+                exit('Torneo no encontrado.');
+            }
+            $this->torneosAssertCanGestionarTorneoRow($t);
+
+            return;
+        }
+        http_response_code(403);
+        exit('Solo el administrador general FVD o el administrador de la asociación organizadora puede usar esta acción.');
     }
 
     /**
@@ -1345,7 +1445,7 @@ final class FvdAdminService
     }
 
     /**
-     * Torneos futuros donde la asociación tiene invitación registrada (puede inscribir).
+     * Torneos futuros con convocatoria para la asociación (incluye pendientes de envío de invitación).
      *
      * @return list<array<string, mixed>>
      */
@@ -1354,7 +1454,6 @@ final class FvdAdminService
         $sql = 'SELECT t.torneo, t.nombre, t.lugar, DATE(t.fechator) AS fechator, c.invitado_en, c.estado_respuesta
             FROM torneosact t
             INNER JOIN torneo_convocatoria_asoc c ON c.torneo_id = t.torneo AND c.asociacion_id = :a
-                AND c.invitado_en IS NOT NULL
             WHERE DATE(t.fechator) >= CURDATE()
             ORDER BY t.fechator ASC';
         $st = $this->pdo->prepare($sql);
@@ -1483,7 +1582,7 @@ final class FvdAdminService
         if ($grupo !== null && $this->torneosactGrupoEventoColumnExists()) {
             $sql = 'SELECT t.torneo, t.nombre, t.lugar, DATE(t.fechator) AS fechator, t.tipo, t.clase
                 FROM torneosact t
-                INNER JOIN torneo_convocatoria_asoc c ON c.torneo_id = t.torneo AND c.asociacion_id = :a AND c.invitado_en IS NOT NULL
+                INNER JOIN torneo_convocatoria_asoc c ON c.torneo_id = t.torneo AND c.asociacion_id = :a
                 WHERE t.grupo_evento_id = :g
                 ORDER BY (t.torneo = :ctx) DESC, t.tipo ASC, t.nombre ASC';
             $st = $this->pdo->prepare($sql);
@@ -1491,7 +1590,7 @@ final class FvdAdminService
         } else {
             $sql = 'SELECT t.torneo, t.nombre, t.lugar, DATE(t.fechator) AS fechator, t.tipo, t.clase
                 FROM torneosact t
-                INNER JOIN torneo_convocatoria_asoc c ON c.torneo_id = t.torneo AND c.asociacion_id = :a AND c.invitado_en IS NOT NULL
+                INNER JOIN torneo_convocatoria_asoc c ON c.torneo_id = t.torneo AND c.asociacion_id = :a
                 WHERE t.torneo = :ctx
                 ORDER BY t.nombre ASC';
             $st = $this->pdo->prepare($sql);
@@ -1505,6 +1604,14 @@ final class FvdAdminService
     {
         if (!AuthService::isDelegadoAsociacion()) {
             return true;
+        }
+        if ($torneoIdSolicitado <= 0) {
+            return false;
+        }
+        foreach ($this->torneosAbiertosInscripcionParaAsociacion($asociacionId) as $r) {
+            if ((int) ($r['torneo'] ?? 0) === $torneoIdSolicitado) {
+                return true;
+            }
         }
         $ctx = AuthService::delegadoTorneoContextId();
         if ($ctx === null || $ctx <= 0) {
@@ -1687,7 +1794,12 @@ final class FvdAdminService
         $ventanaDelegado = null;
         if (AuthService::isDelegadoAsociacion()) {
             try {
-                $ventanaDelegado = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo($this->pdo, $torneoId);
+                $aidV = AuthService::idAsociacion();
+                $ventanaDelegado = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo(
+                    $this->pdo,
+                    $torneoId,
+                    $aidV !== null && (int) $aidV > 0 ? (int) $aidV : null
+                );
             } catch (\Throwable $e) {
                 $ventanaDelegado = null;
             }

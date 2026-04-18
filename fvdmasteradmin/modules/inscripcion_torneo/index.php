@@ -42,11 +42,7 @@ if ($vistaBanderaDelegado) {
     $perPage = 25;
     $filterT = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : 0;
     $ctxTor = AuthService::delegadoTorneoContextId();
-    if ($ctxTor !== null && $ctxTor > 0) {
-        if ($filterT <= 0 || $filterT !== $ctxTor) {
-            header('Location: ' . $selfUrl . '?torneo_id=' . $ctxTor);
-            exit;
-        }
+    if ($filterT <= 0 && $ctxTor !== null && $ctxTor > 0) {
         $filterT = $ctxTor;
     }
     $result = $ctrl->paginateListBandera($page, $perPage, $filterT);

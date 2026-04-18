@@ -68,7 +68,12 @@ final class TorneoService
             'Lugar: ' . (string) ($t['lugar'] ?? ''),
             'ID torneo: ' . (int) ($t['torneo'] ?? 0),
             '',
-            'Ingrese al panel FVD Master Admin (usuario delegado): verá el aviso con el PDF y el enlace al panel de este torneo.',
+            'Tras publicarse la convocatoria, en el panel FVD Master Admin (usuario delegado) tendrá acceso para:',
+            '  1) Altas de nuevos afiliados y gestión de fichas;',
+            '  2) Solicitudes de carnets y traspasos (según calendario del torneo o desde la invitación);',
+            '  3) Más adelante, en la ventana de inscripción al torneo, inscribir a sus atletas.',
+            '',
+            'Verá el aviso con el PDF de invitación y podrá entrar al panel del torneo para comenzar la gestión.',
         ];
         $body = implode("\r\n", $bodyLines);
         $subj = 'FVD — Torneo: ' . (string) ($t['nombre'] ?? 'Torneo');

@@ -3,6 +3,7 @@
 /** @var string $selfUrl */
 /** @var string $q */
 $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
+$fvd_puede_gestion_torneo = $fvd_es_fvd || AuthService::role() === AuthService::ROLE_ASO_ADMIN;
 ?>
 
 <h1>Torneos</h1>
@@ -26,6 +27,8 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
     </form>
     <?php if ($fvd_es_fvd): ?>
     <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=relacion_grupo'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Relacionar campeonatos</a>
+    <?php endif; ?>
+    <?php if ($fvd_puede_gestion_torneo): ?>
     <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary">Nuevo torneo</a>
     <?php endif; ?>
 </div>
@@ -40,8 +43,8 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
             <th>Fecha</th>
             <th>Organización</th>
             <th>Estatus</th>
-            <?php if ($fvd_es_fvd): ?><th>Admin.</th><?php endif; ?>
-            <?php if ($fvd_es_fvd): ?><th></th><?php endif; ?>
+            <?php if ($fvd_puede_gestion_torneo): ?><th>Admin.</th><?php endif; ?>
+            <?php if ($fvd_puede_gestion_torneo): ?><th></th><?php endif; ?>
         </tr>
         </thead>
         <tbody>
@@ -53,7 +56,7 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
                 <td><?= htmlspecialchars(substr((string) ($r['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars((string) ($r['org_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= (int) ($r['estatus'] ?? 0) ?></td>
-                <?php if ($fvd_es_fvd): ?>
+                <?php if ($fvd_puede_gestion_torneo): ?>
                 <td style="white-space:nowrap"><a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=evento&id=' . (int) $r['torneo']), ENT_QUOTES, 'UTF-8') ?>">Admin torneo</a></td>
                 <td style="white-space:nowrap;font-size:0.8125rem">
                     <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $r['torneo']), ENT_QUOTES, 'UTF-8') ?>">Ver</a>
@@ -64,7 +67,7 @@ $fvd_es_fvd = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
             </tr>
         <?php endforeach; ?>
         <?php if ($result['rows'] === []): ?>
-            <tr><td colspan="<?= $fvd_es_fvd ? '8' : '6' ?>" style="padding:12px">Sin registros.</td></tr>
+            <tr><td colspan="<?= $fvd_puede_gestion_torneo ? '8' : '6' ?>" style="padding:12px">Sin registros.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>

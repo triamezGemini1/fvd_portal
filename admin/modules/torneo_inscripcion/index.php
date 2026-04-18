@@ -74,8 +74,17 @@ if (AuthService::isDelegadoAsociacion()) {
             }
         }
         if ($torneoSel > 0 && $allowedIds !== [] && !isset($allowedIds[$torneoSel])) {
-            header('Location: ' . $selfUrl . '?torneo_id=' . $ctxTor);
-            exit;
+            $enAbiertos = false;
+            foreach ($torneosAbiertos as $ta) {
+                if ((int) ($ta['torneo'] ?? 0) === $torneoSel) {
+                    $enAbiertos = true;
+                    break;
+                }
+            }
+            if (!$enAbiertos && $ctxTor !== null && $ctxTor > 0) {
+                header('Location: ' . $selfUrl . '?torneo_id=' . $ctxTor);
+                exit;
+            }
         }
         if ($torneoSel > 0 && isset($allowedIds[$torneoSel])) {
             AuthService::setDelegadoTorneoContext($torneoSel);
@@ -86,11 +95,6 @@ if (AuthService::isDelegadoAsociacion()) {
                 header('Location: ' . $selfUrl . '?torneo_id=' . $first);
                 exit;
             }
-        }
-    } elseif ($ctxTor !== null && $ctxTor > 0) {
-        if ($torneoSel <= 0 || $torneoSel !== $ctxTor) {
-            header('Location: ' . $selfUrl . '?torneo_id=' . $ctxTor);
-            exit;
         }
     }
 }

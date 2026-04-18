@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'noti
     AuthService::ensureSession();
     try {
         $tidN = (int) ($_POST['torneo_id'] ?? 0);
+        $svc->torneosEventoRequireGestionPanel($tidN);
         $out = TorneoService::enviarInvitacionMasiva(fvd_db(), $tidN);
         $_SESSION['fvd_torneo_notif_flash'] = sprintf(
             'Notificaci?n enviada: %d/%d correos. Avisos en panel web para delegados: %d registro(s). Enlace WhatsApp copiable abajo.',
@@ -49,11 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postAct = (string) ($_POST['_action'] ?? '');
     if (str_starts_with($postAct, 'convocatoria_')) {
         try {
-            $svc->torneosEventoRequireFvdAdmin();
+            $tid = (int) ($_POST['torneo_id'] ?? 0);
+            $svc->torneosEventoRequireGestionPanel($tid);
             if (!$svc->torneosConvocatoriaTableExists()) {
                 throw new RuntimeException('Ejecute en MySQL: fvdmasteradmin/sql/install_torneo_convocatoria_y_publicacion.sql');
             }
-            $tid = (int) ($_POST['torneo_id'] ?? 0);
             if ($tid <= 0) {
                 throw new InvalidArgumentException('Torneo no v?lido.');
             }
@@ -98,8 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'torn
     require_once FVD_PROJECT_ROOT . '/src/Services/TorneoFinalizacionService.php';
     AuthService::ensureSession();
     try {
-        $svc->torneosEventoRequireFvdAdmin();
         $tidF = (int) ($_POST['torneo_id'] ?? 0);
+        $svc->torneosEventoRequireGestionPanel($tidF);
         $out = \FvdPortal\Services\TorneoFinalizacionService::finalizarTorneo(fvd_db(), $tidF);
         $_SESSION['fvd_torneo_evento_flash'] = sprintf(
             'Torneo dado por concluido. Histórico: %d registro(s); inscritos (bandera): %d; filas en tabla: %d.',
@@ -129,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
         $tid = isset($_POST['torneo']) && $_POST['torneo'] !== '' ? (int) $_POST['torneo'] : null;
         $savedId = $svc->torneosSave($tid, $_POST, $_FILES);
         $wasNew = $tid === null;
-        if ($wasNew && AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+        if ($wasNew && in_array(AuthService::role(), [AuthService::ROLE_FVD_ADMIN, AuthService::ROLE_ASO_ADMIN], true)) {
             header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $savedId . '&msg=torneo_creado_invitaciones'));
             exit;
         }
@@ -193,12 +194,8 @@ if (AuthService::isDelegadoAsociacion() && ($_SERVER['REQUEST_METHOD'] ?? '') !=
 }
 
 if ($action === 'evento_status_json' && $id !== null && $id > 0) {
-    if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
-        http_response_code(403);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['ok' => false, 'error' => 'Solo administrador FVD.'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+    AuthService::ensureSession();
+    $svc->torneosEventoRequireGestionPanel((int) $id);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate');
     if ($svc->torneosFind($id) === null) {
@@ -252,12 +249,7 @@ if ($action === 'evento_status_json' && $id !== null && $id > 0) {
 if ($action === 'tarjetas_zip' && $id !== null && $id > 0) {
     AuthService::ensureSession();
     AuthService::requireLogin();
-    if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
-        http_response_code(403);
-        header('Content-Type: text/plain; charset=UTF-8');
-        echo 'Solo administrador FVD.';
-        exit;
-    }
+    $svc->torneosEventoRequireGestionPanel((int) $id);
     if ($svc->torneosFind($id) === null) {
         http_response_code(404);
         header('Content-Type: text/plain; charset=UTF-8');
@@ -358,7 +350,8 @@ if ($action === 'tarjetas_zip' && $id !== null && $id > 0) {
 }
 
 if ($action === 'historico_torneo' && $id !== null && $id > 0) {
-    $svc->torneosEventoRequireFvdAdmin();
+    AuthService::ensureSession();
+    $svc->torneosEventoRequireGestionPanel((int) $id);
     $fvdHistoricoFilas = $svc->torneosHistoricoMovimientos((int) $id);
     $fvdHistoricoTorneo = $svc->torneosFind($id);
     $fvd_page_title = 'Histórico del torneo';
@@ -417,10 +410,7 @@ if ($action === 'evento' && $id !== null && $id > 0) {
         exit;
     }
 
-    if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
-        http_response_code(403);
-        exit('Solo el administrador general FVD puede abrir el panel de evento.');
-    }
+    $svc->torneosEventoRequireGestionPanel((int) $id);
     if (!empty($_SESSION['fvd_torneo_evento_flash'])) {
         $fvd_error = (string) $_SESSION['fvd_torneo_evento_flash'];
         unset($_SESSION['fvd_torneo_evento_flash']);
@@ -481,14 +471,21 @@ if ($action === 'relacion_grupo') {
 }
 
 if ($action === 'form') {
-    $svc->torneosRequireFvdAdminForGestion();
+    AuthService::ensureSession();
+    $svc->torneosRequireGestionTorneo();
     $row = $svc->torneosFind($id);
-    $fvdTorneoOrg = $svc->torneosOrganizacionFederacionId();
-    $fvd_torneo_org_id = $fvdTorneoOrg ?? 0;
     if ($id !== null && $row === null) {
         http_response_code(404);
         $fvd_page_title = 'No encontrado';
+    } else {
+        $svc->torneosAssertCanGestionarTorneoRow($row);
     }
+    if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+        $fvdTorneoOrg = $svc->torneosOrganizacionFederacionId();
+    } else {
+        $fvdTorneoOrg = AuthService::idAsociacion();
+    }
+    $fvd_torneo_org_id = (int) ($fvdTorneoOrg ?? 0);
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/form.view.php';
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';
