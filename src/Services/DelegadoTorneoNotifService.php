@@ -228,45 +228,79 @@ final class DelegadoTorneoNotifService
     /**
      * @return array<string, mixed>|null
      */
-    public static function notificacionPorIdParaDelegado(PDO $pdo, int $notifId, int $delegadoId): ?array
+    public static function notificacionPorIdParaDelegado(PDO $pdo, int $notifId, int $delegadoId, ?int $asociacionId = null): ?array
     {
-        if ($notifId <= 0 || $delegadoId <= 0) {
+        if ($notifId <= 0 || ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0))) {
             return null;
         }
         self::ensureTable($pdo);
-        $st = $pdo->prepare(
-            'SELECT n.*, t.nombre AS torneo_nombre, t.fechator, t.lugar
-             FROM fvd_delegado_notif_torneo n
-             INNER JOIN torneosact t ON t.torneo = n.torneo_id
-             WHERE n.id = :id AND n.delegado_id = :d LIMIT 1'
-        );
-        $st->execute([':id' => $notifId, ':d' => $delegadoId]);
-        $r = $st->fetch(PDO::FETCH_ASSOC);
+        try {
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'SELECT n.*, t.nombre AS torneo_nombre, t.fechator, t.lugar
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     WHERE n.id = :id AND del.asociacion_id = :a AND del.activo = 1 LIMIT 1'
+                );
+                $st->execute([':id' => $notifId, ':a' => $asociacionId]);
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT n.*, t.nombre AS torneo_nombre, t.fechator, t.lugar
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     WHERE n.id = :id AND n.delegado_id = :d LIMIT 1'
+                );
+                $st->execute([':id' => $notifId, ':d' => $delegadoId]);
+            }
+            $r = $st->fetch(PDO::FETCH_ASSOC);
 
-        return $r !== false ? $r : null;
+            return $r !== false ? $r : null;
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] notificacionPorIdParaDelegado: ' . $e->getMessage());
+
+            return null;
+        }
     }
 
     /**
+     * Alcance de notificaciones: por defecto `delegado_id` = sesión.
+     * Si se pasa `asociacionId` > 0, se usa la asociación del delegado (tabla `delegados`): un aviso por club aunque el id de fila no coincida con la sesión.
+     *
      * @return list<array<string, mixed>>
      */
-    public static function listarParaDelegado(PDO $pdo, int $delegadoId, int $limite = 30): array
+    public static function listarParaDelegado(PDO $pdo, int $delegadoId, int $limite = 30, ?int $asociacionId = null): array
     {
-        if ($delegadoId <= 0) {
+        if ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0)) {
             return [];
         }
         self::ensureTable($pdo);
         $limite = max(1, min(100, $limite));
         try {
-            $st = $pdo->prepare(
-                'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                    t.nombre AS torneo_nombre, t.fechator, t.lugar
-                 FROM fvd_delegado_notif_torneo n
-                 INNER JOIN torneosact t ON t.torneo = n.torneo_id
-                 WHERE n.delegado_id = :d
-                 ORDER BY n.creado_en DESC
-                 LIMIT ' . (int) $limite
-            );
-            $st->execute([':d' => $delegadoId]);
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     WHERE del.asociacion_id = :a AND del.activo = 1
+                     ORDER BY n.creado_en DESC
+                     LIMIT ' . (int) $limite
+                );
+                $st->execute([':a' => $asociacionId]);
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     WHERE n.delegado_id = :d
+                     ORDER BY n.creado_en DESC
+                     LIMIT ' . (int) $limite
+                );
+                $st->execute([':d' => $delegadoId]);
+            }
 
             return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
         } catch (PDOException $e) {
@@ -276,17 +310,26 @@ final class DelegadoTorneoNotifService
         }
     }
 
-    public static function contarNoVistas(PDO $pdo, int $delegadoId): int
+    public static function contarNoVistas(PDO $pdo, int $delegadoId, ?int $asociacionId = null): int
     {
-        if ($delegadoId <= 0) {
+        if ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0)) {
             return 0;
         }
         self::ensureTable($pdo);
         try {
-            $st = $pdo->prepare(
-                'SELECT COUNT(*) FROM fvd_delegado_notif_torneo WHERE delegado_id = :d AND visto_en IS NULL'
-            );
-            $st->execute([':d' => $delegadoId]);
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'SELECT COUNT(*) FROM fvd_delegado_notif_torneo n
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     WHERE del.asociacion_id = :a AND del.activo = 1 AND n.visto_en IS NULL'
+                );
+                $st->execute([':a' => $asociacionId]);
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT COUNT(*) FROM fvd_delegado_notif_torneo WHERE delegado_id = :d AND visto_en IS NULL'
+                );
+                $st->execute([':d' => $delegadoId]);
+            }
 
             return (int) $st->fetchColumn();
         } catch (PDOException $e) {
@@ -297,38 +340,68 @@ final class DelegadoTorneoNotifService
     /**
      * @return array<string, mixed>|null Última notificación no vista
      */
-    public static function ultimaNoVista(PDO $pdo, int $delegadoId): ?array
+    public static function ultimaNoVista(PDO $pdo, int $delegadoId, ?int $asociacionId = null): ?array
     {
-        if ($delegadoId <= 0) {
+        if ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0)) {
             return null;
         }
         self::ensureTable($pdo);
-        $st = $pdo->prepare(
-            'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                t.nombre AS torneo_nombre, t.fechator, t.lugar
-             FROM fvd_delegado_notif_torneo n
-             INNER JOIN torneosact t ON t.torneo = n.torneo_id
-             WHERE n.delegado_id = :d AND n.visto_en IS NULL
-             ORDER BY n.creado_en DESC
-             LIMIT 1'
-        );
-        $st->execute([':d' => $delegadoId]);
-        $r = $st->fetch(PDO::FETCH_ASSOC);
+        try {
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     WHERE del.asociacion_id = :a AND del.activo = 1 AND n.visto_en IS NULL
+                     ORDER BY n.creado_en DESC
+                     LIMIT 1'
+                );
+                $st->execute([':a' => $asociacionId]);
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     WHERE n.delegado_id = :d AND n.visto_en IS NULL
+                     ORDER BY n.creado_en DESC
+                     LIMIT 1'
+                );
+                $st->execute([':d' => $delegadoId]);
+            }
+            $r = $st->fetch(PDO::FETCH_ASSOC);
 
-        return $r !== false ? $r : null;
+            return $r !== false ? $r : null;
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] ultimaNoVista: ' . $e->getMessage());
+
+            return null;
+        }
     }
 
-    public static function marcarVisto(PDO $pdo, int $notifId, int $delegadoId): void
+    public static function marcarVisto(PDO $pdo, int $notifId, int $delegadoId, ?int $asociacionId = null): void
     {
-        if ($notifId <= 0 || $delegadoId <= 0) {
+        if ($notifId <= 0 || ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0))) {
             return;
         }
         self::ensureTable($pdo);
-        $st = $pdo->prepare(
-            'UPDATE fvd_delegado_notif_torneo SET visto_en = COALESCE(visto_en, NOW()) WHERE id = :id AND delegado_id = :d'
-        );
         try {
-            $st->execute([':id' => $notifId, ':d' => $delegadoId]);
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'UPDATE fvd_delegado_notif_torneo n
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     SET n.visto_en = COALESCE(n.visto_en, NOW())
+                     WHERE n.id = :id AND del.asociacion_id = :a AND del.activo = 1'
+                );
+                $st->execute([':id' => $notifId, ':a' => $asociacionId]);
+            } else {
+                $st = $pdo->prepare(
+                    'UPDATE fvd_delegado_notif_torneo SET visto_en = COALESCE(visto_en, NOW()) WHERE id = :id AND delegado_id = :d'
+                );
+                $st->execute([':id' => $notifId, ':d' => $delegadoId]);
+            }
         } catch (PDOException $e) {
             error_log('[DelegadoTorneoNotifService] marcarVisto: ' . $e->getMessage());
         }

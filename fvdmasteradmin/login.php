@@ -30,8 +30,10 @@ if (AuthService::isAuthenticated()) {
         require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
         $pdo = fvd_db();
         $uid = (int) AuthService::userId();
-        $ult = \FvdPortal\Services\DelegadoTorneoNotifService::ultimaNoVista($pdo, $uid);
-        $cnt = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $uid);
+        $aidL = AuthService::idAsociacion();
+        $aidLInt = ($aidL !== null && (int) $aidL > 0) ? (int) $aidL : null;
+        $ult = \FvdPortal\Services\DelegadoTorneoNotifService::ultimaNoVista($pdo, $uid, $aidLInt);
+        $cnt = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $uid, $aidLInt);
         if ($ult !== null && $cnt === 1) {
             $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
             header('Location: ' . $base . '/fvdmasteradmin/delegado_entrar_torneo.php?notif_id=' . (int) $ult['id']);
@@ -62,8 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             require_once __DIR__ . '/config/db.php';
             require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
             $pdo = fvd_db();
-            $ult = \FvdPortal\Services\DelegadoTorneoNotifService::ultimaNoVista($pdo, (int) AuthService::userId());
-            $cnt = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, (int) AuthService::userId());
+            $uidPost = (int) AuthService::userId();
+            $aidPost = AuthService::idAsociacion();
+            $aidPostInt = ($aidPost !== null && (int) $aidPost > 0) ? (int) $aidPost : null;
+            $ult = \FvdPortal\Services\DelegadoTorneoNotifService::ultimaNoVista($pdo, $uidPost, $aidPostInt);
+            $cnt = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $uidPost, $aidPostInt);
             if ($ult !== null && $cnt === 1) {
                 $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
                 header('Location: ' . $base . '/fvdmasteradmin/delegado_entrar_torneo.php?notif_id=' . (int) $ult['id']);

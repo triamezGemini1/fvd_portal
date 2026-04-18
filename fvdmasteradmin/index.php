@@ -39,8 +39,10 @@ if ($fvdEsDelegadoPanel) {
     $pdo = fvd_db();
     $delegSnap = \FvdPortal\Services\StatsService::snapshotDelegadoPanel($pdo);
     $delegadoUid = (int) AuthService::userId();
-    $delegNotifs = \FvdPortal\Services\DelegadoTorneoNotifService::listarParaDelegado($pdo, $delegadoUid, 25);
-    $delegNotifNoVistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $delegadoUid);
+    $delegAid = AuthService::idAsociacion();
+    $delegAidInt = ($delegAid !== null && (int) $delegAid > 0) ? (int) $delegAid : null;
+    $delegNotifs = \FvdPortal\Services\DelegadoTorneoNotifService::listarParaDelegado($pdo, $delegadoUid, 25, $delegAidInt);
+    $delegNotifNoVistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $delegadoUid, $delegAidInt);
     $urlRegistrarAtleta = $appBase . '/modules/atletas/index.php';
     $delegCupoInsc = null;
     $tidCtx = (int) ($delegSnap['torneo_id'] ?? 0);

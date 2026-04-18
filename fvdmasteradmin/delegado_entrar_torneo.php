@@ -28,6 +28,8 @@ if (!AuthService::isDelegadoAsociacion()) {
 $base = rtrim((string) env('APP_BASE_PATH', ''), '/');
 $pdo = fvd_db();
 $did = (int) AuthService::userId();
+$aidCtx = AuthService::idAsociacion();
+$aid = ($aidCtx !== null && (int) $aidCtx > 0) ? (int) $aidCtx : null;
 
 $notifId = isset($_GET['notif_id']) ? (int) $_GET['notif_id'] : 0;
 $tokenRaw = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
@@ -35,13 +37,16 @@ $row = null;
 
 if ($tokenRaw !== '') {
     $byTok = DelegadoTorneoNotifService::notificacionPorAccessToken($pdo, $tokenRaw);
-    if ($byTok !== null && (int) ($byTok['delegado_id'] ?? 0) === $did) {
-        $row = $byTok;
+    if ($byTok !== null) {
+        $nid = (int) ($byTok['id'] ?? 0);
+        if ($nid > 0) {
+            $row = DelegadoTorneoNotifService::notificacionPorIdParaDelegado($pdo, $nid, $did, $aid);
+        }
     }
 } elseif ($notifId > 0) {
-    $row = DelegadoTorneoNotifService::notificacionPorIdParaDelegado($pdo, $notifId, $did);
+    $row = DelegadoTorneoNotifService::notificacionPorIdParaDelegado($pdo, $notifId, $did, $aid);
 } elseif (isset($_GET['ultima']) && (string) $_GET['ultima'] === '1') {
-    $row = DelegadoTorneoNotifService::ultimaNoVista($pdo, $did);
+    $row = DelegadoTorneoNotifService::ultimaNoVista($pdo, $did, $aid);
 }
 
 if ($row === null) {
@@ -56,7 +61,7 @@ if ($tid <= 0) {
 }
 
 AuthService::setDelegadoTorneoContext($tid);
-DelegadoTorneoNotifService::marcarVisto($pdo, (int) $row['id'], $did);
+DelegadoTorneoNotifService::marcarVisto($pdo, (int) $row['id'], $did, $aid);
 
 $dest = admin_module_url('torneos/index.php?action=evento&id=' . $tid);
 header('Location: ' . $dest);

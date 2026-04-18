@@ -178,9 +178,12 @@ if (AuthService::isDelegadoAsociacion()) {
         require_once $fvdProjRoot . '/fvdmasteradmin/config/db.php';
         require_once $fvdProjRoot . '/src/Services/DelegadoTorneoNotifService.php';
         $pdoDelegNotif = fvd_db();
+        $delegTopAid = AuthService::idAsociacion();
+        $delegTopAidInt = ($delegTopAid !== null && (int) $delegTopAid > 0) ? (int) $delegTopAid : null;
         $fvd_topbar_deleg_notif_no_vistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas(
             $pdoDelegNotif,
-            (int) AuthService::userId()
+            (int) AuthService::userId(),
+            $delegTopAidInt
         );
     } catch (Throwable $e) {
         $fvd_topbar_deleg_notif_no_vistas = 0;

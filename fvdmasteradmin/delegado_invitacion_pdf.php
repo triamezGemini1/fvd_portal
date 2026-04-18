@@ -28,7 +28,9 @@ if ($notifId <= 0) {
 
 $pdo = fvd_db();
 $did = (int) AuthService::userId();
-$row = DelegadoTorneoNotifService::notificacionPorIdParaDelegado($pdo, $notifId, $did);
+$aidCtx = AuthService::idAsociacion();
+$aid = ($aidCtx !== null && (int) $aidCtx > 0) ? (int) $aidCtx : null;
+$row = DelegadoTorneoNotifService::notificacionPorIdParaDelegado($pdo, $notifId, $did, $aid);
 if ($row === null) {
     http_response_code(404);
     exit('Notificación no encontrada.');
