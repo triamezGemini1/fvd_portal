@@ -95,7 +95,8 @@ if (!isset($fvd_sidebar_active)) {
         $fvd_sidebar_active = 'inscripciones';
     } elseif (str_contains($fvdScript, '/modules/inscripcion_torneo/')) {
         $fvd_sidebar_active = 'inscripcion_torneo';
-    } elseif (str_contains($fvdScript, '/modules/torneo_inscripcion/')) {
+    } elseif (str_contains($fvdScript, '/modules/torneo_inscripcion/')
+        || str_contains($fvdScript, '/admin/modules/torneo_inscripcion/')) {
         $fvd_sidebar_active = 'torneo_inscripcion';
     } elseif (str_contains($fvdScript, '/atleta/mi_ficha.php')) {
         $fvd_sidebar_active = 'mi_ficha';
@@ -191,13 +192,13 @@ $fvd_acc_datos_open = in_array(
     ['asociaciones', 'atletas', 'torneos', 'invitaciones', 'solicitudes_delegado'],
     true
 );
-$fvd_acc_fin_open = in_array($fvd_sidebar_active, ['costos', 'deudas', 'pagos'], true);
+$fvd_acc_fin_open = in_array($fvd_sidebar_active, ['costos', 'deudas', 'pagos', 'torneo_inscripcion'], true);
 $fvd_es_admin_fvd = AuthService::isSuperAdmin();
 $fvd_acc_adm_asoc_open = ($fvd_sidebar_active === 'asociaciones');
 $fvd_acc_adm_atletas_open = in_array($fvd_sidebar_active, ['atletas', 'atletas_nuevo'], true);
 $fvd_acc_adm_torneos_open = ($fvd_sidebar_active === 'torneos');
 $fvd_acc_adm_sol_open = in_array($fvd_sidebar_active, ['sol_traspasos_fvd', 'sol_carnets_fvd', 'solicitudes_delegado'], true);
-$fvd_acc_adm_fin_open = in_array($fvd_sidebar_active, ['costos', 'deudas', 'pagos'], true);
+$fvd_acc_adm_fin_open = in_array($fvd_sidebar_active, ['costos', 'deudas', 'pagos', 'torneo_inscripcion'], true);
 $fvd_acc_adm_inf_open = in_array(
     $fvd_sidebar_active,
     ['inscripciones', 'inscripcion_torneo', 'torneo_inscripcion', 'informe_carnets', 'informe_traspasos', 'informe_indicadores_atletas', 'informe_export_atletas', 'informe_deudas_resumen'],
@@ -862,11 +863,10 @@ header('Content-Type: text/html; charset=UTF-8');
                     </div>
                 </details>
                 <details class="fvd-sn-acc"<?= $fvd_acc_fin_open ? ' open' : '' ?>>
-                    <summary class="fvd-sn-acc__summary" title="Finanzas">Finanz. <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
+                    <summary class="fvd-sn-acc__summary" title="Inscripciones al torneo y pagos">Inscripc. / pagos <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
-                        <a class="fvd-sn<?= $fvd_sn_active('deudas') ?>" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Deudas">Deudas</a>
-                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>" title="Conteos desde tabla atletas">Estad. inscripciones</a>
-                        <a class="fvd-sn<?= $fvd_sn_active('pagos') ?>" href="<?= htmlspecialchars(fvd_module_url('relacion_pago/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Pagos">Pagos</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('torneo_inscripcion') ?>" href="<?= htmlspecialchars(fvd_module_url('torneo_inscripcion/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Inscribir afiliados al torneo en curso">Inscripciones al torneo</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('pagos') ?>" href="<?= htmlspecialchars(fvd_module_url('relacion_pago/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Pagos registrados">Pagos</a>
                     </div>
                 </details>
             <?php elseif (AuthService::isAthletePortalUser()): ?>

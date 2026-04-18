@@ -8,7 +8,7 @@ fvd_admin_require_roles();
 
 $svc = new FvdAdminService();
 $selfUrl = fvd_master_module_url('torneo_inscripcion/index.php');
-$fvd_page_title = 'Inscripción';
+$fvd_page_title = AuthService::isDelegadoAsociacion() ? 'Inscripciones al torneo' : 'Inscripción';
 $fvd_error = '';
 $fvd_ok = '';
 
