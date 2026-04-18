@@ -91,7 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rese
     $rolSesion = trim((string) (AuthService::role() ?? ''));
     if (!in_array($rolSesion, [
         AuthService::ROLE_FVD_ADMIN,
-        AuthService::ROLE_ASO_ADMIN,
         AuthService::ROLE_DELEGADO_ASOC,
     ], true)) {
         http_response_code(403);
@@ -378,7 +377,6 @@ $fvd_atletas_reset_n = isset($_GET['n']) ? (int) $_GET['n'] : 0;
 $fvd_atletas_reset_campo = isset($_GET['campo']) ? trim((string) $_GET['campo']) : '';
 $fvd_atletas_puede_reset_marcadores = in_array(trim((string) (AuthService::role() ?? '')), [
     AuthService::ROLE_FVD_ADMIN,
-    AuthService::ROLE_ASO_ADMIN,
     AuthService::ROLE_DELEGADO_ASOC,
 ], true);
 

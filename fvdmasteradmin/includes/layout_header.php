@@ -113,8 +113,7 @@ if (str_contains($fvdScript, 'solicitudes_delegado')) {
     }
 }
 if (str_contains($fvdScript, 'reporte_carnets.php')) {
-    $trc = isset($_GET['tipo']) ? trim((string) $_GET['tipo']) : '';
-    $fvd_sidebar_active = ($trc === 'solicitados') ? 'informe_carnets_sol' : 'informe_carnets_pend';
+    $fvd_sidebar_active = 'informe_carnets';
 }
 if (str_contains($fvdScript, 'reporte_traspasos.php')) {
     $fvd_sidebar_active = 'informe_traspasos';
@@ -192,7 +191,7 @@ $fvd_acc_adm_sol_open = in_array($fvd_sidebar_active, ['sol_traspasos_fvd', 'sol
 $fvd_acc_adm_fin_open = in_array($fvd_sidebar_active, ['costos', 'deudas', 'pagos'], true);
 $fvd_acc_adm_inf_open = in_array(
     $fvd_sidebar_active,
-    ['inscripciones', 'inscripcion_torneo', 'torneo_inscripcion', 'informe_carnets_pend', 'informe_carnets_sol', 'informe_traspasos', 'informe_indicadores_atletas', 'informe_export_atletas', 'informe_deudas_resumen'],
+    ['inscripciones', 'inscripcion_torneo', 'torneo_inscripcion', 'informe_carnets', 'informe_traspasos', 'informe_indicadores_atletas', 'informe_export_atletas', 'informe_deudas_resumen'],
     true
 );
 
@@ -821,8 +820,7 @@ header('Content-Type: text/html; charset=UTF-8');
                 <details class="fvd-sn-acc"<?= $fvd_acc_adm_inf_open ? ' open' : '' ?>>
                     <summary class="fvd-sn-acc__summary" title="Informes y exportaciones">Informes <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
-                        <a class="fvd-sn<?= $fvd_sn_active('informe_carnets_pend') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_carnets.php?tipo=pendientes'), ENT_QUOTES, 'UTF-8') ?>" title="Pendientes de elaborar">Carnets — elaboración</a>
-                        <a class="fvd-sn<?= $fvd_sn_active('informe_carnets_sol') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_carnets.php?tipo=solicitados'), ENT_QUOTES, 'UTF-8') ?>" title="Carnets solicitados">Carnets emitidos / solicitados</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('informe_carnets') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_carnets.php'), ENT_QUOTES, 'UTF-8') ?>" title="Solo atletas.carnet = 1">Solicitud de carnets (marcador = 1)</a>
                         <a class="fvd-sn<?= $fvd_sn_active('informe_traspasos') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_traspasos.php'), ENT_QUOTES, 'UTF-8') ?>" title="Informe de traspasos">Informe traspasos</a>
                         <a class="fvd-sn<?= $fvd_sn_active('informe_indicadores_atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/reporte_indicadores.php'), ENT_QUOTES, 'UTF-8') ?>" title="Todos los campos de atletas con indicadores de servicio">Indicadores servicio (ficha completa)</a>
                         <a class="fvd-sn<?= $fvd_sn_active('informe_deudas_resumen') ?>" href="<?= htmlspecialchars(fvd_module_url('deuda_asociacion/index.php?fvd_from=informes'), ENT_QUOTES, 'UTF-8') ?>" title="Montos por concepto (inscripciones, afiliaciones, carnets, traspasos…)">Resumen finanzas / deudas por torneo</a>

@@ -287,7 +287,7 @@ final class QueryHelper
     /**
      * Todas las filas del listado admin de atletas (mismos filtros y alcance regional), sin paginar.
      *
-     * @param int|null $carnetEquals Si es 0 o 1, filtra por `atletas.carnet` (informes de carnets). Null = sin filtro extra.
+     * @param int|null $carnetEquals Solo **1** aplica filtro (`atletas.carnet = 1`). Cualquier otro valor se ignora (el 0 no es indicador de informe).
      * @param string $alcance todos|asociacion
      * @param string $tipo normal|ultimos|no_activos|bajas
      * @return list<array<string, mixed>>
@@ -312,9 +312,9 @@ final class QueryHelper
         $orderBy = $frag['order_by'];
         $params = $frag['params'];
 
-        if ($carnetEquals !== null) {
-            $params[':carnet_eq'] = $carnetEquals === 1 ? 1 : 0;
-            $search .= ' AND COALESCE(a.carnet, 0) = :carnet_eq ';
+        if ($carnetEquals === 1) {
+            $params[':carnet_eq'] = 1;
+            $search .= ' AND COALESCE(a.carnet, 0) = 1 ';
         }
 
         $dataSql = 'SELECT a.id, a.foto, a.cedula, a.nombre, a.sexo, a.numfvd, a.estatus, a.celular, a.email, a.asociacion, a.categ,
@@ -341,16 +341,21 @@ final class QueryHelper
      * - `cualquiera`: al menos uno de afiliación, anualidad, carnet, traspaso o inscripción está en 1.
      * - `todos`: los cinco están en 1.
      *
+     * Si {@see $marcadorFijo} no es null, se listan solo filas con ese marcador (o la pareja) en **1**;
+     * en ese caso se ignora {@see $modo}.
+     *
      * Respeta el alcance regional ({@see \QueryHelper::applyAsociacionScope} sobre `a.asociacion`).
      *
      * @param 'cualquiera'|'todos' $modo
+     * @param 'afiliacion'|'anualidad'|'carnet'|'traspaso'|'inscripcion'|'afiliacion_anualidad'|null $marcadorFijo
      * @return list<array<string, mixed>>
      */
     public static function selectAtletasPorIndicadoresServicioFull(
         string $modo,
         string $cedula = '',
         string $nombre = '',
-        ?PDO $pdo = null
+        ?PDO $pdo = null,
+        ?string $marcadorFijo = null
     ): array {
         $pdo = $pdo ?? fvd_db();
         $legacy = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
@@ -358,13 +363,26 @@ final class QueryHelper
             require_once $legacy;
         }
 
-        $modo = $modo === 'todos' ? 'todos' : 'cualquiera';
-        if ($modo === 'todos') {
-            $indSql = ' AND COALESCE(a.afiliacion, 0) = 1 AND COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.carnet, 0) = 1'
-                . ' AND COALESCE(a.traspaso, 0) = 1 AND COALESCE(a.inscripcion, 0) = 1 ';
+        $porMarcador = [
+            'afiliacion'          => ' AND COALESCE(a.afiliacion, 0) = 1 ',
+            'anualidad'           => ' AND COALESCE(a.anualidad, 0) = 1 ',
+            'carnet'              => ' AND COALESCE(a.carnet, 0) = 1 ',
+            'traspaso'            => ' AND COALESCE(a.traspaso, 0) = 1 ',
+            'inscripcion'         => ' AND COALESCE(a.inscripcion, 0) = 1 ',
+            'afiliacion_anualidad' => ' AND COALESCE(a.afiliacion, 0) = 1 AND COALESCE(a.anualidad, 0) = 1 ',
+        ];
+        $mk = $marcadorFijo !== null && $marcadorFijo !== '' ? trim($marcadorFijo) : '';
+        if ($mk !== '' && isset($porMarcador[$mk])) {
+            $indSql = $porMarcador[$mk];
         } else {
-            $indSql = ' AND (COALESCE(a.afiliacion, 0) = 1 OR COALESCE(a.anualidad, 0) = 1 OR COALESCE(a.carnet, 0) = 1'
-                . ' OR COALESCE(a.traspaso, 0) = 1 OR COALESCE(a.inscripcion, 0) = 1) ';
+            $modo = $modo === 'todos' ? 'todos' : 'cualquiera';
+            if ($modo === 'todos') {
+                $indSql = ' AND COALESCE(a.afiliacion, 0) = 1 AND COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.carnet, 0) = 1'
+                    . ' AND COALESCE(a.traspaso, 0) = 1 AND COALESCE(a.inscripcion, 0) = 1 ';
+            } else {
+                $indSql = ' AND (COALESCE(a.afiliacion, 0) = 1 OR COALESCE(a.anualidad, 0) = 1 OR COALESCE(a.carnet, 0) = 1'
+                    . ' OR COALESCE(a.traspaso, 0) = 1 OR COALESCE(a.inscripcion, 0) = 1) ';
+            }
         }
 
         $params = [];

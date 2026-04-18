@@ -9,16 +9,9 @@ use FvdPortal\Services\QueryHelper;
 
 fvd_admin_require_roles();
 
-$tipo = isset($_GET['tipo']) ? trim((string) $_GET['tipo']) : 'pendientes';
-if ($tipo === 'emitidos') {
-    $tipo = 'solicitados';
-}
-$carnetEq = $tipo === 'solicitados' ? 1 : 0;
-$titulo = $tipo === 'solicitados'
-    ? 'Carnets solicitados (atletas.carnet = 1)'
-    : 'Elaboración de carnets — pendientes (atletas.carnet = 0)';
-
-$rows = QueryHelper::selectAtletasAdminAll('', '', fvd_db(), $carnetEq);
+// Solo el valor 1 es indicador de negocio; no se informa por carnet = 0.
+$rows = QueryHelper::selectAtletasAdminAll('', '', fvd_db(), 1);
+$titulo = 'Solicitud de carnets (atletas.carnet = 1)';
 $fvd_page_title = 'Reporte carnets';
 $selfReport = admin_module_url('atletas/reporte_carnets.php');
 
@@ -79,12 +72,10 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
     <?php endif; ?>
     <h1 class="fvd-atletas-title"><?= htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') ?></h1>
     <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 1rem">
-        Listado según <code>atletas.carnet</code>: pendientes = 0 o NULL; solicitados al prestador = exactamente 1.
-        Indicadores y montos de carnet solo cuentan filas con <code>carnet = 1</code>. Total: <strong><?= count($rows) ?></strong>
+        Igual que el resto de banderas en <code>atletas</code>, solo cuenta el valor <strong>1</strong>: indica solicitud / carnet registrado. Otros valores no se usan como criterio de informe.
+        Total: <strong><?= count($rows) ?></strong>
     </p>
     <p class="no-print" style="margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:8px">
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($selfReport . '?tipo=pendientes', ENT_QUOTES, 'UTF-8') ?>">Pendientes (carnet=0)</a>
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($selfReport . '?tipo=solicitados', ENT_QUOTES, 'UTF-8') ?>">Solicitados (carnet=1)</a>
         <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars(fvd_crud_self_url('atletas') . '?action=list', ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
     </p>
     <div class="fvd-mod-table-wrap">

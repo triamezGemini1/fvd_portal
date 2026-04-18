@@ -46,11 +46,15 @@ $fvd_asociaciones_list_filter = isset($fvd_asociaciones_list_filter) && is_array
 $fvd_atletas_puede_elegir_alcance = $fvd_atletas_puede_elegir_alcance ?? false;
 $nOpcionesAsoc = count($fvd_asociaciones_list_filter);
 require_once FVD_PROJECT_ROOT . '/fvdmasteradmin/includes/fvd_asociacion_helpers.php';
+$rolAtletasUi = trim((string) (\AuthService::role() ?? ''));
+$widgetStatsTitulo = $rolAtletasUi === \AuthService::ROLE_ASO_ADMIN
+    ? 'Estadísticas'
+    : ('Estadísticas — ' . htmlspecialchars((string) ($fvd_atletas_widget['etiqueta'] ?? ''), ENT_QUOTES, 'UTF-8'));
 ?>
 <h1 class="fvd-atletas-title">Atletas</h1>
 
 <section class="fvd-atletas-widget no-print" aria-label="Estadísticas del contexto" style="margin:0 0 14px;padding:12px 14px;border-radius:10px;border:1px solid var(--fvd-border, #334155);background:linear-gradient(135deg, rgba(46,48,146,.25) 0%, rgba(15,23,42,.6) 100%);max-width:56rem">
-    <h2 style="margin:0 0 10px;font-size:.95rem;font-weight:700;color:var(--fvd-amarillo, #fff200)">Estadísticas — <?= htmlspecialchars((string) ($fvd_atletas_widget['etiqueta'] ?? ''), ENT_QUOTES, 'UTF-8') ?></h2>
+    <h2 style="margin:0 0 10px;font-size:.95rem;font-weight:700;color:var(--fvd-amarillo, #fff200)"><?= $widgetStatsTitulo ?></h2>
     <p style="margin:0 0 10px;font-size:.68rem;color:var(--fvd-muted);line-height:1.4">Cifras alineadas con este listado (tipo «general» sin bajas; sin filtrar por cédula/nombre). Torneos: eventos en <code>torneosact</code> donde la asociación es organizadora. Participación: inscripciones en <code>inscripcion_torneo</code> (o marcador en <code>atletas</code> si la tabla no existe).</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(9.5rem, 1fr));gap:10px;font-size:.8rem">
         <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
@@ -164,16 +168,18 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         $repBase = isset($atletasReportBaseUrl) && is_string($atletasReportBaseUrl) && $atletasReportBaseUrl !== ''
             ? $atletasReportBaseUrl
             : admin_module_url('atletas/');
-        $uRepPen = $repBase . 'reporte_carnets.php?tipo=pendientes';
-        $uRepEmi = $repBase . 'reporte_carnets.php?tipo=solicitados';
+        $uRepAfiliacion = $repBase . 'reporte_indicadores.php?marcador=afiliacion';
+        $uRepSolCarnet = $repBase . 'reporte_carnets.php';
+        $uRepAfilAnual = $repBase . 'reporte_indicadores.php?marcador=afiliacion_anualidad';
         $uRepTr = $repBase . 'reporte_traspasos.php';
-        $uRepInd = $repBase . 'reporte_indicadores.php';
         ?>
-        <span style="font-size:.7rem;color:var(--fvd-muted);font-weight:600">Informes:</span>
-        <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:600" href="<?= htmlspecialchars($uRepInd, ENT_QUOTES, 'UTF-8') ?>" title="Totales, ficha completa y reinicio masivo de marcadores">Indicadores + reset</a>
-        <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($uRepPen, ENT_QUOTES, 'UTF-8') ?>">Elaboración carnets</a>
-        <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($uRepEmi, ENT_QUOTES, 'UTF-8') ?>">Carnets solicitados</a>
-        <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($uRepTr, ENT_QUOTES, 'UTF-8') ?>">Traspasos</a>
+        <nav class="fvd-atletas-informes-nav no-print" aria-label="Informes y reportes" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid rgba(250,204,21,.38);background:rgba(15,23,42,.55);box-shadow:0 1px 0 rgba(255,255,255,.06) inset">
+        <span class="fvd-atletas-informes-nav__label" style="font-size:.82rem;font-weight:800;color:var(--fvd-amarillo,#facc15);letter-spacing:.06em;text-transform:uppercase">Informes</span>
+        <a class="fvd-atletas-informes-nav__link" style="font-size:.88rem;font-weight:700;color:#f8fafc;text-decoration:none;padding:7px 13px;border-radius:8px;border:1px solid rgba(148,163,184,.5);background:rgba(30,41,59,.75);display:inline-flex;align-items:center;box-sizing:border-box;line-height:1.2" href="<?= htmlspecialchars($uRepAfiliacion, ENT_QUOTES, 'UTF-8') ?>" title="Filas con atletas.afiliacion = 1">Afiliación</a>
+        <a class="fvd-atletas-informes-nav__link" style="font-size:.88rem;font-weight:700;color:#f8fafc;text-decoration:none;padding:7px 13px;border-radius:8px;border:1px solid rgba(148,163,184,.5);background:rgba(30,41,59,.75);display:inline-flex;align-items:center;box-sizing:border-box;line-height:1.2" href="<?= htmlspecialchars($uRepSolCarnet, ENT_QUOTES, 'UTF-8') ?>" title="Solo filas con atletas.carnet = 1 (el 0 no es indicador de informe)">Solicitud carnets</a>
+        <a class="fvd-atletas-informes-nav__link" style="font-size:.88rem;font-weight:700;color:#f8fafc;text-decoration:none;padding:7px 13px;border-radius:8px;border:1px solid rgba(148,163,184,.5);background:rgba(30,41,59,.75);display:inline-flex;align-items:center;box-sizing:border-box;line-height:1.2" href="<?= htmlspecialchars($uRepAfilAnual, ENT_QUOTES, 'UTF-8') ?>" title="Afiliación y anualidad en 1 (atletas.afiliacion = 1 y atletas.anualidad = 1)">Afiliación y anualidad</a>
+        <a class="fvd-atletas-informes-nav__link" style="font-size:.88rem;font-weight:700;color:#f8fafc;text-decoration:none;padding:7px 13px;border-radius:8px;border:1px solid rgba(148,163,184,.5);background:rgba(30,41,59,.75);display:inline-flex;align-items:center;box-sizing:border-box;line-height:1.2" href="<?= htmlspecialchars($uRepTr, ENT_QUOTES, 'UTF-8') ?>" title="Historial de traspasos; marcador atletas.traspaso = 1">Traspasos</a>
+        </nav>
     </div>
     <div class="fvd-atletas-export no-print" role="group" aria-label="Exportar listado">
         <span class="fvd-atletas-export__label" style="font-size:.75rem;color:var(--fvd-muted);display:block;margin-bottom:4px;font-weight:600">Exportar</span>
