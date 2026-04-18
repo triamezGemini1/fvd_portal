@@ -109,8 +109,10 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         $uRepPen = $repBase . 'reporte_carnets.php?tipo=pendientes';
         $uRepEmi = $repBase . 'reporte_carnets.php?tipo=solicitados';
         $uRepTr = $repBase . 'reporte_traspasos.php';
+        $uRepInd = $repBase . 'reporte_indicadores.php';
         ?>
         <span style="font-size:.7rem;color:var(--fvd-muted);font-weight:600">Informes:</span>
+        <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:600" href="<?= htmlspecialchars($uRepInd, ENT_QUOTES, 'UTF-8') ?>" title="Totales, ficha completa y reinicio masivo de marcadores">Indicadores + reset</a>
         <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($uRepPen, ENT_QUOTES, 'UTF-8') ?>">Elaboración carnets</a>
         <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($uRepEmi, ENT_QUOTES, 'UTF-8') ?>">Carnets solicitados</a>
         <a class="fvd-input" style="width:auto;padding:4px 10px;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($uRepTr, ENT_QUOTES, 'UTF-8') ?>">Traspasos</a>

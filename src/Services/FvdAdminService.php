@@ -340,6 +340,45 @@ final class FvdAdminService
     }
 
     /**
+     * Pone en 0 un marcador de servicio en `atletas` dentro del alcance de sesión
+     * ({@see QueryHelper::asociacionScopeSql}: FVD = todos; regional = una asociación).
+     * Para `inscripcion` también pone `torneo_id = 0`.
+     *
+     * @param 'carnet'|'traspaso'|'anualidad'|'afiliacion'|'inscripcion' $campo
+     *
+     * @return int Filas afectadas (puede ser 0)
+     */
+    public function atletasResetMarcadorMasivo(string $campo): int
+    {
+        static $allowed = [
+            'carnet' => true,
+            'traspaso' => true,
+            'anualidad' => true,
+            'afiliacion' => true,
+            'inscripcion' => true,
+        ];
+        if (!isset($allowed[$campo])) {
+            throw new \InvalidArgumentException('Marcador no permitido.');
+        }
+        $params = [];
+        $scope = QueryHelper::asociacionScopeSql('a.asociacion', $params);
+        if ($campo === 'inscripcion') {
+            $sql = 'UPDATE atletas a SET a.inscripcion = 0, a.torneo_id = 0 WHERE 1=1' . $scope;
+        } else {
+            $sql = 'UPDATE atletas a SET a.' . $campo . ' = 0 WHERE 1=1' . $scope;
+        }
+        try {
+            $st = $this->pdo->prepare($sql);
+            $st->execute($params);
+
+            return $st->rowCount();
+        } catch (\PDOException $e) {
+            error_log('[FvdAdminService] atletasResetMarcadorMasivo: ' . $e->getMessage());
+            throw new \RuntimeException('No se pudo reiniciar el marcador.');
+        }
+    }
+
+    /**
      * @return list<array<string,mixed>>
      */
     public function atletasListAsociacionesForSelect(): array

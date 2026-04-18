@@ -3,6 +3,8 @@
 # URL: https://federacionvenezolanadedomino.com/fvd_portal_beta/
 #
 # El .env no se sube (está en exclude); créelo en el servidor. Ver .env.production.example
+# Para deshabilitar por completo una copia antigua del proyecto (confusión): en su .env poner APP_DEPLOYMENT_DISABLED=true
+# y opcionalmente APP_DEPLOYMENT_CANONICAL_URL=… (ver config/deployment_disabled.php).
 
 name: Despliegue FTP — beta (fvd_portal_beta)
 

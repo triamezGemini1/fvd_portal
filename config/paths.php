@@ -7,6 +7,10 @@
 // Cargar variables de entorno
 require_once __DIR__ . '/env.php';
 Env::load();
+require_once __DIR__ . '/deployment_disabled.php';
+if (fvd_deployment_is_disabled()) {
+    fvd_deployment_disabled_exit();
+}
 require_once __DIR__ . '/php_polyfills.php';
 
 // Definir rutas base
@@ -76,6 +80,21 @@ function url($path = '') {
 function admin_module_url(string $path = ''): string {
     $path = ltrim($path, '/');
     return BASE_URL . '/admin/modules/' . $path;
+}
+
+/**
+ * URL del informe de indicadores coherente con la entrada actual (GET/POST):
+ * misma ruta que SCRIPT_NAME si ya es reporte_indicadores.php; si no, admin/modules/atletas/reporte_indicadores.php.
+ * Evita que el formulario POST apunte a otra base que el usuario tenga abierta en el navegador.
+ */
+function fvd_atletas_reporte_indicadores_self_url(): string
+{
+    $sn = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($sn !== '' && str_contains($sn, '/atletas/reporte_indicadores.php')) {
+        return $sn;
+    }
+
+    return admin_module_url('atletas/reporte_indicadores.php');
 }
 
 /**
