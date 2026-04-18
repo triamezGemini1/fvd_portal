@@ -42,7 +42,7 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         Movimientos registrados en <code>log_traspasos</code>; el atleta queda con <code>atletas.traspaso = 1</code>. Registros: <strong><?= count($rows) ?></strong> (máx. 500).
     </p>
     <p class="no-print" style="margin:0 0 1rem">
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars(fvd_crud_self_url('atletas') . '?tab=ficha', ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars(fvd_crud_self_url('atletas') . '?action=list', ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
     </p>
     <div class="fvd-mod-table-wrap">
         <table class="fvd-mod-table tabla-atletas">

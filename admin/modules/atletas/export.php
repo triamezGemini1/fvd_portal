@@ -10,6 +10,8 @@ use FvdPortal\Services\ReportService;
 
 fvd_admin_require_roles();
 
+require_once __DIR__ . '/list_filters.inc.php';
+
 $format = isset($_GET['format']) ? strtolower(trim((string) $_GET['format'])) : '';
 if ($format === '') {
     $format = 'csv';
@@ -24,34 +26,43 @@ if ($format !== 'csv' && $format !== 'pdf') {
 $cedula = isset($_GET['cedula']) ? trim((string) $_GET['cedula']) : '';
 $q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
 
-$rows = QueryHelper::selectAtletasAdminAll($cedula, $q, fvd_db());
+$lf = fvd_atletas_resolve_list_filters($_GET);
+$alcance = $lf['alcance'];
+$tipo = $lf['tipo'];
+$asociacionFiltroId = $lf['asociacion_id'];
+
+$rows = QueryHelper::selectAtletasAdminAll($cedula, $q, fvd_db(), null, $alcance, $tipo, $asociacionFiltroId);
 $rowCount = count($rows);
 $ts = date('Y-m-d_His');
 
 require_once FVD_PROJECT_ROOT . '/fvdmasteradmin/includes/fvd_asociacion_helpers.php';
 
-$omitAsocCol = false;
+$omitAsocCol = ($alcance === 'asociacion' && $asociacionFiltroId > 0);
 $repEncabezadoHtml = '';
-$repTitle = 'Listado de atletas FVD';
-$aidRep = AuthService::idAsociacion();
-if ($aidRep !== null && $aidRep > 0) {
-    $omitAsocCol = true;
-    $stAs = fvd_db()->prepare('SELECT nombre, logo FROM asociaciones WHERE id = :id LIMIT 1');
-    $stAs->execute([':id' => $aidRep]);
+$repTitle = 'Listado de atletas';
+$headerAsocId = $asociacionFiltroId;
+if (!$omitAsocCol && AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
+    $mine = AuthService::idAsociacion();
+    if ($mine !== null && (int) $mine > 0) {
+        $omitAsocCol = true;
+        $headerAsocId = (int) $mine;
+    }
+}
+if ($headerAsocId > 0) {
+    $stAs = fvd_db()->prepare('SELECT nombre, logo, delegado FROM asociaciones WHERE id = :id LIMIT 1');
+    $stAs->execute([':id' => $headerAsocId]);
     $arAs = $stAs->fetch(PDO::FETCH_ASSOC);
-    if (is_array($arAs)) {
-        $nomAs = fvd_asoc_nombre_sin_prefijo((string) ($arAs['nombre'] ?? ''));
-        if ($nomAs !== '') {
-            $repTitle = 'Listado de atletas — ' . $nomAs;
-        }
+    if (is_array($arAs) && $omitAsocCol) {
         $logoUri = fvd_asociacion_logo_data_uri(FVD_PROJECT_ROOT, isset($arAs['logo']) ? (string) $arAs['logo'] : null);
         $cellLogo = $logoUri !== null
             ? '<div class="fvd-rep-asoc-head__logo"><img src="' . htmlspecialchars($logoUri, ENT_QUOTES, 'UTF-8') . '" alt=""></div>'
             : '<div class="fvd-rep-asoc-head__logo"></div>';
-        $cellTxt = $nomAs !== ''
-            ? '<div class="fvd-rep-asoc-head__txt">' . htmlspecialchars($nomAs, ENT_QUOTES, 'UTF-8') . '</div>'
+        $delegado = trim((string) ($arAs['delegado'] ?? ''));
+        $cellDel = $delegado !== ''
+            ? '<div class="fvd-rep-asoc-head__deleg" style="font-size:10pt;margin-top:4px"><strong>Delegado:</strong> '
+            . htmlspecialchars($delegado, ENT_QUOTES, 'UTF-8') . '</div>'
             : '';
-        $repEncabezadoHtml = '<div class="fvd-rep-asoc-head">' . $cellLogo . $cellTxt . '</div>';
+        $repEncabezadoHtml = '<div class="fvd-rep-asoc-head">' . $cellLogo . '<div class="fvd-rep-asoc-head__txt"></div>' . $cellDel . '</div>';
     }
 }
 

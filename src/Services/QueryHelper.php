@@ -9,6 +9,7 @@ use PDO;
 use PDOStatement;
 
 require_once dirname(__DIR__, 2) . '/fvdmasteradmin/config/db.php';
+require_once __DIR__ . '/FvdAdminService.php';
 
 /**
  * Consultas PDO genéricas (portal). No colisiona con la clase global {@see \QueryHelper} del master admin.
@@ -19,7 +20,7 @@ final class QueryHelper
      * Listado paginado por igualdad en columnas (AND).
      *
      * Si $tabla es "atletas", listado admin (LIKE cédula/nombre, alcance solo por asociación).
-     * Claves admitidas: __cedula, __nombre.
+     * Claves: __cedula, __nombre, __alcance (todos|asociacion), __tipo (normal|ultimos|no_activos|bajas), __asociacion_id.
      *
      * @param array<string, scalar|null> $filtros column => valor; columnas [a-zA-Z0-9_], salvo claves __* en modo atletas
      * @return array{registros: list<array<string, mixed>>, total: int, paginas: int}
@@ -36,8 +37,11 @@ final class QueryHelper
         if ($tabla === 'atletas') {
             $cedula = isset($filtros['__cedula']) ? (string) $filtros['__cedula'] : '';
             $nombre = isset($filtros['__nombre']) ? (string) $filtros['__nombre'] : '';
+            $alcance = isset($filtros['__alcance']) ? trim((string) $filtros['__alcance']) : 'todos';
+            $tipo = isset($filtros['__tipo']) ? trim((string) $filtros['__tipo']) : 'normal';
+            $asociacionId = isset($filtros['__asociacion_id']) ? (int) $filtros['__asociacion_id'] : 0;
 
-            return self::selectPaginadoAtletasAdmin($cedula, $nombre, $pagina, $limite, $pdo);
+            return self::selectPaginadoAtletasAdmin($cedula, $nombre, $alcance, $tipo, $asociacionId, $pagina, $limite, $pdo);
         }
 
         if ($tabla === 'fvd_invitaciones') {
@@ -158,9 +162,16 @@ final class QueryHelper
         ];
     }
 
+    /**
+     * @param string $alcance todos|asociacion
+     * @param string $tipo normal|ultimos|no_activos|bajas
+     */
     private static function selectPaginadoAtletasAdmin(
         string $cedula,
         string $nombre,
+        string $alcance,
+        string $tipo,
+        int $asociacionId,
         int $pagina,
         int $limite,
         PDO $pdo
@@ -170,17 +181,10 @@ final class QueryHelper
             require_once $legacy;
         }
 
-        $params = [];
-        $search = '';
-        if ($cedula !== '') {
-            $digits = preg_replace('/\D+/', '', $cedula);
-            $params[':fced'] = $digits !== '' ? $digits . '%' : '%' . $cedula . '%';
-            $search .= ' AND a.cedula LIKE :fced ';
-        }
-        if ($nombre !== '') {
-            $params[':fnom'] = '%' . $nombre . '%';
-            $search .= ' AND a.nombre LIKE :fnom ';
-        }
+        $parts = self::atletasAdminListFragments($cedula, $nombre, $alcance, $tipo, $asociacionId);
+        $search = $parts['search'];
+        $orderBy = $parts['order_by'];
+        $params = $parts['params'];
 
         $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1' . $search;
         $dataSql = 'SELECT a.id, a.foto, a.cedula, a.nombre, a.sexo, a.numfvd, a.estatus, a.celular, a.email, a.asociacion, a.categ,
@@ -188,7 +192,7 @@ final class QueryHelper
             s.nombre AS asociacion_nombre
             FROM atletas a
             LEFT JOIN asociaciones s ON a.asociacion = s.id
-            WHERE 1=1' . $search . ' ORDER BY a.id DESC';
+            WHERE 1=1' . $search . ' ' . $orderBy;
 
         $limite = max(1, min(100, $limite));
         $pagina = max(1, $pagina);
@@ -211,25 +215,33 @@ final class QueryHelper
     }
 
     /**
-     * Todas las filas del listado admin de atletas (mismos filtros y alcance regional), sin paginar.
+     * Fragmentos SQL compartidos entre listado paginado y exportación completa.
      *
-     * @param int|null $carnetEquals Si es 0 o 1, filtra por `atletas.carnet` (informes de carnets). Null = sin filtro extra.
-     * @return list<array<string, mixed>>
+     * @param string $alcance todos|asociacion
+     * @param string $tipo normal|ultimos|no_activos|bajas
+     * @return array{search: string, order_by: string, params: array<string, mixed>}
      */
-    public static function selectAtletasAdminAll(
+    public static function atletasAdminListFragments(
         string $cedula,
         string $nombre,
-        ?PDO $pdo = null,
-        ?int $carnetEquals = null
+        string $alcance,
+        string $tipo,
+        int $asociacionId
     ): array {
-        $pdo = $pdo ?? fvd_db();
-        $legacy = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
-        if (!\class_exists('QueryHelper', false)) {
-            require_once $legacy;
+        $baja = \FvdAdminService::ATLETA_ESTATUS_BAJA;
+        $pend = \FvdAdminService::ATLETA_ESTATUS_PENDIENTE;
+        $alcanceOk = ['todos', 'asociacion'];
+        $tipoOk = ['normal', 'ultimos', 'no_activos', 'bajas'];
+        if (!in_array($alcance, $alcanceOk, true)) {
+            $alcance = 'todos';
+        }
+        if (!in_array($tipo, $tipoOk, true)) {
+            $tipo = 'normal';
         }
 
         $params = [];
         $search = '';
+
         if ($cedula !== '') {
             $digits = preg_replace('/\D+/', '', $cedula);
             $params[':fced'] = $digits !== '' ? $digits . '%' : '%' . $cedula . '%';
@@ -239,19 +251,80 @@ final class QueryHelper
             $params[':fnom'] = '%' . $nombre . '%';
             $search .= ' AND a.nombre LIKE :fnom ';
         }
+
+        if ($tipo === 'bajas') {
+            $params[':est_baja'] = $baja;
+            $search .= ' AND a.estatus = :est_baja ';
+        } elseif ($tipo === 'no_activos') {
+            $params[':est_pend'] = $pend;
+            $search .= ' AND COALESCE(a.estatus,0) = :est_pend ';
+        } else {
+            $params[':not_baja'] = $baja;
+            $search .= ' AND (a.estatus IS NULL OR a.estatus <> :not_baja) ';
+        }
+
+        if ($alcance === 'asociacion') {
+            if ($asociacionId > 0) {
+                $params[':f_aid'] = $asociacionId;
+                $search .= ' AND a.asociacion = :f_aid ';
+            } else {
+                $search .= ' AND 0=1 ';
+            }
+        }
+
+        $orderBy = 'ORDER BY a.id DESC';
+        if ($tipo === 'ultimos') {
+            $orderBy = 'ORDER BY COALESCE(a.fechact, a.fechfvd) DESC, a.id DESC';
+        }
+
+        return [
+            'search'    => $search,
+            'order_by'  => $orderBy,
+            'params'    => $params,
+        ];
+    }
+
+    /**
+     * Todas las filas del listado admin de atletas (mismos filtros y alcance regional), sin paginar.
+     *
+     * @param int|null $carnetEquals Si es 0 o 1, filtra por `atletas.carnet` (informes de carnets). Null = sin filtro extra.
+     * @param string $alcance todos|asociacion
+     * @param string $tipo normal|ultimos|no_activos|bajas
+     * @return list<array<string, mixed>>
+     */
+    public static function selectAtletasAdminAll(
+        string $cedula,
+        string $nombre,
+        ?PDO $pdo = null,
+        ?int $carnetEquals = null,
+        string $alcance = 'todos',
+        string $tipo = 'normal',
+        int $asociacionId = 0
+    ): array {
+        $pdo = $pdo ?? fvd_db();
+        $legacy = dirname(__DIR__, 2) . '/fvdmasteradmin/services/QueryHelper.php';
+        if (!\class_exists('QueryHelper', false)) {
+            require_once $legacy;
+        }
+
+        $frag = self::atletasAdminListFragments($cedula, $nombre, $alcance, $tipo, $asociacionId);
+        $search = $frag['search'];
+        $orderBy = $frag['order_by'];
+        $params = $frag['params'];
+
         if ($carnetEquals !== null) {
             $params[':carnet_eq'] = $carnetEquals === 1 ? 1 : 0;
             $search .= ' AND COALESCE(a.carnet, 0) = :carnet_eq ';
         }
 
-        $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1' . $search;
         $dataSql = 'SELECT a.id, a.foto, a.cedula, a.nombre, a.sexo, a.numfvd, a.estatus, a.celular, a.email, a.asociacion, a.categ,
             a.carnet, a.traspaso,
             s.nombre AS asociacion_nombre
             FROM atletas a
             LEFT JOIN asociaciones s ON a.asociacion = s.id
-            WHERE 1=1' . $search . ' ORDER BY a.id DESC';
+            WHERE 1=1' . $search . ' ' . $orderBy;
 
+        $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1' . $search;
         \QueryHelper::applyAsociacionScope($countSql, $dataSql, 'a.asociacion', $params);
 
         $stmt = $pdo->prepare($dataSql);

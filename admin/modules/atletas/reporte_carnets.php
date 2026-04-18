@@ -79,12 +79,13 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
     <?php endif; ?>
     <h1 class="fvd-atletas-title"><?= htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') ?></h1>
     <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 1rem">
-        Listado según el marcador <code>atletas.carnet</code> (0 = pendiente de solicitud, 1 = solicitado). Total: <strong><?= count($rows) ?></strong>
+        Listado según <code>atletas.carnet</code>: pendientes = 0 o NULL; solicitados al prestador = exactamente 1.
+        Indicadores y montos de carnet solo cuentan filas con <code>carnet = 1</code>. Total: <strong><?= count($rows) ?></strong>
     </p>
     <p class="no-print" style="margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:8px">
         <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($selfReport . '?tipo=pendientes', ENT_QUOTES, 'UTF-8') ?>">Pendientes (carnet=0)</a>
         <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($selfReport . '?tipo=solicitados', ENT_QUOTES, 'UTF-8') ?>">Solicitados (carnet=1)</a>
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars(fvd_crud_self_url('atletas') . '?tab=ficha', ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars(fvd_crud_self_url('atletas') . '?action=list', ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
     </p>
     <div class="fvd-mod-table-wrap">
         <table class="fvd-mod-table tabla-atletas">

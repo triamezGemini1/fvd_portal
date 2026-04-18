@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
+require_once FVD_PROJECT_ROOT . '/src/Services/PaginationView.php';
+use FvdPortal\Services\PaginationView;
 use FvdPortal\Services\QueryHelper;
 
 fvd_admin_require_roles();
+
+require_once __DIR__ . '/list_filters.inc.php';
 
 $svc = new FvdAdminService();
 $selfUrl = fvd_crud_self_url('atletas');
@@ -22,6 +26,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'togg
     $tid = (int) ($_POST['id'] ?? 0);
     if ($tid > 0) {
         $svc->atletasToggleActivo($tid);
+    }
+    header('Location: ' . $selfUrl . '?action=list');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'dar_baja') {
+    $tid = (int) ($_POST['id'] ?? 0);
+    if ($tid > 0) {
+        $svc->atletasDarBaja($tid);
+    }
+    header('Location: ' . $selfUrl . '?action=list');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'restaurar_atleta') {
+    $tid = (int) ($_POST['id'] ?? 0);
+    if ($tid > 0) {
+        $svc->atletasRestaurarDesdeBaja($tid);
     }
     header('Location: ' . $selfUrl . '?action=list');
     exit;
@@ -56,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'tras
     $tdest = isset($_POST['asociacion_destino_id']) ? (int) $_POST['asociacion_destino_id'] : 0;
     try {
         \FvdPortal\Services\TraspasoService::ejecutar(fvd_db(), $taid, $tdest, AuthService::userId());
-        header('Location: ' . $selfUrl . '?tab=ficha');
+        header('Location: ' . $selfUrl . '?action=list');
         exit;
     } catch (Throwable $e) {
         $_SESSION['fvd_traspaso_error'] = $e->getMessage();
@@ -67,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'tras
 
 $fvd_page_title = 'Atletas';
 $rawAction = isset($_GET['action']) ? trim((string) $_GET['action']) : '';
-$impliesAtletasList = isset($_GET['tab']) || isset($_GET['page']) || isset($_GET['cedula'])
+$impliesAtletasList = isset($_GET['page']) || isset($_GET['cedula'])
     || (isset($_GET['q']) && trim((string) $_GET['q']) !== '');
 if ($rawAction === '') {
     $action = $impliesAtletasList ? 'list' : 'form';
@@ -111,7 +133,7 @@ if ($action === 'traspaso') {
     require_once FVD_PROJECT_ROOT . '/src/Services/CarnetService.php';
     $tid = isset($_GET['id']) ? (int) $_GET['id'] : 0;
     if ($tid <= 0) {
-        header('Location: ' . $selfUrl . '?tab=ficha');
+        header('Location: ' . $selfUrl . '?action=list');
         exit;
     }
     $trow = $svc->atletasFind($tid);
@@ -154,7 +176,7 @@ if ($action === 'traspaso') {
     $carnetFotoApiUrl = $fvdAtletasSite
         ? fvd_master_module_url('atletas/carnet_foto_api.php')
         : admin_module_url('atletas/carnet_foto_api.php');
-    $atletasListUrl = $selfUrl . '?tab=ficha';
+    $atletasListUrl = $selfUrl . '?action=list';
     $currentAsocNombre = trim((string) ($trow['asociacion_nombre'] ?? '—'));
     $atletaIdTraspaso = $tid;
     include __DIR__ . '/traspaso.view.php';
@@ -197,7 +219,7 @@ if ($action === 'carnets') {
     $carnetFotoApiUrl = $fvdAtletasSite
         ? fvd_master_module_url('atletas/carnet_foto_api.php')
         : admin_module_url('atletas/carnet_foto_api.php');
-    $atletasListUrl = $selfUrl . '?tab=ficha';
+    $atletasListUrl = $selfUrl . '?action=list';
     $carnetVistaCompacta = count($carnetCards) === 1;
     include __DIR__ . '/carnets.view.php';
     exit;
@@ -249,15 +271,22 @@ if ($action === 'form') {
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $cedula = isset($_GET['cedula']) ? trim((string) $_GET['cedula']) : '';
 $q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
-$fvd_atletas_tab = isset($_GET['tab']) && $_GET['tab'] === 'ficha' ? 'ficha' : 'list';
 $fvd_puede_traspaso = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 $perPage = 12;
+
+$lf = fvd_atletas_resolve_list_filters($_GET);
+$fvd_atletas_alcance = $lf['alcance'];
+$fvd_atletas_tipo = $lf['tipo'];
+$asociacionFiltroId = $lf['asociacion_id'];
 
 $paged = QueryHelper::selectPaginado(
     'atletas',
     [
-        '__cedula' => $cedula,
-        '__nombre' => $q,
+        '__cedula'         => $cedula,
+        '__nombre'         => $q,
+        '__alcance'        => $fvd_atletas_alcance,
+        '__tipo'           => $fvd_atletas_tipo,
+        '__asociacion_id'  => $asociacionFiltroId,
     ],
     $page,
     $perPage,
@@ -272,6 +301,34 @@ $result = [
     'rows'     => $paged['registros'],
 ];
 
+$fvd_atletas_show_asociacion_col = !($fvd_atletas_alcance === 'asociacion' && $asociacionFiltroId > 0);
+$fvd_asociacion_header = null;
+$fvd_atletas_puede_elegir_alcance = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
+$fvd_asociaciones_list_filter = $svc->atletasListAsociacionesForSelect();
+if ($fvd_atletas_puede_elegir_alcance && $fvd_asociaciones_list_filter === []) {
+    $stAsocAll = fvd_db()->query('SELECT id, nombre FROM asociaciones ORDER BY nombre ASC');
+    $fvd_asociaciones_list_filter = $stAsocAll ? $stAsocAll->fetchAll(PDO::FETCH_ASSOC) : [];
+}
+if ($fvd_atletas_alcance === 'asociacion' && $asociacionFiltroId > 0) {
+    $stH = fvd_db()->prepare('SELECT id, nombre, logo, delegado FROM asociaciones WHERE id = :id LIMIT 1');
+    $stH->execute([':id' => $asociacionFiltroId]);
+    $rowH = $stH->fetch(PDO::FETCH_ASSOC);
+    if (is_array($rowH)) {
+        $fvd_asociacion_header = $rowH;
+    }
+}
+
+$paginationQueryParams = [
+    'action' => 'list',
+    'cedula' => $cedula,
+    'q' => $q,
+    'alcance' => $fvd_atletas_alcance,
+    'tipo' => $fvd_atletas_tipo,
+];
+if ($fvd_atletas_alcance === 'asociacion' && $asociacionFiltroId > 0) {
+    $paginationQueryParams['asociacion_id'] = $asociacionFiltroId;
+}
+
 $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
 $fvdAtletasSite = str_contains($sn, '/fvdmasteradmin/modules/atletas/')
     || (str_contains($sn, '/modules/atletas/') && !str_contains($sn, '/admin/modules/'));
@@ -284,6 +341,14 @@ $atletasExportUrl = $fvdAtletasSite
 $atletasReportBaseUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/')
     : admin_module_url('atletas/');
+$fvd_atletas_pager_html = PaginationView::navHtml(
+    $selfUrl,
+    (int) $result['page'],
+    (int) $result['pages'],
+    (int) $result['total'],
+    $paginationQueryParams,
+    'fvd-atletas-pager'
+);
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';
 require FVD_MASTER_ROOT . '/includes/layout_footer.php';

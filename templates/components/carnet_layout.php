@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /** @var array<string, mixed> $card */
 $carnetUnSolo = $carnetUnSolo ?? false;
-$cEmit = !empty($card['carnet_solicitado']) || !empty($card['carnet_emitido']);
+$cEmit = !empty($card['carnet_solicitado']);
 $imgPx = $carnetUnSolo ? 132 : 108;
 ?>
 <div class="fvd-carnet-card" data-atleta-id="<?= (int) $card['atleta_id'] ?>">

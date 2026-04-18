@@ -92,9 +92,15 @@ function fvd_master_module_url(string $path = ''): string {
  * @param 'asociaciones'|'atletas'|'torneos'|'invitaciones'|'solicitudes_delegado' $module
  */
 function fvd_crud_self_url(string $module): string {
-    $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
+    $sn = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    // Preferir la ruta real del script: si APP_BASE_PATH en .env no coincide con la URL (p. ej. /fvd_portal
+    // en local vs beta en .env), fvd_master_module_url() apuntaba a otro prefijo y el GET (estado, q)
+    // no llegaba a este index.php — el filtro parecía no funcionar.
     if (str_contains($sn, '/modules/' . $module . '/') || str_contains($sn, '/fvdmasteradmin/modules/' . $module . '/')) {
-        return fvd_master_module_url($module . '/index.php');
+        return $sn;
+    }
+    if (str_contains($sn, '/admin/modules/' . $module . '/')) {
+        return $sn;
     }
 
     return admin_module_url($module . '/index.php');

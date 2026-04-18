@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
+require_once FVD_PROJECT_ROOT . '/src/Services/PaginationView.php';
+use FvdPortal\Services\PaginationView;
 use FvdPortal\Services\QueryHelper;
 
 fvd_admin_require_roles();
+
+require_once __DIR__ . '/list_filters.inc.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('X-Content-Type-Options: nosniff');
@@ -17,9 +21,17 @@ try {
     $cedula = isset($_GET['cedula']) ? trim((string) $_GET['cedula']) : '';
     $filtrosParam = isset($_GET['filtros']) ? (string) $_GET['filtros'] : '';
 
+    $lf = fvd_atletas_resolve_list_filters($_GET);
+    $alcance = $lf['alcance'];
+    $tipo = $lf['tipo'];
+    $asociacionFiltroId = $lf['asociacion_id'];
+
     $filtros = [
-        '__cedula' => $cedula,
-        '__nombre' => $q,
+        '__cedula'         => $cedula,
+        '__nombre'         => $q,
+        '__alcance'        => $alcance,
+        '__tipo'           => $tipo,
+        '__asociacion_id'  => $asociacionFiltroId,
     ];
 
     if ($filtrosParam !== '') {
@@ -29,7 +41,7 @@ try {
                 if (!is_string($k) || $k === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $k)) {
                     continue;
                 }
-                if ($k === '__ficha_filtro' || $k === '__revision_delegado') {
+                if ($k === '__ficha_filtro' || $k === '__revision_delegado' || $k === '__list_mode') {
                     continue;
                 }
                 if (is_scalar($v) || $v === null) {
@@ -45,6 +57,7 @@ try {
     $selfUrl = fvd_crud_self_url('atletas');
     $atletaRowTpl = FVD_PROJECT_ROOT . '/templates/components/atleta_table_row.php';
     $fvd_puede_traspaso = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
+    $fvd_atletas_show_asociacion_col = !($alcance === 'asociacion' && $asociacionFiltroId > 0);
     $appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
     $fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
 
@@ -53,24 +66,15 @@ try {
         require $atletaRowTpl;
     }
     if ($paged['registros'] === []) {
-        echo '<tr><td colspan="12" style="padding:12px">Sin registros con los filtros actuales.</td></tr>';
+        $cs = $fvd_atletas_show_asociacion_col ? '13' : '12';
+        echo '<tr><td colspan="' . $cs . '" style="padding:12px">Sin registros con los filtros actuales.</td></tr>';
     }
     $tbodyHtml = ob_get_clean();
 
     $pages = (int) $paged['paginas'];
     $total = (int) $paged['total'];
 
-    ob_start();
-    ?>
-    <span><?= $total ?> reg. · pág. <?= $page ?>/<?= $pages ?></span>
-    <?php if ($page > 1): ?>
-        <a href="#" data-fvd-page="<?= $page - 1 ?>">Anterior</a>
-    <?php endif; ?>
-    <?php if ($page < $pages): ?>
-        <a href="#" data-fvd-page="<?= $page + 1 ?>">Siguiente</a>
-    <?php endif; ?>
-    <?php
-    $pagerHtml = trim(preg_replace('/\s+/', ' ', ob_get_clean()));
+    $pagerHtml = trim(preg_replace('/\s+/', ' ', PaginationView::navPrefetchHtml($page, $pages, $total)));
 
     echo json_encode([
         'ok'         => true,

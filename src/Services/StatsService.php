@@ -498,7 +498,8 @@ final class StatsService
     }
 
     /**
-     * Carnet pendiente (0) vs solicitado (1) en el ámbito regional actual.
+     * Carnet pendiente (NULL/0) vs solicitado (exactamente 1) en el ámbito regional actual.
+     * Valores distintos de 0, NULL y 1 no incrementan ninguno de los dos contadores (no entran en estadísticas de carnet).
      *
      * @return array{pendiente: int, solicitado: int}
      */
@@ -507,8 +508,8 @@ final class StatsService
         $params = [];
         $scope = self::scopeAtletas($params);
         $sql = 'SELECT
-            SUM(CASE WHEN COALESCE(a.carnet, 0) = 0 THEN 1 ELSE 0 END) AS pendiente,
-            SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS solicitado
+            SUM(CASE WHEN (a.carnet IS NULL OR a.carnet = 0) THEN 1 ELSE 0 END) AS pendiente,
+            SUM(CASE WHEN a.carnet = 1 THEN 1 ELSE 0 END) AS solicitado
             FROM atletas a WHERE 1=1' . $scope;
         try {
             $st = $pdo->prepare($sql);
@@ -665,5 +666,67 @@ final class StatsService
             $st->bindValue($key, $v, $type);
         }
         $st->execute();
+    }
+
+    /**
+     * Datos consolidados para el panel admin: ficha de asociación, deudas por torneo y pagos recientes.
+     *
+     * @return array{asociacion: array<string, mixed>|null, deudas: list<array<string, mixed>>, pagos: list<array<string, mixed>>}|null
+     */
+    public static function dashboardDetalleAsociacion(PDO $pdo, int $asociacionId): ?array
+    {
+        if ($asociacionId <= 0) {
+            return null;
+        }
+        try {
+            $st = $pdo->prepare('SELECT * FROM asociaciones WHERE id = :id LIMIT 1');
+            $st->execute([':id' => $asociacionId]);
+            $asoc = $st->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('[StatsService] dashboardDetalleAsociacion asoc: ' . $e->getMessage());
+
+            return null;
+        }
+        if ($asoc === false) {
+            return null;
+        }
+
+        $deudas = [];
+        $pagos = [];
+        try {
+            $sd = $pdo->prepare(
+                'SELECT d.*, t.nombre AS torneo_nombre
+                FROM deuda_asociaciones d
+                LEFT JOIN torneosact t ON d.torneo_id = t.torneo
+                WHERE d.asociacion_id = :aid
+                ORDER BY d.fecha_creacion DESC
+                LIMIT 50'
+            );
+            $sd->execute([':aid' => $asociacionId]);
+            $deudas = $sd->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('[StatsService] dashboardDetalleAsociacion deudas: ' . $e->getMessage());
+        }
+        try {
+            $sp = $pdo->prepare(
+                'SELECT r.id, r.torneo_id, r.asociacion_id, r.fecha, r.monto_dolares, r.monto_total, r.tipo_pago, r.secuencia, r.tasa_cambio, r.referencia,
+                    t.nombre AS torneo_nombre
+                FROM relacion_pagos r
+                LEFT JOIN torneosact t ON r.torneo_id = t.torneo
+                WHERE r.asociacion_id = :aid
+                ORDER BY r.fecha DESC, r.id DESC
+                LIMIT 40'
+            );
+            $sp->execute([':aid' => $asociacionId]);
+            $pagos = $sp->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('[StatsService] dashboardDetalleAsociacion pagos: ' . $e->getMessage());
+        }
+
+        return [
+            'asociacion' => $asoc,
+            'deudas'     => $deudas,
+            'pagos'      => $pagos,
+        ];
     }
 }

@@ -11,9 +11,10 @@ use RuntimeException;
 require_once dirname(__DIR__, 2) . '/config/paths.php';
 
 /**
- * Carnet: la columna `atletas.carnet` en BD es el marcador para informes.
+ * Carnet: la columna `atletas.carnet` en BD es el marcador para informes y estadísticas.
  * — 0 / NULL: pendiente de solicitud (reporte «elaboración de carnets»).
- * — 1: carnet solicitado (reporte «carnets solicitados»).
+ * — 1: carnet solicitado al prestador (reporte «carnets solicitados», montos/indicadores).
+ * Otros valores numéricos no se usan en cómputos estadísticos (solo cuenta exactamente 1).
  * Sin HTML.
  */
 final class CarnetService

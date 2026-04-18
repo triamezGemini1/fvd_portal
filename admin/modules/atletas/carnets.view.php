@@ -13,7 +13,7 @@ if (!function_exists('url')) {
 $carnetUnSolo = $carnetVistaCompacta && $carnetCards !== [];
 $hayPendienteSolicitud = false;
 foreach ($carnetCards as $c) {
-    if (empty($c['carnet_solicitado']) && empty($c['carnet_emitido'])) {
+    if (empty($c['carnet_solicitado'])) {
         $hayPendienteSolicitud = true;
         break;
     }
@@ -126,11 +126,12 @@ header('Content-Type: text/html; charset=UTF-8');
 <div class="fvd-carnet-shell<?= $carnetVistaCompacta ? ' fvd-carnet-shell--single' : ' fvd-carnet-shell--multi' ?>">
     <div class="fvd-carnet-toolbar fvd-carnet-no-print">
         <p class="fvd-carnet-indicador">
-            <strong>Registrar carnet solicitado</strong> fija el marcador <code style="font-size:15px">atletas.carnet = 1</code> (informes de elaboración y carnets solicitados).
-            El traspaso de asociación marca <code style="font-size:15px">atletas.traspaso = 1</code> y el historial en <code style="font-size:15px">log_traspasos</code>.
+            <strong>Solicitar (impresión)</strong> marca <code style="font-size:15px">atletas.carnet = 1</code> y abre la impresión para el prestador del servicio.
+            <strong>Registrar carnet solicitado</strong> solo guarda el marcador sin imprimir. Las estadísticas y el reporte «solicitados» solo consideran <code>carnet = 1</code> (otros valores no cuentan).
+            El traspaso de asociación usa <code style="font-size:15px">atletas.traspaso = 1</code> y <code style="font-size:15px">log_traspasos</code>.
         </p>
         <a class="fvd-carnet-btn--ghost" href="<?= htmlspecialchars($atletasListUrl, ENT_QUOTES, 'UTF-8') ?>">← Volver al listado</a>
-        <button type="button" class="fvd-carnet-btn--ghost" onclick="window.print()">Solicitar</button>
+        <button type="button" class="fvd-carnet-btn--ghost" id="fvd-carnet-solicitar-btn">Solicitar (impresión)</button>
         <?php if ($carnetIdsMarcar !== [] && $hayPendienteSolicitud): ?>
             <button type="button" class="fvd-carnet-btn--primary" id="fvd-carnet-emitir-btn" title="Marca atletas.carnet = 1 (carnet solicitado)">Registrar carnet solicitado</button>
         <?php elseif ($carnetIdsMarcar !== [] && !$hayPendienteSolicitud): ?>
@@ -181,26 +182,47 @@ header('Content-Type: text/html; charset=UTF-8');
 (function () {
     var msg = document.getElementById('fvd-carnet-msg');
     var btn = document.getElementById('fvd-carnet-emitir-btn');
+    var btnSol = document.getElementById('fvd-carnet-solicitar-btn');
     var api = <?= json_encode($carnetMarcarApiUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var ids = <?= json_encode($carnetIdsMarcar, JSON_UNESCAPED_UNICODE) ?>;
+    var hayPendiente = <?= $hayPendienteSolicitud ? 'true' : 'false' ?>;
+    function postMarcarCarnet(onOk) {
+        if (!api || !ids || !ids.length) {
+            if (onOk) { onOk(); }
+            return;
+        }
+        if (msg) { msg.textContent = 'Guardando carnet solicitado (carnet=1)…'; }
+        fetch(api, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+            if (d && d.ok) {
+                if (msg) {
+                    msg.textContent = 'Listo: carnet=1 en ' + (d.updated || 0) + ' registro(s).';
+                }
+                if (btn) { btn.disabled = true; }
+                if (onOk) { onOk(); }
+            } else {
+                if (msg) { msg.textContent = (d && d.error) ? d.error : 'No se pudo guardar.'; }
+            }
+        }).catch(function () {
+            if (msg) { msg.textContent = 'Error de red.'; }
+        });
+    }
     if (btn && api && ids && ids.length) {
         btn.addEventListener('click', function () {
-            msg.textContent = 'Guardando carnet solicitado (carnet=1)…';
-            fetch(api, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ ids: ids })
-            }).then(function (r) { return r.json(); }).then(function (d) {
-                if (d && d.ok) {
-                    msg.textContent = 'Listo: carnet solicitado (carnet=1) en ' + (d.updated || 0) + ' registro(s). Recargue para ver el indicador actualizado.';
-                    btn.disabled = true;
-                } else {
-                    msg.textContent = (d && d.error) ? d.error : 'No se pudo guardar.';
-                }
-            }).catch(function () {
-                msg.textContent = 'Error de red.';
-            });
+            postMarcarCarnet(null);
+        });
+    }
+    if (btnSol) {
+        btnSol.addEventListener('click', function () {
+            if (hayPendiente && api && ids && ids.length) {
+                postMarcarCarnet(function () { window.print(); });
+            } else {
+                window.print();
+            }
         });
     }
 

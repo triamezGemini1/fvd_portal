@@ -26,6 +26,9 @@ final class FvdAdminService
     /** Atleta con Nº FVD asignado y registro activo. */
     public const ATLETA_ESTATUS_ACTIVO = 1;
 
+    /** Baja lógica: no se elimina la fila; no debe figurar en listados normales. */
+    public const ATLETA_ESTATUS_BAJA = 2;
+
     /** Categoría por edad: LIBRE (≥18 años). */
     public const ATLETA_CATEG_LIBRE = 1;
 
@@ -78,10 +81,37 @@ final class FvdAdminService
     }
 
     // ——— Asociaciones ———
+    //
+    // Campo único: `asociaciones.estatus` (misma columna para listado, filtro y toggle).
+    // Valores canónicos al guardar desde el panel: 1 = activa, 0 = inactiva.
+    // Legacy / sitio público (PublicSiteData): también se consideran activas 'activo', NULL o ''.
 
     /**
-     * Condición SQL alineada con PublicSiteData: en BD puede haber estatus numérico (1/0),
-     * texto 'activo', o NULL/vacío (legacy). No usar solo "= 1" / "= 0".
+     * ¿La fila de asociación está "activa" para UI, filtro y toggle? Misma regla que el SQL del listado.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function asociacionEstatusEsActiva(array $row): bool
+    {
+        $estRaw = $row['estatus'] ?? null;
+        if ($estRaw === 1 || $estRaw === '1') {
+            return true;
+        }
+        if (is_string($estRaw) && strcasecmp(trim($estRaw), 'activo') === 0) {
+            return true;
+        }
+        if ($estRaw === null) {
+            return true;
+        }
+        if (trim((string) $estRaw) === '') {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Condición SQL alineada con {@see asociacionEstatusEsActiva()} y PublicSiteData.
      */
     private static function sqlAsociacionesWhereEstatus(string $filtroEstatus): string
     {
@@ -211,7 +241,7 @@ final class FvdAdminService
         $st->execute($params);
     }
 
-    /** Activa/desactiva asociación (estatus 0 ↔ 1). Solo administrador FVD. */
+    /** Activa/desactiva asociación: persiste siempre 0/1 en `estatus`. Solo administrador FVD. */
     public function asociacionesToggleEstatus(int $id): void
     {
         if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
@@ -222,8 +252,8 @@ final class FvdAdminService
         if ($row === null) {
             return;
         }
-        $cur = (int) ($row['estatus'] ?? 0);
-        $new = $cur === 1 ? 0 : 1;
+        $activa = self::asociacionEstatusEsActiva($row);
+        $new = $activa ? 0 : 1;
         $st = $this->pdo->prepare('UPDATE asociaciones SET estatus = :e WHERE id = :id');
         $st->execute([':e' => $new, ':id' => $id]);
     }
@@ -233,14 +263,24 @@ final class FvdAdminService
     /**
      * @return array{total:int,page:int,per_page:int,pages:int,rows:list<array<string,mixed>>}
      */
-    public function atletasPaginateList(int $page, int $perPage, string $cedula, string $q): array
-    {
+    public function atletasPaginateList(
+        int $page,
+        int $perPage,
+        string $cedula,
+        string $q,
+        string $alcance = 'todos',
+        string $tipo = 'normal',
+        int $asociacionId = 0
+    ): array {
         require_once __DIR__ . '/QueryHelper.php';
         $p = \FvdPortal\Services\QueryHelper::selectPaginado(
             'atletas',
             [
-                '__cedula' => $cedula,
-                '__nombre' => $q,
+                '__cedula'         => $cedula,
+                '__nombre'         => $q,
+                '__alcance'        => $alcance,
+                '__tipo'           => $tipo,
+                '__asociacion_id'  => $asociacionId,
             ],
             $page,
             $perPage,
@@ -535,6 +575,9 @@ final class FvdAdminService
             return;
         }
         $cur = (int) ($prev['estatus'] ?? 0);
+        if ($cur === self::ATLETA_ESTATUS_BAJA) {
+            return;
+        }
         $new = $cur === self::ATLETA_ESTATUS_ACTIVO ? self::ATLETA_ESTATUS_PENDIENTE : self::ATLETA_ESTATUS_ACTIVO;
         $st = $this->pdo->prepare('UPDATE atletas SET estatus = :e WHERE id = :id');
         $st->execute([':e' => $new, ':id' => $id]);
@@ -543,21 +586,53 @@ final class FvdAdminService
         }
     }
 
-    public function atletasDelete(int $id): void
+    /**
+     * Marca al atleta como dado de baja (no borra la fila).
+     */
+    public function atletasDarBaja(int $id): void
     {
         $prev = $this->atletasFind($id);
         if ($prev === null) {
             return;
         }
         $this->enforceAsociacionId(isset($prev['asociacion']) ? (int) $prev['asociacion'] : null);
-        $params = [':id' => $id];
+        $params = [':id' => $id, ':e' => self::ATLETA_ESTATUS_BAJA];
         $scope = QueryHelper::asociacionScopeSql('a.asociacion', $params);
-        $sql = 'DELETE FROM atletas a WHERE a.id = :id ' . $scope;
+        $sql = 'UPDATE atletas a SET a.estatus = :e WHERE a.id = :id ' . $scope;
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
         if ($st->rowCount() > 0) {
             $this->sincronizarDeudaTrasCambioAtletas((int) ($prev['torneo_id'] ?? 0), (int) ($prev['asociacion'] ?? 0));
         }
+    }
+
+    /** Restaura un atleta dado de baja a estatus pendiente (reactivación manual). */
+    public function atletasRestaurarDesdeBaja(int $id): void
+    {
+        $prev = $this->atletasFind($id);
+        if ($prev === null) {
+            return;
+        }
+        if ((int) ($prev['estatus'] ?? 0) !== self::ATLETA_ESTATUS_BAJA) {
+            return;
+        }
+        $this->enforceAsociacionId(isset($prev['asociacion']) ? (int) $prev['asociacion'] : null);
+        $params = [':id' => $id, ':e' => self::ATLETA_ESTATUS_PENDIENTE];
+        $scope = QueryHelper::asociacionScopeSql('a.asociacion', $params);
+        $sql = 'UPDATE atletas a SET a.estatus = :e WHERE a.id = :id ' . $scope;
+        $st = $this->pdo->prepare($sql);
+        $st->execute($params);
+        if ($st->rowCount() > 0) {
+            $this->sincronizarDeudaTrasCambioAtletas((int) ($prev['torneo_id'] ?? 0), (int) ($prev['asociacion'] ?? 0));
+        }
+    }
+
+    /**
+     * @deprecated Usar {@see self::atletasDarBaja()}; se mantiene por enlaces antiguos.
+     */
+    public function atletasDelete(int $id): void
+    {
+        $this->atletasDarBaja($id);
     }
 
     /**
@@ -655,6 +730,9 @@ final class FvdAdminService
         }
         if ($e === self::ATLETA_ESTATUS_ACTIVO) {
             return 'Activo';
+        }
+        if ($e === self::ATLETA_ESTATUS_BAJA) {
+            return 'Baja';
         }
 
         return (string) $e;

@@ -21,7 +21,7 @@ $listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
 <?php if (!empty($fvd_error ?? '')): ?><p class="fvd-mod-msg"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 
 <div class="fvd-mod-toolbar">
-    <form method="get" action="" class="fvd-admin-filter-form" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+    <form method="get" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-admin-filter-form" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
         <input type="hidden" name="action" value="list">
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block">Buscar por nombre</label>
@@ -73,11 +73,7 @@ $listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
                 <td><?= htmlspecialchars((string) ($r['telefono'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars((string) ($r['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?php
-                    $estRaw = $r['estatus'] ?? null;
-                    $esActiva = $estRaw === 1 || $estRaw === '1'
-                        || (is_string($estRaw) && strcasecmp(trim($estRaw), 'activo') === 0)
-                        || $estRaw === null
-                        || trim((string) $estRaw) === '';
+                    $esActiva = FvdAdminService::asociacionEstatusEsActiva($r);
                     echo $esActiva ? 'Activa' : 'Inactiva';
                 ?></td>
                 <td style="white-space:nowrap;font-size:0.8125rem">

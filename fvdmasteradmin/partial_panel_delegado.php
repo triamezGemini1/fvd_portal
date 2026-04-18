@@ -342,7 +342,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
                 <span style="opacity:0.55;cursor:not-allowed" title="Alta de atletas solo en fase 1 del calendario">Registrar atleta</span>
                 <?php endif; ?>
 
-                · <a href="<?= htmlspecialchars($appBase . '/modules/atletas/index.php?tab=ficha', ENT_QUOTES, 'UTF-8') ?>">Fichas / carnets</a>
+                · <a href="<?= htmlspecialchars($appBase . '/modules/atletas/index.php?action=list', ENT_QUOTES, 'UTF-8') ?>">Fichas / carnets</a>
 
             </p>
 
