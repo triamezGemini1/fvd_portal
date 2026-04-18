@@ -453,6 +453,27 @@ final class QueryHelper
             . 'SUM(CASE WHEN IFNULL(' . $f . '.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS total_traspasos';
     }
 
+    /**
+     * Métricas por torneo desde `inscripcion_torneo`: `inscripcion` 1 o 2 = fila inscrita al torneo (sitio o movimiento).
+     *
+     * @param string $tableAlias Alias validado (p. ej. it)
+     */
+    public static function sqlSelectMetricasTorneoPorInscripcionTorneo(string $tableAlias = 'it'): string
+    {
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $tableAlias)) {
+            throw new InvalidArgumentException('Alias de tabla no válido.');
+        }
+        $f = $tableAlias;
+        $insc = 'SUM(CASE WHEN COALESCE(' . $f . '.inscripcion, 0) IN (1, 2) THEN 1 ELSE 0 END)';
+
+        return 'COUNT(*) AS filas_origen, '
+            . $insc . ' AS total_inscritos, '
+            . 'SUM(CASE WHEN COALESCE(' . $f . '.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_afiliados, '
+            . $insc . ' AS total_anualidad, '
+            . 'SUM(CASE WHEN COALESCE(' . $f . '.carnet, 0) = 1 THEN 1 ELSE 0 END) AS total_carnets, '
+            . 'SUM(CASE WHEN COALESCE(' . $f . '.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS total_traspasos';
+    }
+
     private static function assertAtletasAlias(string $alias): void
     {
         if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $alias)) {

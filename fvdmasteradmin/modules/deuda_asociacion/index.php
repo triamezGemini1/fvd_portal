@@ -57,6 +57,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'actu
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'preparar_torneo_inscripciones') {
+    if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
+        http_response_code(403);
+        $fvd_error = 'Solo el administrador general puede ejecutar esta preparación.';
+    } else {
+        require_once dirname(__DIR__, 3) . '/src/Services/TorneoInscripcionPreparacionService.php';
+        $tidPrep = (int) ($_POST['torneo_id'] ?? 0);
+        $res = \FvdPortal\Services\TorneoInscripcionPreparacionService::prepararTorneo(fvd_db(), $tidPrep);
+        $_SESSION['fvd_preparar_torneo_result'] = $res;
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?msg=preparar_torneo'));
+        exit;
+    }
+}
+
 $fvd_page_title = 'Deudas por asociación';
 $action = $_GET['action'] ?? 'list';
 $tid = isset($_GET['tid']) ? (int) $_GET['tid'] : null;
@@ -95,7 +109,7 @@ if ($action === 'estadisticas_inscripcion') {
     $fvd_page_title = 'Estadísticas origen inscripciones';
     $fvdTorneosSelect = $ctrl->listTorneosParaSelector();
     $tidStats = isset($_GET['tid']) ? (int) $_GET['tid'] : 0;
-    $fvdEstadisticasInscripcion = ['tabla_ok' => false, 'rows' => []];
+    $fvdEstadisticasInscripcion = ['tabla_ok' => false, 'rows' => [], 'fuente' => 'atletas'];
     $fvdTorneoNombreStats = '';
     if ($tidStats > 0) {
         $fvdEstadisticasInscripcion = $ctrl->estadisticasInscripcionOrigenPorTorneo($tidStats);
@@ -145,6 +159,13 @@ if (isset($_SESSION['fvd_deuda_masiva_result'])) {
     $fvd_deuda_masiva_result = $_SESSION['fvd_deuda_masiva_result'];
     unset($_SESSION['fvd_deuda_masiva_result']);
 }
+
+$fvd_preparar_torneo_result = null;
+if (isset($_SESSION['fvd_preparar_torneo_result'])) {
+    $fvd_preparar_torneo_result = $_SESSION['fvd_preparar_torneo_result'];
+    unset($_SESSION['fvd_preparar_torneo_result']);
+}
+$fvdTorneosSelectPreparar = $ctrl->listTorneosParaSelector();
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';

@@ -2,7 +2,7 @@
 /** @var string $selfUrl */
 /** @var list<array<string, mixed>> $fvdTorneosSelect */
 /** @var int $tidStats */
-/** @var array{tabla_ok:bool, rows:list<array<string, mixed>>} $fvdEstadisticasInscripcion */
+/** @var array{tabla_ok:bool, rows:list<array<string, mixed>>, fuente?:string} $fvdEstadisticasInscripcion */
 /** @var string $fvdTorneoNombreStats */
 $fvdTorneosSelect = $fvdTorneosSelect ?? [];
 $tidStats = $tidStats ?? 0;
@@ -11,11 +11,15 @@ $fvdTorneoNombreStats = $fvdTorneoNombreStats ?? '';
 $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 ?>
 
-<h1>Estadísticas por torneo — <code>atletas</code></h1>
+<h1>Estadísticas por torneo — <?= htmlspecialchars(($fvdEstadisticasInscripcion['fuente'] ?? '') === 'inscripcion_torneo' ? 'inscripcion_torneo' : 'atletas', ENT_QUOTES, 'UTF-8') ?></h1>
 <p class="muted" style="font-size:0.875rem;line-height:1.5;margin-bottom:16px">
-    Fichas con <code>torneo_id</code> igual al torneo elegido. Los conteos salen de la misma consulta agregada que el resto de indicadores en <code>atletas</code>
-    (banderas con <code>IFNULL(campo,0)=1</code>). <strong>Inscripción</strong> y <strong>anualidad</strong> muestran el mismo número: inscritos en el torneo
-    (primer torneo del año: quien juega debe pagar anualidad). <strong>Afiliación</strong>, <strong>carnet</strong> y <strong>traspaso</strong> son independientes.
+    <?php if (($fvdEstadisticasInscripcion['fuente'] ?? '') === 'inscripcion_torneo'): ?>
+        Filas del torneo en <code>inscripcion_torneo</code>. <code>inscripcion</code> en 1 o 2 cuenta como inscrito al evento (sitio o movimiento).
+        <strong>Inscripción</strong> y <strong>anualidad</strong> muestran el mismo conteo de filas inscritas; <strong>afiliación</strong>, <strong>carnet</strong> y <strong>traspaso</strong> son independientes por columna.
+    <?php else: ?>
+        Fichas con <code>torneo_id</code> igual al torneo elegido (legado). Conteos con banderas en <code>atletas</code>.
+        <strong>Inscripción</strong> y <strong>anualidad</strong> muestran el mismo número: inscritos en el torneo.
+    <?php endif; ?>
     <strong>No</strong> se calculan montos ni deudas aquí. Fuera de las ventanas de calendario del torneo, delegados y asociaciones solo pueden <strong>consultar</strong> esta información.
 </p>
 <?php if (!$fvd_admin): ?>
@@ -48,7 +52,8 @@ $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
     <?php if (!$fvdEstadisticasInscripcion['tabla_ok']): ?>
         <p class="fvd-mod-msg">No está disponible la tabla <code>atletas</code> en esta base.</p>
     <?php elseif (($fvdEstadisticasInscripcion['rows'] ?? []) === []): ?>
-        <p class="fvd-mod-msg">No hay atletas con <code>torneo_id</code> de este torneo<?= $fvd_admin ? '' : ' en su asociación' ?>.</p>
+        <p class="fvd-mod-msg">No hay datos para este torneo<?= $fvd_admin ? '' : ' en su asociación' ?>
+            <?= ($fvdEstadisticasInscripcion['fuente'] ?? '') === 'inscripcion_torneo' ? '(tabla <code>inscripcion_torneo</code>)' : '(<code>atletas.torneo_id</code>)' ?>.</p>
     <?php else: ?>
         <div class="fvd-mod-table-wrap">
             <table class="fvd-mod-table fvd-mod-table--nowrap">

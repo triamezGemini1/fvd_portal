@@ -2,7 +2,11 @@
 /** @var array $result */
 /** @var string $selfUrl */
 /** @var array<string, mixed>|null $fvd_deuda_masiva_result */
+/** @var array<string, mixed>|null $fvd_preparar_torneo_result */
+/** @var list<array<string, mixed>> $fvdTorneosSelectPreparar */
 $fvd_deuda_masiva_result = $fvd_deuda_masiva_result ?? null;
+$fvd_preparar_torneo_result = $fvd_preparar_torneo_result ?? null;
+$fvdTorneosSelectPreparar = $fvdTorneosSelectPreparar ?? [];
 $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 $confirmMasivo = $fvd_admin
     ? '¿Sincronizar estados de cuenta para todas las asociaciones?'
@@ -24,12 +28,19 @@ $fmtInt = static function ($value): string {
 ?>
 
 <h1>Finanzas — Estados de cuenta por torneo y asociación</h1>
-<p>Relación de <code>deuda_asociaciones</code>: una fila por torneo + asociación, con totales de conceptos (desde sincronización con <code>atletas</code>) y pagos acumulados.</p>
+<p>Relación de <code>deuda_asociaciones</code>: una fila por torneo + asociación, con totales de conceptos (sincronización desde <code>inscripcion_torneo</code> si existe la tabla; si no, desde <code>atletas</code>) y pagos acumulados.</p>
 <p style="font-size:0.8125rem;margin:8px 0 12px;line-height:1.45">
-    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>">Estadísticas por torneo (<code>atletas</code>)</a>
-    — conteos por asociación y renglón (banderas en <code>atletas</code>), sin calcular deudas. La sincronización de montos en esta pantalla usa la misma fuente.
+    <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>">Estadísticas por torneo</a>
+    — conteos por asociación desde <code>inscripcion_torneo</code> (preferido) o <code>atletas.torneo_id</code>. La sincronización de montos usa la misma fuente que el generador de deuda.
 </p>
 <?php if (!empty($fvd_error)): ?><p class="fvd-mod-msg"><?= htmlspecialchars($fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+<?php if (($_GET['msg'] ?? '') === 'preparar_torneo' && is_array($fvd_preparar_torneo_result)): ?>
+    <p class="fvd-mod-msg" style="color:#166534;">
+        Preparación de torneo: notificaciones marcadas <strong><?= (int) ($fvd_preparar_torneo_result['notificaciones_marcadas'] ?? 0) ?></strong>;
+        filas de movimiento sincronizadas <strong><?= (int) ($fvd_preparar_torneo_result['filas_sincronizadas'] ?? 0) ?></strong>
+        (<?= (int) ($fvd_preparar_torneo_result['asociaciones'] ?? 0) ?> asociación(es)).
+    </p>
+<?php endif; ?>
 <?php if (($_GET['msg'] ?? '') === 'deuda_actualizada'): ?><p class="fvd-mod-msg" style="color:#166534;">Deuda actualizada desde atletas.</p><?php endif; ?>
 <?php if (($_GET['msg'] ?? '') === 'deuda_masiva' && is_array($fvd_deuda_masiva_result)): ?>
     <?php
@@ -52,11 +63,11 @@ $fmtInt = static function ($value): string {
     </p>
     <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--fvd-muted,#64748b);line-height:1.45">
         <?php if ($fvd_admin): ?>
-            Recalcula montos desde la tabla <strong>atletas</strong> (destino del portal) para <strong>todas las asociaciones</strong> con fila de deuda (torneos no finalizados).
+            Recalcula montos desde <strong>inscripcion_torneo</strong> (si existe) o <strong>atletas</strong> para <strong>todas las asociaciones</strong> con fila de deuda (torneos no finalizados).
         <?php else: ?>
-            Recalcula desde <strong>atletas</strong> solo para <strong>su asociación</strong> (torneos con deuda y no finalizados).
+            Recalcula desde la misma fuente que el generador solo para <strong>su asociación</strong> (torneos con deuda y no finalizados).
         <?php endif; ?>
-        Para ver totales según la tabla de <strong>inscripciones</strong> (origen), use el enlace de estadísticas arriba.
+        Use el enlace de estadísticas arriba para el desglose por renglón.
     </p>
     <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl), ENT_QUOTES, 'UTF-8') ?>" style="display:inline;margin:0" onsubmit="return confirm(<?= json_encode($confirmMasivo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>);">
         <input type="hidden" name="_action" value="actualizar_deudas_masivo">
@@ -70,6 +81,35 @@ $fmtInt = static function ($value): string {
         </button>
     </form>
 </div>
+
+<?php if ($fvd_admin && $fvdTorneosSelectPreparar !== []): ?>
+<div class="fvd-deuda-toolbar" style="margin:12px 0;padding:12px;border:1px solid var(--fvd-border,#e5e7eb);border-radius:8px;background:#f0fdf4">
+    <p style="margin:0 0 8px;font-size:0.875rem;font-weight:600">Antes de abrir inscripciones (solo administración general)</p>
+    <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--fvd-muted,#64748b);line-height:1.45">
+        Marca como vistas las notificaciones de delegados para el torneo y ejecuta la sincronización de filas de <strong>movimiento</strong> (canal <code>inscripcion=2</code> en <code>inscripcion_torneo</code>) con los datos actuales de <code>atletas</code>.
+    </p>
+    <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl), ENT_QUOTES, 'UTF-8') ?>" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end"
+          onsubmit="return confirm('¿Procesar notificaciones y sincronizar movimientos para el torneo elegido?');">
+        <input type="hidden" name="_action" value="preparar_torneo_inscripciones">
+        <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
+        <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
+        <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.875rem">
+            <span>Torneo</span>
+            <select name="torneo_id" required style="min-width:220px;padding:6px 8px">
+                <option value="">— Elija torneo —</option>
+                <?php foreach ($fvdTorneosSelectPreparar as $t): ?>
+                    <?php $tidOpt = (int) ($t['id'] ?? 0); ?>
+                    <option value="<?= $tidOpt ?>"><?= htmlspecialchars((string) ($t['nombre'] ?? $tidOpt), ENT_QUOTES, 'UTF-8') ?> (<?= $tidOpt ?>)</option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <button type="submit" class="fvd-btn fvd-btn--primary" style="padding:8px 18px;font-size:0.9rem">Preparar inscripciones</button>
+    </form>
+</div>
+<?php endif; ?>
 
 <div class="fvd-mod-table-wrap" style="overflow-x:auto">
     <table class="fvd-mod-table fvd-mod-table--nowrap" style="font-size:0.78rem">
@@ -113,7 +153,7 @@ $fmtInt = static function ($value): string {
                         <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
                         <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
                         <?php endif; ?>
-                        <button type="submit" class="fvd-btn fvd-btn--secondary" style="padding:4px 10px;font-size:0.85rem;vertical-align:middle" title="Recalcular montos desde atletas (destino portal), no desde inscripcion_torneo">Sincronizar</button>
+                        <button type="submit" class="fvd-btn fvd-btn--secondary" style="padding:4px 10px;font-size:0.85rem;vertical-align:middle" title="Recalcular montos (inscripcion_torneo si existe; si no, atletas)">Sincronizar</button>
                     </form>
                     <?php if ($fvd_admin): ?>
                         &nbsp;|&nbsp;<a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=delete&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id']), ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar deuda?');">Eliminar</a>

@@ -8,14 +8,12 @@ use PDO;
 use PDOException;
 
 /**
- * Conteos por concepto y asociación leyendo solo {@see atletas} para el torneo dado (`torneo_id`).
- * Las expresiones SUM coinciden con {@see QueryHelper::sqlSelectMetricasTorneoPorAsociacion}
- * (misma base que indicadores globales; inscripción y anualidad comparten conteo de inscritos).
- * No calcula montos ni deuda.
+ * Conteos por concepto y asociación para un torneo. Preferencia: tabla `inscripcion_torneo` (inscritos al evento);
+ * si no existe, `atletas` con `torneo_id` (legado / bandera).
  */
 final class InscripcionTorneoEstadisticasService
 {
-    public static function tablaExiste(PDO $pdo): bool
+    public static function tablaAtletasExiste(PDO $pdo): bool
     {
         try {
             $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
@@ -29,14 +27,42 @@ final class InscripcionTorneoEstadisticasService
 
             return (bool) $st->fetchColumn();
         } catch (PDOException $e) {
-            error_log('[InscripcionTorneoEstadisticasService] tablaExiste: ' . $e->getMessage());
+            error_log('[InscripcionTorneoEstadisticasService] tablaAtletasExiste: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
+    public static function tablaInscripcionTorneoExiste(PDO $pdo): bool
+    {
+        try {
+            $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+            if ($db === false || $db === null || $db === '') {
+                return false;
+            }
+            $st = $pdo->prepare(
+                'SELECT 1 FROM information_schema.tables WHERE table_schema = :db AND table_name = :t LIMIT 1'
+            );
+            $st->execute([':db' => (string) $db, ':t' => 'inscripcion_torneo']);
+
+            return (bool) $st->fetchColumn();
+        } catch (PDOException $e) {
+            error_log('[InscripcionTorneoEstadisticasService] tablaInscripcionTorneoExiste: ' . $e->getMessage());
 
             return false;
         }
     }
 
     /**
-     * @param array<string, mixed> $params Debe incluir :tid; el alcance delegado añade :fvd_asoc_scope sobre `a.asociacion`
+     * @deprecated Use {@see tablaAtletasExiste}
+     */
+    public static function tablaExiste(PDO $pdo): bool
+    {
+        return self::tablaAtletasExiste($pdo);
+    }
+
+    /**
+     * @param array<string, mixed> $params Debe incluir :tid; el alcance delegado añade :fvd_asoc_scope sobre la columna de asociación
      *
      * @return list<array<string, mixed>>
      */
@@ -44,6 +70,51 @@ final class InscripcionTorneoEstadisticasService
     {
         require_once dirname(__DIR__, 2) . '/src/Services/QueryHelper.php';
 
+        if (self::tablaInscripcionTorneoExiste($pdo)) {
+            return self::estadisticasDesdeInscripcionTorneo($pdo, $asociacionScopeSql, $params);
+        }
+
+        return self::estadisticasDesdeAtletasTorneoId($pdo, $asociacionScopeSql, $params);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function estadisticasDesdeInscripcionTorneo(PDO $pdo, string $asociacionScopeSql, array $params): array
+    {
+        $metricas = \FvdPortal\Services\QueryHelper::sqlSelectMetricasTorneoPorInscripcionTorneo('it');
+        $scopeSql = str_replace('a.asociacion', 'it.asociacion_id', $asociacionScopeSql);
+        $sql = 'SELECT it.asociacion_id AS asociacion_id,
+                MAX(COALESCE(NULLIF(TRIM(s.nombre), \'\'), \'Sin nombre\')) AS asoc_nombre,
+                ' . $metricas . '
+            FROM inscripcion_torneo it
+            LEFT JOIN asociaciones s ON s.id = it.asociacion_id
+            WHERE it.torneo_id = :tid ' . $scopeSql . '
+            GROUP BY it.asociacion_id
+            ORDER BY asoc_nombre ASC';
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute($params);
+
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+            return is_array($rows) ? $rows : [];
+        } catch (PDOException $e) {
+            error_log('[InscripcionTorneoEstadisticasService] estadisticasDesdeInscripcionTorneo: ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function estadisticasDesdeAtletasTorneoId(PDO $pdo, string $asociacionScopeSql, array $params): array
+    {
         $metricas = \FvdPortal\Services\QueryHelper::sqlSelectMetricasTorneoPorAsociacion('a');
         $sql = 'SELECT a.asociacion AS asociacion_id,
                 MAX(COALESCE(NULLIF(TRIM(s.nombre), \'\'), \'Sin nombre\')) AS asoc_nombre,
@@ -61,7 +132,7 @@ final class InscripcionTorneoEstadisticasService
 
             return is_array($rows) ? $rows : [];
         } catch (PDOException $e) {
-            error_log('[InscripcionTorneoEstadisticasService] estadisticasPorTorneoAgrupadas: ' . $e->getMessage());
+            error_log('[InscripcionTorneoEstadisticasService] estadisticasDesdeAtletasTorneoId: ' . $e->getMessage());
 
             return [];
         }

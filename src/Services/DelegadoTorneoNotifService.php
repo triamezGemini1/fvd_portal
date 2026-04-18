@@ -333,4 +333,28 @@ final class DelegadoTorneoNotifService
             error_log('[DelegadoTorneoNotifService] marcarVisto: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Marca como vistas todas las notificaciones pendientes de un torneo (uso administrador FVD antes de abrir inscripciones).
+     */
+    public static function marcarTodasVistasParaTorneo(PDO $pdo, int $torneoId): int
+    {
+        if ($torneoId <= 0) {
+            return 0;
+        }
+        self::ensureTable($pdo);
+        try {
+            $st = $pdo->prepare(
+                'UPDATE fvd_delegado_notif_torneo SET visto_en = COALESCE(visto_en, NOW())
+                 WHERE torneo_id = :t AND visto_en IS NULL'
+            );
+            $st->execute([':t' => $torneoId]);
+
+            return $st->rowCount();
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] marcarTodasVistasParaTorneo: ' . $e->getMessage());
+
+            return 0;
+        }
+    }
 }

@@ -259,9 +259,8 @@ class DeudaAsociacionController extends FvdModuleController
     }
 
     /**
-     * Recalcula la deuda del torneo+asociación desde `atletas`: cuenta marcas en inscripción, afiliación,
-     * carnet, traspaso y anualidad; aplica precios de la última fila de `costos` y persiste en `deuda_asociaciones`.
-     * Así, altas/bajas o cambios de conceptos en atletas se reflejan en el estado de cuenta al ejecutar este procedimiento.
+     * Recalcula la deuda del torneo+asociación desde `inscripcion_torneo` (si existe la tabla) o desde `atletas`:
+     * cuenta marcas por concepto; aplica precios de la última fila de `costos` y persiste en `deuda_asociaciones`.
      */
     public function actualizarDeudaDesdeAtletas(int $torneoId, int $asociacionId): void
     {
@@ -394,18 +393,22 @@ class DeudaAsociacionController extends FvdModuleController
     }
 
     /**
-     * Estadísticas solo lectura desde `atletas` (torneo_id del torneo), por asociación.
-     * Métricas: {@see \FvdPortal\Services\QueryHelper::sqlSelectMetricasTorneoPorAsociacion}.
+     * Estadísticas solo lectura por torneo: preferencia `inscripcion_torneo`; si no existe la tabla, `atletas.torneo_id`.
+     * Métricas: {@see \FvdPortal\Services\QueryHelper::sqlSelectMetricasTorneoPorInscripcionTorneo} o
+     * {@see \FvdPortal\Services\QueryHelper::sqlSelectMetricasTorneoPorAsociacion}.
      *
-     * @return array{tabla_ok:bool, rows:list<array<string, mixed>>}
+     * @return array{tabla_ok:bool, rows:list<array<string, mixed>>, fuente: 'inscripcion_torneo'|'atletas'}
      */
     public function estadisticasInscripcionOrigenPorTorneo(int $torneoId): array
     {
         require_once $this->projectRoot() . '/src/Services/InscripcionTorneoEstadisticasService.php';
-        if (!\FvdPortal\Services\InscripcionTorneoEstadisticasService::tablaExiste($this->pdo)) {
+        $tieneIt = \FvdPortal\Services\InscripcionTorneoEstadisticasService::tablaInscripcionTorneoExiste($this->pdo);
+        $tieneA = \FvdPortal\Services\InscripcionTorneoEstadisticasService::tablaAtletasExiste($this->pdo);
+        if (!$tieneIt && !$tieneA) {
             return [
                 'tabla_ok' => false,
                 'rows' => [],
+                'fuente' => 'atletas',
             ];
         }
         $params = [':tid' => $torneoId];
@@ -415,6 +418,7 @@ class DeudaAsociacionController extends FvdModuleController
         return [
             'tabla_ok' => true,
             'rows' => $rows,
+            'fuente' => $tieneIt ? 'inscripcion_torneo' : 'atletas',
         ];
     }
 }

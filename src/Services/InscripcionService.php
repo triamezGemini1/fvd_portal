@@ -26,6 +26,12 @@ final class InscripcionService
 
     public const CLASE_EQUIPOS = 3;
 
+    /** Columna `inscripcion` en `inscripcion_torneo`: confirmado en sitio (MisTorneos / panel). */
+    public const CANAL_INSCRIPCION_SITIO = 1;
+
+    /** Columna `inscripcion` en `inscripcion_torneo`: cargado por movimiento (sincronizado desde `atletas`). */
+    public const CANAL_INSCRIPCION_MOVIMIENTO = 2;
+
     /**
      * Modo bandera: cambios en `atletas.inscripcion` / `torneo_id` sin pasar por FvdAdminService.
      * Recalcula `deuda_asociaciones` desde conteos; no debe interrumpir el flujo de inscripción.
@@ -39,6 +45,21 @@ final class InscripcionService
             DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion($pdo, $torneoId, $asociacionId);
         } catch (Throwable $e) {
             error_log('[InscripcionService] sincronizarDeudaBandera: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Recalcula `deuda_asociaciones` desde la tabla de inscripción al torneo (cuando existe).
+     */
+    private static function sincronizarDeudaTabla(PDO $pdo, int $torneoId, int $asociacionId): void
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return;
+        }
+        try {
+            DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion($pdo, $torneoId, $asociacionId);
+        } catch (Throwable $e) {
+            error_log('[InscripcionService] sincronizarDeudaTabla: ' . $e->getMessage());
         }
     }
 
@@ -116,7 +137,8 @@ final class InscripcionService
     {
         try {
             $st = $pdo->prepare(
-                'SELECT COUNT(*) FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a'
+                'SELECT COUNT(*) FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a
+                 AND COALESCE(inscripcion, 0) IN (' . self::CANAL_INSCRIPCION_SITIO . ', ' . self::CANAL_INSCRIPCION_MOVIMIENTO . ')'
             );
             $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
             $n = $st->fetchColumn();
@@ -232,7 +254,7 @@ final class InscripcionService
     public static function atletaEnAsociacion(PDO $pdo, int $atletaId, int $asociacionId): array
     {
         $st = $pdo->prepare(
-            'SELECT id, cedula, nombre, sexo, numfvd, asociacion, estatus, afiliacion, anualidad, inscripcion, torneo_id FROM atletas WHERE id = :id AND asociacion = :asoc LIMIT 1'
+            'SELECT id, cedula, nombre, sexo, numfvd, asociacion, estatus, afiliacion, anualidad, carnet, traspaso, inscripcion, torneo_id FROM atletas WHERE id = :id AND asociacion = :asoc LIMIT 1'
         );
         $st->execute([':id' => $atletaId, ':asoc' => $asociacionId]);
         $a = $st->fetch(PDO::FETCH_ASSOC);
@@ -249,10 +271,11 @@ final class InscripcionService
             throw new InvalidArgumentException('Cédula numérica inválida para inscripción.');
         }
         $st = $pdo->prepare(
-            'SELECT 1 FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c LIMIT 1'
+            'SELECT COALESCE(inscripcion, 0) FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c LIMIT 1'
         );
         $st->execute([':t' => $torneoId, ':a' => $asociacionId, ':c' => $cedulaNum]);
-        if ($st->fetchColumn()) {
+        $ins = $st->fetchColumn();
+        if ($ins !== false && $ins !== null && (int) $ins === self::CANAL_INSCRIPCION_SITIO) {
             throw new InvalidArgumentException('Esta cédula ya está inscrita en el torneo para su asociación.');
         }
     }
@@ -260,17 +283,21 @@ final class InscripcionService
     /**
      * Fila existente por cédula o null.
      *
-     * @return array{cedula:int, equipo:int}|null
+     * @return array{cedula:int, equipo:int, inscripcion:int}|null
      */
     public static function filaInscripcionPorCedula(PDO $pdo, int $torneoId, int $asociacionId, int $cedulaNum): ?array
     {
         $st = $pdo->prepare(
-            'SELECT cedula, equipo FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c LIMIT 1'
+            'SELECT cedula, equipo, COALESCE(inscripcion, 0) AS inscripcion FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c LIMIT 1'
         );
         $st->execute([':t' => $torneoId, ':a' => $asociacionId, ':c' => $cedulaNum]);
         $r = $st->fetch(PDO::FETCH_ASSOC);
 
-        return $r !== false ? ['cedula' => (int) $r['cedula'], 'equipo' => (int) ($r['equipo'] ?? 0)] : null;
+        return $r !== false ? [
+            'cedula' => (int) $r['cedula'],
+            'equipo' => (int) ($r['equipo'] ?? 0),
+            'inscripcion' => (int) ($r['inscripcion'] ?? 0),
+        ] : null;
     }
 
     public static function validarIndividual(PDO $pdo, int $atletaId, int $torneoId, int $asociacionId): void
@@ -404,9 +431,10 @@ final class InscripcionService
     {
         $ins = $pdo->prepare(
             'INSERT INTO inscripcion_torneo (asociacion_id, torneo_id, equipo, cedula, nombre, numfvd, sexo, inscripcion)
-            VALUES (:asoc, :tor, :eq, :ced, :nom, :nf, :sx, 1)'
+            VALUES (:asoc, :tor, :eq, :ced, :nom, :nf, :sx, ' . self::CANAL_INSCRIPCION_SITIO . ')'
         );
         $n = 0;
+        $huboAltasNuevas = false;
         foreach ($atletaIds as $rawId) {
             $id = (int) $rawId;
             if ($id <= 0) {
@@ -424,6 +452,22 @@ final class InscripcionService
             }
             $sxRaw = strtoupper(trim((string) ($a['sexo'] ?? '')));
             $sx = $sxRaw === 'F' || $sxRaw === '2' ? 2 : 1;
+
+            $prev = self::filaInscripcionPorCedula($pdo, $torneoId, $asociacionId, $ced);
+            if ($prev !== null && (int) ($prev['equipo'] ?? 0) === $equipo) {
+                $canal = (int) ($prev['inscripcion'] ?? 0);
+                if ($equipo === 0 && $canal === self::CANAL_INSCRIPCION_MOVIMIENTO) {
+                    if (self::confirmarInscripcionSitioIndividualDesdeTabla($pdo, $torneoId, $asociacionId, $id)) {
+                        ++$n;
+                    }
+
+                    continue;
+                }
+                if ($canal === self::CANAL_INSCRIPCION_SITIO) {
+                    continue;
+                }
+            }
+
             try {
                 $ins->execute([
                     ':asoc' => $asociacionId,
@@ -435,6 +479,7 @@ final class InscripcionService
                     ':sx' => $sx,
                 ]);
                 ++$n;
+                $huboAltasNuevas = true;
             } catch (PDOException $e) {
                 $em = $e->getMessage();
                 if (strpos($em, 'Duplicate') !== false || strpos($em, '1062') !== false) {
@@ -442,6 +487,112 @@ final class InscripcionService
                 }
                 throw $e;
             }
+        }
+        if ($huboAltasNuevas) {
+            self::sincronizarDeudaTabla($pdo, $torneoId, $asociacionId);
+        }
+
+        return $n;
+    }
+
+    /**
+     * Fila previa de movimiento (canal 2): pasa a confirmación en sitio (1) y copia conceptos desde `atletas`.
+     * Si `atletas.estatus` = 9, fuerza `anualidad` = 1 en la fila del torneo.
+     */
+    public static function confirmarInscripcionSitioIndividualDesdeTabla(PDO $pdo, int $torneoId, int $asociacionId, int $atletaId): bool
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0 || $atletaId <= 0) {
+            return false;
+        }
+        $row = self::atletaEnAsociacion($pdo, $atletaId, $asociacionId);
+        $ced = self::cedulaNumerica($row);
+        if ($ced <= 0) {
+            return false;
+        }
+        $st = $pdo->prepare(
+            'SELECT COALESCE(inscripcion, 0) FROM inscripcion_torneo
+             WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c AND equipo = 0 LIMIT 1'
+        );
+        $st->execute([':t' => $torneoId, ':a' => $asociacionId, ':c' => $ced]);
+        $insCol = $st->fetchColumn();
+        if ($insCol === false || $insCol === null || (int) $insCol !== self::CANAL_INSCRIPCION_MOVIMIENTO) {
+            return false;
+        }
+
+        $sxRaw = strtoupper(trim((string) ($row['sexo'] ?? '')));
+        $sx = $sxRaw === 'F' || $sxRaw === '2' ? 2 : 1;
+        $est = (int) ($row['estatus'] ?? 0);
+        $anu = $est === 9 ? 1 : (int) ($row['anualidad'] ?? 0);
+
+        $upd = $pdo->prepare(
+            'UPDATE inscripcion_torneo SET
+                inscripcion = :ins,
+                nombre = :nom,
+                numfvd = :nf,
+                sexo = :sx,
+                afiliacion = :afi,
+                carnet = :car,
+                traspaso = :tra,
+                anualidad = :anu
+             WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c AND equipo = 0
+               AND COALESCE(inscripcion, 0) = :mov'
+        );
+        $upd->execute([
+            ':ins' => self::CANAL_INSCRIPCION_SITIO,
+            ':nom' => (string) ($row['nombre'] ?? ''),
+            ':nf' => (int) ($row['numfvd'] ?? 0),
+            ':sx' => $sx,
+            ':afi' => (int) ($row['afiliacion'] ?? 0),
+            ':car' => (int) ($row['carnet'] ?? 0),
+            ':tra' => (int) ($row['traspaso'] ?? 0),
+            ':anu' => $anu,
+            ':t' => $torneoId,
+            ':a' => $asociacionId,
+            ':c' => $ced,
+            ':mov' => self::CANAL_INSCRIPCION_MOVIMIENTO,
+        ]);
+        $ok = $upd->rowCount() > 0;
+        if ($ok) {
+            self::sincronizarDeudaTabla($pdo, $torneoId, $asociacionId);
+        }
+
+        return $ok;
+    }
+
+    /**
+     * Actualiza filas de movimiento (canal 2) con datos actuales de `atletas` (misma cédula / asociación).
+     *
+     * @return int Filas actualizadas
+     */
+    public static function sincronizarMovimientosDesdeAtletas(PDO $pdo, int $torneoId, int $asociacionId): int
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return 0;
+        }
+        $mov = self::CANAL_INSCRIPCION_MOVIMIENTO;
+        $sql = 'UPDATE inscripcion_torneo it
+            INNER JOIN atletas a ON a.asociacion = it.asociacion_id
+                AND REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(a.cedula)), \'V\', \'\'), \'E\', \'\'), \'J\', \'\'), \'P\', \'\') = CAST(it.cedula AS CHAR)
+            SET it.nombre = COALESCE(a.nombre, it.nombre),
+                it.numfvd = COALESCE(a.numfvd, it.numfvd),
+                it.sexo = CASE WHEN UPPER(TRIM(a.sexo)) IN (\'F\', \'2\') THEN 2 ELSE 1 END,
+                it.afiliacion = COALESCE(a.afiliacion, 0),
+                it.anualidad = COALESCE(a.anualidad, 0),
+                it.carnet = COALESCE(a.carnet, 0),
+                it.traspaso = COALESCE(a.traspaso, 0),
+                it.inscripcion = ' . $mov . '
+            WHERE it.torneo_id = :t AND it.asociacion_id = :a AND COALESCE(it.inscripcion, 0) = ' . $mov;
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+            $n = $st->rowCount();
+        } catch (Throwable $e) {
+            error_log('[InscripcionService] sincronizarMovimientosDesdeAtletas: ' . $e->getMessage());
+
+            return 0;
+        }
+        if ($n > 0) {
+            self::sincronizarDeudaTabla($pdo, $torneoId, $asociacionId);
         }
 
         return $n;
@@ -998,12 +1149,19 @@ final class InscripcionService
                 return ['resultado' => 'ya_inscrito', 'mensaje' => 'Esta cédula ya está inscrita en este torneo.'];
             }
         } else {
-            $stY = $pdo->prepare(
-                'SELECT 1 FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c LIMIT 1'
+            $stIt = $pdo->prepare(
+                'SELECT COALESCE(inscripcion, 0) FROM inscripcion_torneo WHERE torneo_id = :t AND asociacion_id = :a AND cedula = :c LIMIT 1'
             );
-            $stY->execute([':t' => $torneoId, ':a' => $asociacionId, ':c' => $cedInt]);
-            if ($stY->fetchColumn()) {
-                return ['resultado' => 'ya_inscrito', 'mensaje' => 'Esta cédula ya está inscrita en este torneo.'];
+            $stIt->execute([':t' => $torneoId, ':a' => $asociacionId, ':c' => $cedInt]);
+            $canalIt = $stIt->fetchColumn();
+            if ($canalIt !== false && $canalIt !== null) {
+                $canal = (int) $canalIt;
+                if ($canal === self::CANAL_INSCRIPCION_SITIO) {
+                    return ['resultado' => 'ya_inscrito', 'mensaje' => 'Esta cédula ya está inscrita en este torneo.'];
+                }
+                if ($canal === self::CANAL_INSCRIPCION_MOVIMIENTO) {
+                    // Hay preinscripción por movimiento: se confirma en sitio con el flujo de inscribir (canal → 1).
+                }
             }
         }
 

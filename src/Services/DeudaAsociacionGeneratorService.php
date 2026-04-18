@@ -12,8 +12,8 @@ use RuntimeException;
  * Genera o actualiza una fila en deuda_asociaciones a partir de atletas del club en un torneo
  * y la última fila de tarifas en costos (productos: cantidad × precio unitario).
  *
- * **Actualizar deuda (estado de cuenta):** cada ejecución vuelve a leer la tabla `atletas`
- * para el par `torneo_id` + `asociacion`, contando filas con marca 1 en cada concepto:
+ * **Actualizar deuda (estado de cuenta):** si existe `inscripcion_torneo`, cada ejecución cuenta allí;
+ * si no, lee `atletas` para el par `torneo_id` + `asociacion`, con marca 1 en cada concepto:
  * `inscripcion`, `afiliacion`, `carnet`, `traspaso`, `anualidad`. Cualquier alta o baja
  * (p. ej. marcar/desmarcar conceptos o retirar de la competencia) se refleja al pulsar
  * actualizar en el módulo de deudas, siempre que exista tarifa en `costos`.
@@ -80,6 +80,30 @@ final class DeudaAsociacionGeneratorService
     }
 
     /**
+     * Si existe la tabla `inscripcion_torneo`, los conteos de deuda por torneo/asociación
+     * se calculan sobre esa tabla (filas de inscripción); si no, sobre `atletas` con `torneo_id`.
+     */
+    public static function conteosUsanTablaInscripcionTorneo(PDO $pdo): bool
+    {
+        try {
+            $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
+            if ($db === false || $db === null || $db === '') {
+                return false;
+            }
+            $st = $pdo->prepare(
+                'SELECT 1 FROM information_schema.tables WHERE table_schema = :db AND table_name = :t LIMIT 1'
+            );
+            $st->execute([':db' => (string) $db, ':t' => 'inscripcion_torneo']);
+
+            return (bool) $st->fetchColumn();
+        } catch (PDOException $e) {
+            error_log('[DeudaAsociacionGeneratorService] conteosUsanTablaInscripcionTorneo: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * Conteos entre atletas de la asociación inscritos en el torneo (misma cohorte que torneo_id en ficha).
      *
      * @return array{
@@ -97,6 +121,10 @@ final class DeudaAsociacionGeneratorService
         ];
         if ($torneoId <= 0 || $asociacionId <= 0) {
             return $emptyCounts;
+        }
+
+        if (self::conteosUsanTablaInscripcionTorneo($pdo)) {
+            return self::conteosPorTorneoYAsociacionDesdeInscripcionTorneo($pdo, $torneoId, $asociacionId);
         }
 
         $selects = [];
@@ -125,6 +153,57 @@ final class DeudaAsociacionGeneratorService
         }
 
         return $out;
+    }
+
+    /**
+     * Misma lógica de conceptos que en `atletas`, aplicada a filas de `inscripcion_torneo`.
+     * Columna `inscripcion` en la tabla: 1 = confirmado en sitio, 2 = movimiento (ambos cuentan como inscrito al torneo).
+     *
+     * @return array{
+     *   total_inscritos:int,total_afiliados:int,total_carnets:int,total_traspasos:int,total_anualidad:int
+     * }
+     */
+    public static function conteosPorTorneoYAsociacionDesdeInscripcionTorneo(PDO $pdo, int $torneoId, int $asociacionId): array
+    {
+        $emptyCounts = [
+            'total_inscritos' => 0,
+            'total_afiliados' => 0,
+            'total_carnets' => 0,
+            'total_traspasos' => 0,
+            'total_anualidad' => 0,
+        ];
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return $emptyCounts;
+        }
+
+        $sql = 'SELECT
+            COALESCE(SUM(CASE WHEN COALESCE(it.inscripcion, 0) IN (1, 2) AND COALESCE(it.afiliacion, 0) = 0 THEN 1 ELSE 0 END), 0) AS total_inscritos,
+            COALESCE(SUM(CASE WHEN COALESCE(it.afiliacion, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_afiliados,
+            COALESCE(SUM(CASE WHEN COALESCE(it.carnet, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_carnets,
+            COALESCE(SUM(CASE WHEN COALESCE(it.traspaso, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_traspasos,
+            COALESCE(SUM(CASE WHEN COALESCE(it.anualidad, 0) = 1 AND COALESCE(it.afiliacion, 0) = 1 THEN 1 ELSE 0 END), 0) AS total_anualidad
+            FROM inscripcion_torneo it
+            WHERE it.torneo_id = :tor AND it.asociacion_id = :asoc';
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([':tor' => $torneoId, ':asoc' => $asociacionId]);
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('[DeudaAsociacionGeneratorService] conteosPorTorneoYAsociacionDesdeInscripcionTorneo: ' . $e->getMessage());
+
+            return $emptyCounts;
+        }
+        if ($r === false) {
+            return $emptyCounts;
+        }
+
+        return [
+            'total_inscritos' => (int) ($r['total_inscritos'] ?? 0),
+            'total_afiliados' => (int) ($r['total_afiliados'] ?? 0),
+            'total_carnets'   => (int) ($r['total_carnets'] ?? 0),
+            'total_traspasos' => (int) ($r['total_traspasos'] ?? 0),
+            'total_anualidad' => (int) ($r['total_anualidad'] ?? 0),
+        ];
     }
 
     /**
