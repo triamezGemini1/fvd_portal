@@ -2,7 +2,19 @@
 /** @var array{total:int,page:int,per_page:int,pages:int,rows:list} $result */
 /** @var string $selfUrl */
 /** @var string $q */
+/** @var string $filtroEstatus */
 $fvd_is_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
+$listQs = [];
+if ($result['page'] > 1) {
+    $listQs['page'] = (int) $result['page'];
+}
+if ($q !== '') {
+    $listQs['q'] = $q;
+}
+if ($filtroEstatus !== 'todas') {
+    $listQs['estado'] = $filtroEstatus;
+}
+$listQuerySuffix = $listQs === [] ? '' : '&' . http_build_query($listQs);
 ?>
 
 <h1>Asociaciones</h1>
@@ -14,6 +26,14 @@ $fvd_is_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block">Buscar por nombre</label>
             <input class="fvd-input" type="search" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" placeholder="Nombre" style="max-width:14rem">
+        </div>
+        <div>
+            <label for="asoc-filtro-estado" style="font-size:.8125rem;color:var(--fvd-muted);display:block">Estatus</label>
+            <select class="fvd-input" id="asoc-filtro-estado" name="estado" style="max-width:12rem">
+                <option value="todas"<?= $filtroEstatus === 'todas' ? ' selected' : '' ?>>Todas</option>
+                <option value="activas"<?= $filtroEstatus === 'activas' ? ' selected' : '' ?>>Activas</option>
+                <option value="inactivas"<?= $filtroEstatus === 'inactivas' ? ' selected' : '' ?>>Inactivas</option>
+            </select>
         </div>
         <button type="submit" class="fvd-input" style="width:auto;align-self:flex-end;padding:6px 12px">Buscar</button>
         <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;align-self:flex-end;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
@@ -60,7 +80,7 @@ $fvd_is_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
                     <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Ver</a>
                     &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
                     <?php if ($fvd_is_admin): ?>
-                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=toggle_estatus&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>" title="Conmutar activa/inactiva"><?= $estAs === 1 ? 'Desactivar' : 'Activar' ?></a>
+                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=toggle_estatus&id=' . (int) $r['id'] . $listQuerySuffix, ENT_QUOTES, 'UTF-8') ?>" title="Conmutar activa/inactiva" onclick="return confirm('¿<?= $estAs === 1 ? 'Desactivar' : 'Activar' ?> esta asociación?');"><?= $estAs === 1 ? 'Desactivar' : 'Activar' ?></a>
                         &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar esta asociación?');">Eliminar</a>
                     <?php endif; ?>
                 </td>
@@ -74,12 +94,25 @@ $fvd_is_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 </div>
 
 <?php
-$qArg = $q !== '' ? '&q=' . rawurlencode($q) : '';
 $p = (int) $result['page'];
 $pages = (int) $result['pages'];
+$navBase = [];
+if ($q !== '') {
+    $navBase['q'] = $q;
+}
+if ($filtroEstatus !== 'todas') {
+    $navBase['estado'] = $filtroEstatus;
+}
+$hrefAsocPage = function (int $pg) use ($selfUrl, $navBase): string {
+    $params = $navBase;
+    if ($pg > 1) {
+        $params['page'] = $pg;
+    }
+    return $params === [] ? $selfUrl : $selfUrl . '?' . http_build_query($params);
+};
 ?>
 <nav class="fvd-mod-pager">
     <span><?= (int) $result['total'] ?> reg. · pág. <?= $p ?>/<?= $pages ?></span>
-    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p - 1) . $qArg, ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
-    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p + 1) . $qArg, ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
+    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($hrefAsocPage($p - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
+    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($hrefAsocPage($p + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
 </nav>

@@ -144,7 +144,8 @@ class QueryHelper
 
     /**
      * Aplica el alcance regional a consultas de listado (COUNT y SELECT).
-     * En el SELECT inserta el fragmento antes de ORDER BY si existe.
+     * El fragmento se añade siempre a la cláusula WHERE: antes de GROUP BY si existe;
+     * si no, antes de ORDER BY; si no hay ninguno, al final (equivalente a WHERE).
      *
      * @param array<string, mixed> $params
      */
@@ -157,7 +158,14 @@ class QueryHelper
         $scope = self::asociacionScopeSql($qualifiedColumn, $params);
         $countSql .= $scope;
 
-        if (preg_match('/\s+ORDER\s+BY\s+/i', $dataSql, $m, PREG_OFFSET_CAPTURE)) {
+        if ($scope === '') {
+            return;
+        }
+
+        if (preg_match('/\s+GROUP\s+BY\s+/i', $dataSql, $m, PREG_OFFSET_CAPTURE)) {
+            $pos = $m[0][1];
+            $dataSql = substr($dataSql, 0, $pos) . $scope . ' ' . substr($dataSql, $pos);
+        } elseif (preg_match('/\s+ORDER\s+BY\s+/i', $dataSql, $m, PREG_OFFSET_CAPTURE)) {
             $pos = $m[0][1];
             $dataSql = substr($dataSql, 0, $pos) . $scope . ' ' . substr($dataSql, $pos);
         } else {

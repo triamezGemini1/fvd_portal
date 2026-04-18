@@ -263,10 +263,9 @@ final class StatsService
     }
 
     /**
-     * Conteos en `atletas` para estimados: anualidad solo con <code>anualidad=1</code> y <code>afiliacion=1</code>;
-     * inscripción con <code>inscripcion=1</code> y <code>afiliacion=0</code> (sin duplicar con afiliado).
-     * Resto de conceptos: marca = 1. Montos = conteo × tarifa vigente.
-     * Misma regla que la generación de deuda: última fila de `costos`.
+     * Conteos en `atletas` para estimados: cada indicador se cuenta por separado (marca = 1 en su columna).
+     * Montos = conteo × tarifa vigente (última fila de `costos`). El desglose por asociación respeta el alcance de sesión
+     * (delegado: solo su asociación; admin FVD: todas).
      *
      * @return array{
      *   tarifa: array<string, mixed>|null,
@@ -275,7 +274,7 @@ final class StatsService
      *     montos: array{afiliacion:float,anualidad:float,carnet:float,traspaso:float,inscripcion:float},
      *     monto_total: float
      *   },
-     *   por_asociacion: list<array<string, mixed>> (solo se rellena si la sesión es administrador FVD; si no, lista vacía)
+     *   por_asociacion: list<array<string, mixed>>
      * }
      */
     public static function indicadoresServicioConCostosEstimados(PDO $pdo): array
@@ -284,15 +283,7 @@ final class StatsService
 
         $tarifa = self::ultimaTarifaCostos($pdo);
         $countsTot = QueryHelper::aggregateIndicadoresAtletasTotales($pdo);
-        $rowsAsoc = [];
-        $authSvc = dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
-        if (is_file($authSvc)) {
-            require_once $authSvc;
-            \AuthService::ensureSession();
-            if (\AuthService::isSuperAdmin()) {
-                $rowsAsoc = QueryHelper::aggregateIndicadoresAtletasPorAsociacion($pdo);
-            }
-        }
+        $rowsAsoc = QueryHelper::aggregateIndicadoresAtletasPorAsociacion($pdo);
 
         $totMontos = self::montosIndicadoresDesdeTarifa($tarifa, $countsTot);
         $porAsoc = [];

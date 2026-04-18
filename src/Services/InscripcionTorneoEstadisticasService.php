@@ -9,7 +9,8 @@ use PDOException;
 
 /**
  * Conteos por concepto y asociación leyendo solo {@see atletas} para el torneo dado (`torneo_id`).
- * Renglones: afiliacion, anualidad, carnet, traspaso, inscripcion (inscritos).
+ * Las expresiones SUM coinciden con {@see QueryHelper::sqlSelectMetricasTorneoPorAsociacion}
+ * (misma base que indicadores globales; inscripción y anualidad comparten conteo de inscritos).
  * No calcula montos ni deuda.
  */
 final class InscripcionTorneoEstadisticasService
@@ -41,18 +42,16 @@ final class InscripcionTorneoEstadisticasService
      */
     public static function estadisticasPorTorneoAgrupadas(PDO $pdo, string $asociacionScopeSql, array $params): array
     {
+        require_once dirname(__DIR__, 2) . '/src/Services/QueryHelper.php';
+
+        $metricas = \FvdPortal\Services\QueryHelper::sqlSelectMetricasTorneoPorAsociacion('a');
         $sql = 'SELECT a.asociacion AS asociacion_id,
-                COALESCE(NULLIF(TRIM(s.nombre), \'\'), \'Sin nombre\') AS asoc_nombre,
-                COUNT(*) AS filas_origen,
-                SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) AS total_inscritos,
-                SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_afiliados,
-                SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_anualidad,
-                SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS total_carnets,
-                SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS total_traspasos
+                MAX(COALESCE(NULLIF(TRIM(s.nombre), \'\'), \'Sin nombre\')) AS asoc_nombre,
+                ' . $metricas . '
             FROM atletas a
             LEFT JOIN asociaciones s ON s.id = a.asociacion
             WHERE a.torneo_id = :tid ' . $asociacionScopeSql . '
-            GROUP BY a.asociacion, s.nombre
+            GROUP BY a.asociacion
             ORDER BY asoc_nombre ASC';
         try {
             $st = $pdo->prepare($sql);

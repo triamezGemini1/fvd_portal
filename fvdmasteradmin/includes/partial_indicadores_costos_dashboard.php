@@ -14,9 +14,9 @@ if (!isset($fvdIndicadoresCostos) || !is_array($fvdIndicadoresCostos)) {
     return;
 }
 
-if (!class_exists(\AuthService::class, false)) {
-    require_once dirname(__DIR__) . '/services/AuthService.php';
-}
+require_once dirname(__DIR__, 2) . '/src/Services/IndicadoresTablaDefs.php';
+
+use FvdPortal\Services\IndicadoresTablaDefs;
 
 $ic = $fvdIndicadoresCostos;
 $variant = isset($fvdIndicadoresCostosVariant) && $fvdIndicadoresCostosVariant === 'delegado' ? 'delegado' : 'full';
@@ -27,6 +27,9 @@ $tot = $ic['totales'] ?? [];
 $counts = is_array($tot['counts'] ?? null) ? $tot['counts'] : [];
 $montoGrand = (float) ($tot['monto_total'] ?? 0);
 $porAsoc = is_array($ic['por_asociacion'] ?? null) ? $ic['por_asociacion'] : [];
+
+$fvdIndCols = IndicadoresTablaDefs::columnasMetricas();
+$countsVals = IndicadoresTablaDefs::valoresMetricasInt($counts, 'indicadores dashboard resumen');
 
 $fmtN = static function (float $v): string {
     return \function_exists('fvd_format_contable') ? fvd_format_contable($v) : number_format($v, 2, ',', '.');
@@ -52,9 +55,8 @@ $linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)'
         <?php endif; ?>
     </div>
     <p style="margin:0 0 12px;font-size:.72rem;color:<?= htmlspecialchars($mutedColor, ENT_QUOTES, 'UTF-8') ?>;line-height:1.45">
-        <strong>Anualidad:</strong> <code>anualidad=1</code> y <code>afiliacion=1</code>.
-        <strong>Inscritos:</strong> <code>inscripcion=1</code> y <code>afiliacion=0</code> (no se duplica con afiliado).
-        <strong>Afiliados, carnet, traspaso:</strong> renglón en <strong>1</strong>. Montos = conteo × última tarifa en <code>costos</code><?= $fechaTar !== '' ? ' (fecha ' . htmlspecialchars($fechaTar, ENT_QUOTES, 'UTF-8') . ')' : '' ?>.
+        Cada columna cuenta atletas con ese campo en <strong>1</strong>, de forma independiente (sin filtrar por otros indicadores).
+        Montos = conteo × última tarifa en <code>costos</code><?= $fechaTar !== '' ? ' (fecha ' . htmlspecialchars($fechaTar, ENT_QUOTES, 'UTF-8') . ')' : '' ?>.
         <?php if ($tarifa === null): ?><strong style="color:#f87171"> No hay filas en <code>costos</code>; solo se muestran cantidades.</strong><?php endif; ?>
     </p>
 
@@ -63,31 +65,25 @@ $linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)'
             <thead>
             <tr>
                 <th scope="col"><?= $variant === 'delegado' ? 'Resumen' : 'Ámbito' ?></th>
-                <th scope="col" style="text-align:right">Atletas</th>
-                <th scope="col" style="text-align:right">Afiliados</th>
-                <th scope="col" style="text-align:right">Anualidad</th>
-                <th scope="col" style="text-align:right">Carnets</th>
-                <th scope="col" style="text-align:right">Traspaso</th>
-                <th scope="col" style="text-align:right">Inscritos</th>
+                <?php foreach ($fvdIndCols as $col): ?>
+                <th scope="col" style="text-align:right" title="<?= htmlspecialchars($col['title'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($col['label'], ENT_QUOTES, 'UTF-8') ?></th>
+                <?php endforeach; ?>
                 <th scope="col" style="text-align:right">Total est.</th>
             </tr>
             </thead>
             <tbody>
             <tr>
                 <th scope="row">General</th>
-                <td style="text-align:right"><?= (int) ($counts['total_atletas'] ?? 0) ?></td>
-                <td style="text-align:right"><?= (int) ($counts['afiliacion'] ?? 0) ?></td>
-                <td style="text-align:right"><?= (int) ($counts['anualidad'] ?? 0) ?></td>
-                <td style="text-align:right"><?= (int) ($counts['carnet'] ?? 0) ?></td>
-                <td style="text-align:right"><?= (int) ($counts['traspaso'] ?? 0) ?></td>
-                <td style="text-align:right"><?= (int) ($counts['inscripcion'] ?? 0) ?></td>
+                <?php foreach ($fvdIndCols as $col): ?>
+                <td style="text-align:right"><?= (int) ($countsVals[$col['key']] ?? 0) ?></td>
+                <?php endforeach; ?>
                 <td style="text-align:right;font-weight:600"><?= $fmtN($montoGrand) ?></td>
             </tr>
             </tbody>
         </table>
     </div>
 
-    <?php if ($porAsoc !== [] && \AuthService::isSuperAdmin()): ?>
+    <?php if ($porAsoc !== []): ?>
     <h3 style="margin:0 0 8px;font-size:.85rem">Por asociación</h3>
     <div style="overflow-x:auto;max-height:min(48vh,520px);overflow-y:auto">
         <table class="fvd-mod-table" style="font-size:<?= $variant === 'delegado' ? '.75rem' : '.78rem' ?>">
@@ -95,27 +91,25 @@ $linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)'
             <tr>
                 <th scope="col">ID</th>
                 <th scope="col">Asociación</th>
-                <th scope="col" style="text-align:right">Atletas</th>
-                <th scope="col" style="text-align:right">Afil.</th>
-                <th scope="col" style="text-align:right">Anual.</th>
-                <th scope="col" style="text-align:right">Carn.</th>
-                <th scope="col" style="text-align:right">Trasp.</th>
-                <th scope="col" style="text-align:right">Insc.</th>
+                <?php foreach ($fvdIndCols as $col): ?>
+                <th scope="col" style="text-align:right" title="<?= htmlspecialchars($col['title'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($col['labelShort'], ENT_QUOTES, 'UTF-8') ?></th>
+                <?php endforeach; ?>
                 <th scope="col" style="text-align:right">Total est.</th>
             </tr>
             </thead>
             <tbody>
             <?php foreach ($porAsoc as $pa): ?>
-                <?php $mt = (float) ($pa['monto_total'] ?? 0); ?>
+                <?php
+                $mt = (float) ($pa['monto_total'] ?? 0);
+                $paId = (int) ($pa['asociacion_id'] ?? 0);
+                $paVals = IndicadoresTablaDefs::valoresMetricasInt($pa, 'indicadores dashboard asoc id=' . $paId);
+                ?>
                 <tr>
-                    <td style="white-space:nowrap"><?= (int) ($pa['asociacion_id'] ?? 0) ?></td>
+                    <td style="white-space:nowrap"><?= $paId ?></td>
                     <td><?= htmlspecialchars((string) ($pa['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['total_atletas'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['afiliacion'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['anualidad'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['carnet'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['traspaso'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['inscripcion'] ?? 0) ?></td>
+                    <?php foreach ($fvdIndCols as $col): ?>
+                    <td style="text-align:right"><?= (int) ($paVals[$col['key']] ?? 0) ?></td>
+                    <?php endforeach; ?>
                     <td style="text-align:right;font-weight:600"><?= $fmtN($mt) ?></td>
                 </tr>
             <?php endforeach; ?>

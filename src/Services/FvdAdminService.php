@@ -80,15 +80,21 @@ final class FvdAdminService
     // ——— Asociaciones ———
 
     /**
+     * @param 'todas'|'activas'|'inactivas' $filtroEstatus
      * @return array{total:int,page:int,per_page:int,pages:int,rows:list<array<string,mixed>>}
      */
-    public function asociacionesPaginateList(int $page, int $perPage, string $q): array
+    public function asociacionesPaginateList(int $page, int $perPage, string $q, string $filtroEstatus = 'todas'): array
     {
         $params = [];
         $search = '';
         if ($q !== '') {
             $params[':fq'] = '%' . $q . '%';
             $search = ' AND asociaciones.nombre LIKE :fq ';
+        }
+        if ($filtroEstatus === 'activas') {
+            $search .= ' AND asociaciones.estatus = 1 ';
+        } elseif ($filtroEstatus === 'inactivas') {
+            $search .= ' AND asociaciones.estatus = 0 ';
         }
         $countSql = 'SELECT COUNT(*) FROM asociaciones WHERE 1=1' . $search;
         $dataSql = 'SELECT id, nombre, delegado, telefono, email, estatus, logo, direccion, numreg FROM asociaciones WHERE 1=1'

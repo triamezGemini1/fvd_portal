@@ -13,8 +13,9 @@ $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 
 <h1>Estadísticas por torneo — <code>atletas</code></h1>
 <p class="muted" style="font-size:0.875rem;line-height:1.5;margin-bottom:16px">
-    Fichas con <code>torneo_id</code> igual al torneo elegido. Conteos por renglón en la misma tabla:
-    <strong>inscripción</strong>, <strong>afiliación</strong>, <strong>anualidad</strong>, <strong>carnet</strong> y <strong>traspaso</strong> (valor <code>1</code> en cada columna).
+    Fichas con <code>torneo_id</code> igual al torneo elegido. Los conteos salen de la misma consulta agregada que el resto de indicadores en <code>atletas</code>
+    (banderas con <code>IFNULL(campo,0)=1</code>). <strong>Inscripción</strong> y <strong>anualidad</strong> muestran el mismo número: inscritos en el torneo
+    (primer torneo del año: quien juega debe pagar anualidad). <strong>Afiliación</strong>, <strong>carnet</strong> y <strong>traspaso</strong> son independientes.
     <strong>No</strong> se calculan montos ni deudas aquí. Fuera de las ventanas de calendario del torneo, delegados y asociaciones solo pueden <strong>consultar</strong> esta información.
 </p>
 <?php if (!$fvd_admin): ?>

@@ -324,8 +324,54 @@ final class QueryHelper
     }
 
     /**
+     * Fragmento SQL compartido: SUM por cada bandera en `atletas` (IFNULL(campo,0)=1).
+     * Usado en todos los reportes de indicadores globales / por asociación.
+     *
+     * @return string Lista de expresiones SUM… AS campo (sin COUNT inicial)
+     */
+    public static function sqlSumCasesIndicadoresAtletas(string $tableAlias = 'a'): string
+    {
+        self::assertAtletasAlias($tableAlias);
+
+        return 'SUM(CASE WHEN IFNULL(' . $tableAlias . '.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS afiliacion, '
+            . 'SUM(CASE WHEN IFNULL(' . $tableAlias . '.anualidad, 0) = 1 THEN 1 ELSE 0 END) AS anualidad, '
+            . 'SUM(CASE WHEN IFNULL(' . $tableAlias . '.carnet, 0) = 1 THEN 1 ELSE 0 END) AS carnet, '
+            . 'SUM(CASE WHEN IFNULL(' . $tableAlias . '.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS traspaso, '
+            . 'SUM(CASE WHEN IFNULL(' . $tableAlias . '.inscripcion, 0) = 1 THEN 1 ELSE 0 END) AS inscripcion';
+    }
+
+    /**
+     * SELECT de métricas para estadísticas por torneo (`torneo_id`), agrupadas por asociación.
+     * Misma lógica de banderas que {@see sqlSumCasesIndicadoresAtletas}, excepto:
+     * inscripción y anualidad usan el mismo conteo (inscripcion=1) para que coincidan:
+     * en el primer torneo del año quien está inscrito debe pagar anualidad.
+     *
+     * @return string Expresiones después de asociacion_id / nombre (incluye filas_origen y métricas)
+     */
+    public static function sqlSelectMetricasTorneoPorAsociacion(string $tableAlias = 'a'): string
+    {
+        self::assertAtletasAlias($tableAlias);
+        $f = $tableAlias;
+        $insc = 'SUM(CASE WHEN IFNULL(' . $f . '.inscripcion, 0) = 1 THEN 1 ELSE 0 END)';
+
+        return 'COUNT(*) AS filas_origen, '
+            . $insc . ' AS total_inscritos, '
+            . 'SUM(CASE WHEN IFNULL(' . $f . '.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS total_afiliados, '
+            . $insc . ' AS total_anualidad, '
+            . 'SUM(CASE WHEN IFNULL(' . $f . '.carnet, 0) = 1 THEN 1 ELSE 0 END) AS total_carnets, '
+            . 'SUM(CASE WHEN IFNULL(' . $f . '.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS total_traspasos';
+    }
+
+    private static function assertAtletasAlias(string $alias): void
+    {
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $alias)) {
+            throw new InvalidArgumentException('Alias de tabla no válido.');
+        }
+    }
+
+    /**
      * Cuantificación global sobre `atletas` en el alcance de sesión: total de filas y conteos por indicador.
-     * Anualidad: solo `anualidad = 1` y `afiliacion = 1`. Inscripción: `inscripcion = 1` y `afiliacion = 0` (sin solapar con afiliado).
+     * Cada columna cuenta por separado filas con ese marcador en 1 (sin cruzar condiciones entre columnas).
      *
      * @return array{
      *   total_atletas:int,
@@ -345,12 +391,8 @@ final class QueryHelper
         }
 
         $params = [];
-        $base = 'SELECT COUNT(*) AS total_atletas,
-            SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS afiliacion,
-            SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS anualidad,
-            SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS carnet,
-            SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS traspaso,
-            SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) AS inscripcion
+        $sums = self::sqlSumCasesIndicadoresAtletas('a');
+        $base = 'SELECT COUNT(*) AS total_atletas, ' . $sums . '
             FROM atletas a
             WHERE 1=1';
 
@@ -384,7 +426,9 @@ final class QueryHelper
     }
 
     /**
-     * Misma lógica que {@see self::aggregateIndicadoresAtletasTotales}, agrupada por asociación (club regional).
+     * Misma lógica que {@see self::aggregateIndicadoresAtletasTotales}, agrupada por asociación.
+     * Por cada asociación N, cada columna equivale a contar filas con
+     * `WHERE atletas.asociacion = N AND campo = 1` (el alcance de sesión se añade en WHERE).
      *
      * @return list<array<string, mixed>>
      */
@@ -397,18 +441,17 @@ final class QueryHelper
         }
 
         $params = [];
+        // Una fila por asociacion_id: GROUP BY solo a.asociacion (evita partir el mismo id por s.nombre NULL/distinto).
+        // Cada métrica = COUNT equivalente a: SELECT COUNT(*) FROM atletas WHERE asociacion = N AND campo = 1
+        $sums = self::sqlSumCasesIndicadoresAtletas('a');
         $dataSql = 'SELECT a.asociacion AS asociacion_id,
-            COALESCE(s.nombre, \'\') AS asociacion_nombre,
+            MAX(COALESCE(s.nombre, \'\')) AS asociacion_nombre,
             COUNT(*) AS total_atletas,
-            SUM(CASE WHEN COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS afiliacion,
-            SUM(CASE WHEN COALESCE(a.anualidad, 0) = 1 AND COALESCE(a.afiliacion, 0) = 1 THEN 1 ELSE 0 END) AS anualidad,
-            SUM(CASE WHEN COALESCE(a.carnet, 0) = 1 THEN 1 ELSE 0 END) AS carnet,
-            SUM(CASE WHEN COALESCE(a.traspaso, 0) = 1 THEN 1 ELSE 0 END) AS traspaso,
-            SUM(CASE WHEN COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0 THEN 1 ELSE 0 END) AS inscripcion
+            ' . $sums . '
             FROM atletas a
-            LEFT JOIN asociaciones s ON a.asociacion = s.id
+            LEFT JOIN asociaciones s ON s.id = a.asociacion
             WHERE 1=1
-            GROUP BY a.asociacion, s.nombre
+            GROUP BY a.asociacion
             ORDER BY asociacion_nombre ASC';
 
         $countSql = 'SELECT COUNT(*) FROM atletas a WHERE 1=1';

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
+require_once FVD_PROJECT_ROOT . '/src/Services/IndicadoresTablaDefs.php';
 
+use FvdPortal\Services\IndicadoresTablaDefs;
 use FvdPortal\Services\QueryHelper;
 
 fvd_admin_require_roles();
@@ -20,10 +22,7 @@ $nombre = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
 $rows = QueryHelper::selectAtletasPorIndicadoresServicioFull($modo, $cedula, $nombre, fvd_db());
 
 $totalesAlcance = QueryHelper::aggregateIndicadoresAtletasTotales(fvd_db());
-$porAsociacion = [];
-if (\AuthService::isSuperAdmin()) {
-    $porAsociacion = QueryHelper::aggregateIndicadoresAtletasPorAsociacion(fvd_db());
-}
+$porAsociacion = QueryHelper::aggregateIndicadoresAtletasPorAsociacion(fvd_db());
 
 $stats = [
     'total'       => count($rows),
@@ -83,6 +82,9 @@ $atletasUrl = fvd_crud_self_url('atletas');
 
 $columnas = $rows !== [] ? array_keys($rows[0]) : [];
 
+$fvdIndCols = IndicadoresTablaDefs::columnasMetricas();
+$totalesVals = IndicadoresTablaDefs::valoresMetricasInt($totalesAlcance, 'totales alcance');
+
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
 <div class="report-container fvd-rep-indicadores" style="max-width:100%">
@@ -96,7 +98,7 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
     <section class="fvd-rep-indicadores__alcance" aria-label="Cuantificación total en su alcance" style="margin:0 0 1.25rem;padding:12px;border-radius:8px;border:1px solid var(--fvd-border);background:rgba(255,255,255,0.04)">
         <h2 style="margin:0 0 .5rem;font-size:.95rem">Totales generales (tabla <code>atletas</code>, su alcance)</h2>
         <p style="margin:0 0 .75rem;font-size:.72rem;color:var(--fvd-muted);line-height:1.45">
-            Cada columna cuenta filas con ese campo en <strong>1</strong> (un mismo atleta puede sumar en varios indicadores).
+            Cada columna cuenta por separado las filas con ese campo en <strong>1</strong>, sin condiciones cruzadas; un mismo atleta puede sumar en varios indicadores.
             La unidad regional en datos es <strong>asociación</strong> (<code>atletas.asociacion</code>); no existe columna <code>club</code> en esta tabla.
         </p>
         <div style="overflow-x:auto">
@@ -104,23 +106,17 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
                 <thead>
                 <tr>
                     <th scope="col">Ámbito</th>
-                    <th scope="col" style="text-align:right">Atletas</th>
-                    <th scope="col" style="text-align:right" title="afiliacion=1">Afiliados</th>
-                    <th scope="col" style="text-align:right" title="anualidad=1">Anualidad</th>
-                    <th scope="col" style="text-align:right" title="carnet=1">Carnets</th>
-                    <th scope="col" style="text-align:right" title="traspaso=1">Traspaso</th>
-                    <th scope="col" style="text-align:right" title="inscripcion=1">Inscritos</th>
+                    <?php foreach ($fvdIndCols as $col): ?>
+                    <th scope="col" style="text-align:right" title="<?= htmlspecialchars($col['title'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($col['label'], ENT_QUOTES, 'UTF-8') ?></th>
+                    <?php endforeach; ?>
                 </tr>
                 </thead>
                 <tbody>
                 <tr>
                     <th scope="row">General</th>
-                    <td style="text-align:right"><?= (int) $totalesAlcance['total_atletas'] ?></td>
-                    <td style="text-align:right"><?= (int) $totalesAlcance['afiliacion'] ?></td>
-                    <td style="text-align:right"><?= (int) $totalesAlcance['anualidad'] ?></td>
-                    <td style="text-align:right"><?= (int) $totalesAlcance['carnet'] ?></td>
-                    <td style="text-align:right"><?= (int) $totalesAlcance['traspaso'] ?></td>
-                    <td style="text-align:right"><?= (int) $totalesAlcance['inscripcion'] ?></td>
+                    <?php foreach ($fvdIndCols as $col): ?>
+                    <td style="text-align:right"><?= (int) ($totalesVals[$col['key']] ?? 0) ?></td>
+                    <?php endforeach; ?>
                 </tr>
                 </tbody>
             </table>
@@ -133,25 +129,23 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
                 <tr>
                     <th scope="col">ID</th>
                     <th scope="col">Asociación</th>
-                    <th scope="col" style="text-align:right">Atletas</th>
-                    <th scope="col" style="text-align:right">Afiliados</th>
-                    <th scope="col" style="text-align:right">Anualidad</th>
-                    <th scope="col" style="text-align:right">Carnets</th>
-                    <th scope="col" style="text-align:right">Traspaso</th>
-                    <th scope="col" style="text-align:right">Inscritos</th>
+                    <?php foreach ($fvdIndCols as $col): ?>
+                    <th scope="col" style="text-align:right" title="<?= htmlspecialchars($col['title'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($col['label'], ENT_QUOTES, 'UTF-8') ?></th>
+                    <?php endforeach; ?>
                 </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($porAsociacion as $pa): ?>
+                <?php
+                    $aid = (int) ($pa['asociacion_id'] ?? 0);
+                    $paVals = IndicadoresTablaDefs::valoresMetricasInt($pa, 'por asociación id=' . $aid);
+                ?>
                 <tr>
-                    <td style="white-space:nowrap"><?= (int) ($pa['asociacion_id'] ?? 0) ?></td>
+                    <td style="white-space:nowrap"><?= $aid ?></td>
                     <td><?= htmlspecialchars((string) ($pa['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['total_atletas'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['afiliacion'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['anualidad'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['carnet'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['traspaso'] ?? 0) ?></td>
-                    <td style="text-align:right"><?= (int) ($pa['inscripcion'] ?? 0) ?></td>
+                    <?php foreach ($fvdIndCols as $col): ?>
+                    <td style="text-align:right"><?= (int) ($paVals[$col['key']] ?? 0) ?></td>
+                    <?php endforeach; ?>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>

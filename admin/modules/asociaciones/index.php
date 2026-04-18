@@ -17,7 +17,23 @@ if (($_GET['action'] ?? '') === 'delete' && isset($_GET['id'])) {
 
 if (($_GET['action'] ?? '') === 'toggle_estatus' && isset($_GET['id']) && AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
     $svc->asociacionesToggleEstatus((int) $_GET['id']);
-    header('Location: ' . $selfUrl);
+    $redir = $selfUrl;
+    $qs = [];
+    if (isset($_GET['page']) && (int) $_GET['page'] > 1) {
+        $qs['page'] = (int) $_GET['page'];
+    }
+    $qToggle = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
+    if ($qToggle !== '') {
+        $qs['q'] = $qToggle;
+    }
+    $estToggle = isset($_GET['estado']) ? trim((string) $_GET['estado']) : 'todas';
+    if (in_array($estToggle, ['activas', 'inactivas'], true)) {
+        $qs['estado'] = $estToggle;
+    }
+    if ($qs !== []) {
+        $redir .= '?' . http_build_query($qs);
+    }
+    header('Location: ' . $redir);
     exit;
 }
 
@@ -51,7 +67,9 @@ if ($action === 'form') {
 
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
-$result = $svc->asociacionesPaginateList($page, 15, $q);
+$estadoRaw = isset($_GET['estado']) ? trim((string) $_GET['estado']) : 'todas';
+$filtroEstatus = in_array($estadoRaw, ['activas', 'inactivas'], true) ? $estadoRaw : 'todas';
+$result = $svc->asociacionesPaginateList($page, 15, $q, $filtroEstatus);
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';

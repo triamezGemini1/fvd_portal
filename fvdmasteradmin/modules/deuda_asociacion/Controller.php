@@ -394,7 +394,8 @@ class DeudaAsociacionController extends FvdModuleController
     }
 
     /**
-     * Estadísticas solo lectura desde `atletas` (torneo_id del torneo), por asociación y renglón (banderas).
+     * Estadísticas solo lectura desde `atletas` (torneo_id del torneo), por asociación.
+     * Métricas: {@see \FvdPortal\Services\QueryHelper::sqlSelectMetricasTorneoPorAsociacion}.
      *
      * @return array{tabla_ok:bool, rows:list<array<string, mixed>>}
      */
