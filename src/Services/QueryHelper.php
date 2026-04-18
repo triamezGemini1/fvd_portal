@@ -314,7 +314,7 @@ final class QueryHelper
 
         if ($carnetEquals === 1) {
             $params[':carnet_eq'] = 1;
-            $search .= ' AND COALESCE(a.carnet, 0) = 1 ';
+            $search .= ' AND COALESCE(a.carnet, 0) = :carnet_eq ';
         }
 
         $dataSql = 'SELECT a.id, a.foto, a.cedula, a.nombre, a.sexo, a.numfvd, a.estatus, a.celular, a.email, a.asociacion, a.categ,
