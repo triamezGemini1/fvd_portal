@@ -10,6 +10,31 @@
   margin-right: auto;
 }
 
+/* Vista embebida (iframe / Telegram): evitar scroll horizontal en 14" */
+body.is-embedded .fvd-insc-sitio {
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+body.is-embedded .fvd-insc-sitio__grid {
+  min-width: 0;
+}
+body.is-embedded .fvd-insc-sitio__table-wrap {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+body.is-embedded .fvd-insc-sitio__table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.75rem;
+}
+body.is-embedded .fvd-insc-sitio__table td,
+body.is-embedded .fvd-insc-sitio__table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
 .fvd-insc-sitio__head {
   display: flex;
   flex-wrap: wrap;

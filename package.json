@@ -1,0 +1,33 @@
+{
+  "name": "fvd_portal",
+  "version": "1.0.0",
+  "description": "Aplicación **independiente** de la carpeta `crudmysql`: landing pública, FVD Master Admin y recursos asociados bajo `C:\\wamp64\\www\\fvd_portal`.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/triamezGemini1/fvd_portal.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/triamezGemini1/fvd_portal/issues"
+  },
+  "homepage": "https://github.com/triamezGemini1/fvd_portal#readme",
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "tailwindcss": "^4.2.2",
+    "vite": "^8.0.8"
+  },
+  "dependencies": {
+    "@heroicons/vue": "^2.2.0",
+    "lucide-vue-next": "^1.0.0",
+    "vue": "^3.5.32"
+  }
+}

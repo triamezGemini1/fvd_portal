@@ -15,7 +15,7 @@ $maxDiasFechas = isset($fvd_relacion_max_dias_fechas) ? (int) $fvd_relacion_max_
 
 <h1>Relacionar campeonatos (mismo día)</h1>
 <p style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 0.75rem">
-    Seleccione <strong>dos o más campeonatos</strong> celebrados el mismo día; el sistema asignará un <strong>nuevo número de grupo</strong> compartido. Los torneos (no campeonato) aparecen solo como referencia y no se pueden vincular.
+    Seleccione <strong>dos o más campeonatos</strong> celebrados el mismo día. El sistema asigna un <strong>grupo de evento compartido</strong> y lo conserva: <strong>no podrá volver a vincular el mismo conjunto</strong> (evita duplicar el proceso). Puede <strong>añadir</strong> un campeonato aún sin grupo a otros que ya compartan grupo. Los torneos (no campeonato) son solo referencia y no se vinculan.
 </p>
 
 <?php if ($fvd_torneo_relacion_flash !== ''): ?>
@@ -76,10 +76,13 @@ $maxDiasFechas = isset($fvd_relacion_max_dias_fechas) ? (int) $fvd_relacion_max_
                     $tid = (int) ($r['torneo'] ?? 0);
                     $esCamp = (int) ($r['tipo'] ?? 0) === 2;
                     ?>
-                    <tr<?= $esCamp ? ' data-fecha="' . htmlspecialchars(substr((string) ($r['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8') . '"' : '' ?><?= $esCamp ? '' : ' style="opacity:0.65"' ?>>
+                    <?php
+                    $gAct = isset($r['grupo_evento_id']) ? (int) $r['grupo_evento_id'] : 0;
+                    ?>
+                    <tr<?= $esCamp ? ' data-fecha="' . htmlspecialchars(substr((string) ($r['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8') . '"' : '' ?><?= $esCamp && $gAct > 0 ? ' data-fvd-grupo="' . $gAct . '"' : '' ?><?= $esCamp ? '' : ' style="opacity:0.65"' ?>>
                         <td>
                             <?php if ($esCamp): ?>
-                                <input type="checkbox" name="torneo_id[]" value="<?= $tid ?>" class="fvd-rel-camp-cb">
+                                <input type="checkbox" name="torneo_id[]" value="<?= $tid ?>" class="fvd-rel-camp-cb" data-fvd-grupo="<?= $gAct > 0 ? $gAct : '' ?>">
                             <?php else: ?>
                                 <span title="Solo los campeonatos se vinculan por grupo">—</span>
                             <?php endif; ?>
@@ -114,8 +117,26 @@ $maxDiasFechas = isset($fvd_relacion_max_dias_fechas) ? (int) $fvd_relacion_max_
         var selNinguno = document.getElementById('fvd_rel_sel_ninguno');
         function sync() {
             var n = 0;
-            cbs.forEach(function (el) { if (el.checked) n++; });
-            if (btn) btn.disabled = n < 2;
+            var grupos = [];
+            cbs.forEach(function (el) {
+                if (!el.checked) return;
+                n++;
+                var g = el.getAttribute('data-fvd-grupo');
+                if (g && String(g).trim() !== '') {
+                    grupos.push(parseInt(g, 10));
+                }
+            });
+            var yaTodosMismoGrupo = false;
+            if (n >= 2 && grupos.length === n) {
+                var u = grupos.filter(function (v, i, a) { return a.indexOf(v) === i; });
+                yaTodosMismoGrupo = u.length === 1;
+            }
+            if (btn) {
+                btn.disabled = n < 2 || yaTodosMismoGrupo;
+                btn.title = yaTodosMismoGrupo
+                    ? 'Estos campeonatos ya están en el mismo grupo. No hace falta repetir la vinculación.'
+                    : '';
+            }
         }
         cbs.forEach(function (el) { el.addEventListener('change', sync); });
         if (selTodos) selTodos.addEventListener('click', function () {
@@ -170,7 +191,7 @@ $maxDiasFechas = isset($fvd_relacion_max_dias_fechas) ? (int) $fvd_relacion_max_
                 if (nom.focus) nom.focus();
                 return false;
             }
-            return confirm('Se asignará un nuevo grupo compartido, se guardará el nombre nominal y se actualizarán las invitaciones de delegados cuando corresponda. ¿Continuar?');
+            return confirm('Se guardará el grupo compartido (nuevo o ampliando uno existente), el nombre nominal y se actualizarán las invitaciones de delegados cuando corresponda. ¿Continuar?');
         });
         sync();
     })();

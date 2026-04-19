@@ -10,6 +10,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/services/AuthService.php';
 require_once dirname(__DIR__) . '/config/paths.php';
+if (!function_exists('fvd_append_embed_to_url')) {
+    require_once dirname(__DIR__) . '/config/fvd_navigation_return.php';
+}
 require_once __DIR__ . '/config/db.php';
 require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
 
@@ -50,19 +53,22 @@ if ($tokenRaw !== '') {
 }
 
 if ($row === null) {
-    header('Location: ' . $base . '/fvdmasteradmin/index.php?msg=notif_no');
+    $h = AuthService::homeUrl();
+    header('Location: ' . $h . (str_contains($h, '?') ? '&' : '?') . 'msg=notif_no');
     exit;
 }
 
 $tid = (int) ($row['torneo_id'] ?? 0);
 if ($tid <= 0) {
-    header('Location: ' . $base . '/fvdmasteradmin/index.php?msg=notif_no');
+    $h = AuthService::homeUrl();
+    header('Location: ' . $h . (str_contains($h, '?') ? '&' : '?') . 'msg=notif_no');
     exit;
 }
 
 AuthService::setDelegadoTorneoContext($tid);
 DelegadoTorneoNotifService::marcarVisto($pdo, (int) $row['id'], $did, $aid);
 
-$dest = admin_module_url('torneos/index.php?action=evento&id=' . $tid);
+$dest = url('fvdmasteradmin/delegado_dashboard.php');
+$dest = fvd_append_embed_to_url($dest);
 header('Location: ' . $dest);
 exit;

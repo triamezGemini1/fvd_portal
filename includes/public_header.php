@@ -172,6 +172,10 @@ function public_layout_header(string $active = 'inicio'): void
         ['key' => 'afiliacion', 'label' => 'Afiliación', 'href' => url('afiliacion.php')],
     ];
     $logo = public_layout_logo_url();
+    $navBase = 'fvd-p-navlink rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200';
+    require_once dirname(__DIR__) . '/fvdmasteradmin/services/AuthService.php';
+    AuthService::ensureSession();
+    $fvdPubAuth = AuthService::isAuthenticated();
     ?>
 <header class="fvd-p-header sticky top-0 z-50<?= $logo !== '' ? ' fvd-p-header--with-logo' : '' ?>">
     <div class="fvd-p-header__inner flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -187,11 +191,15 @@ function public_layout_header(string $active = 'inicio'): void
             <?php foreach ($items as $item): ?>
                 <?php
                 $isActive = ($active === $item['key']);
-                $base = 'fvd-p-navlink rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200';
-                $cls = $isActive ? $base . ' fvd-p-navlink--active' : $base;
+                $cls = $isActive ? $navBase . ' fvd-p-navlink--active' : $navBase;
                 ?>
                 <a class="<?= $cls ?>" href="<?= htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></a>
             <?php endforeach; ?>
+            <?php if ($fvdPubAuth): ?>
+                <span class="mx-1 hidden h-5 w-px bg-white/25 sm:inline-block" aria-hidden="true"></span>
+                <a class="<?= $navBase ?> text-amber-200/95 hover:text-white" href="<?= htmlspecialchars(AuthService::perfilUrl(), ENT_QUOTES, 'UTF-8') ?>">Mi perfil</a>
+                <a class="<?= $navBase ?> border border-white/30 font-semibold" href="<?= htmlspecialchars(AuthService::logoutUrl(), ENT_QUOTES, 'UTF-8') ?>">Cerrar sesión</a>
+            <?php endif; ?>
         </nav>
     </div>
 </header>

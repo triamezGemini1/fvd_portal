@@ -92,18 +92,30 @@ class AuthService
     {
         if (session_status() === PHP_SESSION_NONE) {
             $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
-            if ($base !== '') {
-                $path = $base . '/';
-                if (PHP_VERSION_ID >= 70300) {
-                    session_set_cookie_params([
-                        'lifetime' => 0,
-                        'path' => $path,
-                        'httponly' => true,
-                        'samesite' => 'Lax',
-                    ]);
-                } else {
-                    session_set_cookie_params(0, $path, '', isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off', true);
+            $path = $base !== '' ? ($base . '/') : '/';
+
+            /* Cookie Secure solo con HTTPS; en http://localhost WAMP la sesión no persiste si Secure queda activo (p. ej. php.ini / .htaccess). */
+            $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+            if (function_exists('env')) {
+                $es = env('SESSION_SECURE', null);
+                if ($es !== null && $es !== '') {
+                    $secure = filter_var((string) $es, FILTER_VALIDATE_BOOLEAN);
                 }
+            }
+            if (!$secure) {
+                ini_set('session.cookie_secure', '0');
+            }
+
+            if (PHP_VERSION_ID >= 70300) {
+                session_set_cookie_params([
+                    'lifetime' => 0,
+                    'path'     => $path,
+                    'secure'   => $secure,
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                session_set_cookie_params(0, $path, '', $secure, true);
             }
             session_start();
         }
@@ -600,9 +612,36 @@ class AuthService
 
     public static function loginUrl(): string
     {
-        $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        $root = dirname(__DIR__, 2);
+        if (!function_exists('url')) {
+            require_once $root . '/config/paths.php';
+        }
 
-        return $base . '/fvdmasteradmin/login.php';
+        return url('login.php');
+    }
+
+    /**
+     * Tras login exitoso: admin general siempre al Panel Maestro; no se respeta return_to hacia /admin/modules/.
+     *
+     * @param string|null $fromSession Valor previo de $_SESSION['fvd_redirect_after_login']
+     */
+    public static function safeRedirectAfterLogin(?string $fromSession): string
+    {
+        $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        $master = $base . '/fvdmasteradmin/master_panel.php';
+        if (self::role() === self::ROLE_FVD_ADMIN) {
+            return $master;
+        }
+        $s = is_string($fromSession) ? trim($fromSession) : '';
+        if ($s !== '' && isset($s[0]) && $s[0] === '/') {
+            if (stripos($s, '/admin/modules/') !== false) {
+                return self::homeUrl();
+            }
+
+            return $s;
+        }
+
+        return self::homeUrl();
     }
 
     public static function homeUrl(): string
@@ -610,6 +649,9 @@ class AuthService
         $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
         if (self::isDelegadoAsociacion()) {
             return $base . '/fvdmasteradmin/delegado_dashboard.php';
+        }
+        if (self::role() === self::ROLE_FVD_ADMIN) {
+            return $base . '/fvdmasteradmin/master_panel.php';
         }
 
         return $base . '/fvdmasteradmin/index.php';
@@ -620,6 +662,16 @@ class AuthService
         $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
 
         return $base . '/fvdmasteradmin/logout.php';
+    }
+
+    /**
+     * Perfil de cuenta (contraseña, datos); delegados se redirigen internamente a perfil_delegado.php.
+     */
+    public static function perfilUrl(): string
+    {
+        $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+
+        return $base . '/fvdmasteradmin/perfil.php';
     }
 
     private static function redirectToLogin(): void

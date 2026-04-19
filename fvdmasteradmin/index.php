@@ -35,6 +35,11 @@ if ($fvdEsDelegadoPanel) {
     exit;
 }
 
+if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+    header('Location: ' . $appBase . '/fvdmasteradmin/master_panel.php');
+    exit;
+}
+
 require_once __DIR__ . '/services/FvdDashboardStats.php';
 require_once $projRoot . '/src/Services/StatsService.php';
 

@@ -46,6 +46,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'noti
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'lanzar_convocatoria_nacional') {
+    AuthService::ensureSession();
+    try {
+        $tidL = (int) ($_POST['torneo_id'] ?? 0);
+        $out = $svc->lanzarConvocatoriaNacional($tidL);
+        $_SESSION['fvd_torneo_list_flash'] = sprintf(
+            'Convocatoria nacional: %d delegado(s) con acceso web; %d registro(s) en fvd_notificaciones; %d envío(s) Telegram.',
+            $out['delegados'],
+            $out['notificaciones'],
+            $out['telegram_enviados']
+        );
+    } catch (Throwable $e) {
+        AuthService::ensureSession();
+        $_SESSION['fvd_torneo_list_flash'] = 'No se pudo enviar el lote: ' . $e->getMessage();
+        error_log('[admin/torneos lanzar_convocatoria_nacional] ' . $e->getMessage());
+    }
+    header('Location: ' . $selfUrl . '?action=list');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'lanzar_convocatoria_pendientes') {
+    AuthService::ensureSession();
+    try {
+        $tidP = (int) ($_POST['torneo_id'] ?? 0);
+        $out = $svc->lanzarConvocatoriaPendientes($tidP);
+        $_SESSION['fvd_torneo_list_flash'] = sprintf(
+            'Re-envío a pendientes: %d delegado(s) nuevo(s); %d registro(s) en notificaciones; %d envío(s) Telegram.',
+            $out['insertados'],
+            $out['notificaciones'],
+            $out['telegram_enviados']
+        );
+    } catch (Throwable $e) {
+        AuthService::ensureSession();
+        $_SESSION['fvd_torneo_list_flash'] = 'No se pudo re-enviar a pendientes: ' . $e->getMessage();
+        error_log('[admin/torneos lanzar_convocatoria_pendientes] ' . $e->getMessage());
+    }
+    header('Location: ' . $selfUrl . '?action=list');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postAct = (string) ($_POST['_action'] ?? '');
     if (str_starts_with($postAct, 'convocatoria_')) {
@@ -189,7 +229,7 @@ if (AuthService::isDelegadoAsociacion() && ($_SERVER['REQUEST_METHOD'] ?? '') !=
         }
     } elseif ($action !== 'evento' || $id === null || $id <= 0) {
         $base = rtrim((string) env('APP_BASE_PATH', ''), '/');
-        header('Location: ' . $base . '/fvdmasteradmin/index.php');
+        header('Location: ' . $base . '/fvdmasteradmin/delegado_dashboard.php');
         exit;
     }
 }
@@ -497,6 +537,9 @@ if ($action === 'form') {
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
 $result = $svc->torneosPaginateList($page, 15, $q);
+if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+    $result['rows'] = $svc->torneosListEnrichDespachoMonitor($result['rows']);
+}
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';

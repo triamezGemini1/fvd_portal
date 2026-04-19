@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 /** @var array $delegSnap */
 /** @var string $appBase */
-/** @var string $urlRegistrarAtleta */
 /** @var list<array<string,mixed>> $delegNotifs */
 /** @var int $delegNotifNoVistas */
 /** @var int $campeonatoIdInt */
@@ -20,47 +19,49 @@ declare(strict_types=1);
 $tidInt = (int) ($delegSnap['torneo_id'] ?? 0);
 $tnom = (string) ($delegSnap['torneo_nombre'] ?? '');
 
-$urlTorneoInscripcion = fvd_module_url('torneo_inscripcion/index.php')
-    . (isset($fvd_deleg_torneo_q) && $fvd_deleg_torneo_q !== ''
-        ? $fvd_deleg_torneo_q
-        : ($tidInt > 0 ? '?torneo_id=' . $tidInt : ''));
-
-$fvd_q_afiliados = ['action' => 'form'];
 $myAidNav = AuthService::idAsociacion();
-if ($myAidNav !== null && (int) $myAidNav > 0) {
-    $fvd_q_afiliados['asociacion_id'] = (int) $myAidNav;
+$myAidInt = ($myAidNav !== null && (int) $myAidNav > 0) ? (int) $myAidNav : 0;
+
+$qTorneoVinc = [];
+if ($campeonatoIdInt > 0) {
+    $qTorneoVinc['campeonato_id'] = $campeonatoIdInt;
 }
-$urlAfiliados = fvd_module_url('atletas/index.php?' . http_build_query($fvd_q_afiliados));
+$urlTorneosVinculados = fvd_module_url(
+    'torneo_inscripcion/index.php' . ($qTorneoVinc !== [] ? '?' . http_build_query($qTorneoVinc) : '')
+);
+
+$fvd_q_nuevo = ['action' => 'form'];
+$fvd_q_lista = ['action' => 'list'];
+if ($myAidInt > 0) {
+    $fvd_q_nuevo['asociacion_id'] = $myAidInt;
+    $fvd_q_lista['asociacion_id'] = $myAidInt;
+}
+$urlNuevoAtleta = fvd_module_url('atletas/index.php?' . http_build_query($fvd_q_nuevo));
+$urlListadoAtletas = fvd_module_url('atletas/index.php?' . http_build_query($fvd_q_lista));
 
 $urlBandejaTraspasos = $appBase . '/fvdmasteradmin/delegado_bandeja_traspasos.php'
     . (isset($fvd_deleg_asoc_q) ? (string) $fvd_deleg_asoc_q : '');
 $urlEstadoCarnets = $appBase . '/fvdmasteradmin/delegado_estado_carnetizacion.php'
     . (isset($fvd_deleg_asoc_q) ? (string) $fvd_deleg_asoc_q : '');
 
-$saldoLinea = 'Sin datos de saldo';
-if ($campeonatoIdInt > 0 && is_array($balanceCampeonato)) {
-    $totB = $balanceCampeonato['totales'] ?? [];
-    $saldoEur = $totB['saldo_eur'] ?? null;
-    if ($saldoEur !== null) {
-        $saldoLinea = 'Saldo pendiente: ' . number_format((float) $saldoEur, 2, ',', '.') . ' €';
-    } else {
-        $saldoLinea = 'Revise deudas y pagos en inscripción al torneo';
-    }
-} elseif ($campeonatoIdInt <= 0) {
-    $saldoLinea = 'Fije un campeonato en contexto (inscripciones) para ver el balance';
-}
-
 $fvdFmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
 
+$totFin = is_array($balanceCampeonato) ? ($balanceCampeonato['totales'] ?? []) : [];
+$deudaEur = $totFin['monto_total_eur'] ?? null;
+$pagadoEur = isset($totFin['pagado_eur']) ? (float) $totFin['pagado_eur'] : 0.0;
+$saldoEurFin = $totFin['saldo_eur'] ?? null;
+$deudaBs = isset($totFin['monto_total_bs']) ? (float) $totFin['monto_total_bs'] : 0.0;
+
 ?>
-<div class="fvd-dd-root container-fluid px-0" id="fvd-deleg-guia-inscripcion">
+<div class="fvd-card">
+<div class="fvd-dd-root" id="fvd-deleg-guia-inscripcion">
 
     <?php if (isset($_GET['msg']) && $_GET['msg'] === 'notif_no'): ?>
         <p class="fvd-mod-msg">No se encontró la notificación o ya no aplica.</p>
     <?php endif; ?>
 
     <?php if (($delegNotifNoVistas ?? 0) > 0): ?>
-        <div class="fvd-deleg-alert-invites mb-3" role="status" aria-live="polite">
+        <div class="fvd-deleg-alert-invites fvd-dd-alert-invites" role="status" aria-live="polite">
             <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene <?= (int) $delegNotifNoVistas ?> notificación(es) sin abrir. Revise el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones</a> o el enlace en la barra superior.</span>
         </div>
     <?php endif; ?>
@@ -99,80 +100,119 @@ $fvdFmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
         </section>
     <?php endif; ?>
 
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
-        <div class="col d-flex">
-            <a class="fvd-dd-card fvd-dd-card--insc" href="<?= htmlspecialchars($urlTorneoInscripcion, ENT_QUOTES, 'UTF-8') ?>">
+    <div class="fvd-dd-finance-outer">
+            <section class="fvd-dd-finance fvd-dd-shadow-sm" aria-label="Balance global del campeonato">
+                <div class="fvd-dd-finance__head">
+                    <h2 class="fvd-dd-finance__title"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> Balance del campeonato</h2>
+                    <?php if ($campeonatoIdInt > 0 && $nombreCampeonatoNominal !== ''): ?>
+                        <p class="fvd-dd-finance__sub"><?= htmlspecialchars($nombreCampeonatoNominal, ENT_QUOTES, 'UTF-8') ?></p>
+                    <?php elseif ($campeonatoIdInt > 0): ?>
+                        <p class="fvd-dd-finance__sub">ID grupo: <?= (int) $campeonatoIdInt ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php if ($campeonatoIdInt > 0 && is_array($balanceCampeonato) && $myAidInt > 0): ?>
+                    <div class="fvd-dd-finance__grid">
+                        <div class="fvd-dd-finance__box fvd-dd-finance__box--deuda">
+                            <span class="fvd-dd-finance__k">Total deuda (referencia)</span>
+                            <?php if ($deudaEur !== null && (float) $deudaEur > 0): ?>
+                                <span class="fvd-dd-finance__v"><?= $fvdFmtN((float) $deudaEur) ?> €</span>
+                            <?php else: ?>
+                                <span class="fvd-dd-finance__v"><?= $fvdFmtN($deudaBs) ?> Bs</span>
+                                <span class="fvd-dd-finance__hint">Sin total EUR en deuda_asociaciones</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="fvd-dd-finance__box fvd-dd-finance__box--pagado">
+                            <span class="fvd-dd-finance__k">Total pagado</span>
+                            <span class="fvd-dd-finance__v"><?= $fvdFmtN($pagadoEur) ?> €</span>
+                        </div>
+                        <div class="fvd-dd-finance__box fvd-dd-finance__box--saldo">
+                            <span class="fvd-dd-finance__k">Saldo pendiente</span>
+                            <?php if ($saldoEurFin !== null): ?>
+                                <span class="fvd-dd-finance__v"><?= $fvdFmtN((float) $saldoEurFin) ?> €</span>
+                            <?php else: ?>
+                                <span class="fvd-dd-finance__v">—</span>
+                                <span class="fvd-dd-finance__hint">Defina montos EUR por torneo para ver saldo</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <p class="fvd-dd-finance__empty">Seleccione un campeonato en contexto (desde inscripciones o el interruptor de rama) para ver deuda, pagos y saldo de su club.</p>
+                <?php endif; ?>
+            </section>
+    </div>
+
+    <div class="fvd-dd-mosaic">
+        <div class="fvd-dd-mosaic__cell">
+            <div class="fvd-dd-card fvd-dd-card--insc-light fvd-dd-shadow-sm">
                 <div class="fvd-dd-card__row">
-                    <div class="fvd-dd-card__icon" aria-hidden="true"><i class="fa-solid fa-trophy"></i></div>
+                    <div class="fvd-dd-card__icon fvd-dd-card__icon--xl" aria-hidden="true"><i class="fa-solid fa-trophy"></i></div>
                     <div class="fvd-dd-card__body">
                         <p class="fvd-dd-card__label">Inscripciones</p>
-                        <h2 class="fvd-dd-card__title">Inscribir atletas</h2>
-                        <p class="fvd-dd-card__meta">Preparación e inscripción al torneo en curso.</p>
+                        <h2 class="fvd-dd-card__title">Torneos del campeonato</h2>
+                        <p class="fvd-dd-card__meta">Vincule ramas e inscriba atletas según la convocatoria (usa <code class="fvd-dd-code">campeonato_id</code> en sesión).</p>
                     </div>
                 </div>
-                <div class="fvd-dd-card__cta"><span>Acceso rápido</span></div>
-            </a>
+                <div class="fvd-dd-card__actions">
+                    <?php if ($campeonatoIdInt > 0): ?>
+                        <a class="fvd-btn fvd-btn--primary" href="<?= htmlspecialchars($urlTorneosVinculados, ENT_QUOTES, 'UTF-8') ?>">Gestionar torneos vinculados</a>
+                    <?php else: ?>
+                        <span class="fvd-btn fvd-btn--secondary fvd-dd-btn--disabled" title="Fije primero un campeonato en contexto">Gestionar torneos vinculados</span>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
-        <div class="col d-flex">
-            <a class="fvd-dd-card fvd-dd-card--afi" href="<?= htmlspecialchars($urlAfiliados, ENT_QUOTES, 'UTF-8') ?>">
+        <div class="fvd-dd-mosaic__cell">
+            <div class="fvd-dd-card fvd-dd-card--asoc fvd-dd-shadow-sm">
                 <div class="fvd-dd-card__row">
-                    <div class="fvd-dd-card__icon" aria-hidden="true"><i class="fa-solid fa-user"></i></div>
+                    <div class="fvd-dd-card__icon" aria-hidden="true"><i class="fa-solid fa-users"></i></div>
                     <div class="fvd-dd-card__body">
-                        <p class="fvd-dd-card__label">Afiliados</p>
-                        <h2 class="fvd-dd-card__title">Gestión de afiliados</h2>
-                        <p class="fvd-dd-card__meta">Total atletas en su asociación: <strong><?= number_format($totalAtletasAsoc, 0, ',', '.') ?></strong></p>
+                        <p class="fvd-dd-card__label">Mi asociación</p>
+                        <h2 class="fvd-dd-card__title">Atletas del club</h2>
+                        <p class="fvd-dd-card__meta">Total en su asociación: <strong><?= number_format($totalAtletasAsoc, 0, ',', '.') ?></strong></p>
                     </div>
                 </div>
-                <div class="fvd-dd-card__cta"><span>Acceso rápido</span></div>
-            </a>
+                <div class="fvd-dd-card__actions fvd-dd-card__actions--split">
+                    <a class="fvd-btn fvd-btn--primary" href="<?= htmlspecialchars($urlNuevoAtleta, ENT_QUOTES, 'UTF-8') ?>">Ingresar nuevo atleta</a>
+                    <a class="fvd-btn fvd-btn--secondary" href="<?= htmlspecialchars($urlListadoAtletas, ENT_QUOTES, 'UTF-8') ?>">Ver listado</a>
+                </div>
+            </div>
         </div>
-        <div class="col d-flex">
-            <a class="fvd-dd-card fvd-dd-card--tras" href="<?= htmlspecialchars($urlBandejaTraspasos, ENT_QUOTES, 'UTF-8') ?>">
+        <div class="fvd-dd-mosaic__cell">
+            <div class="fvd-dd-card fvd-dd-card--tras fvd-dd-shadow-sm">
                 <div class="fvd-dd-card__row">
                     <div class="fvd-dd-card__icon" aria-hidden="true"><i class="fa-solid fa-right-left"></i></div>
                     <div class="fvd-dd-card__body">
                         <p class="fvd-dd-card__label">Traspasos</p>
-                        <h2 class="fvd-dd-card__title">Bandeja de traspasos<?php if ($nPendTrasp > 0): ?><span class="fvd-dd-badge" aria-label="Pendientes"><?= (int) $nPendTrasp ?></span><?php endif; ?></h2>
-                        <p class="fvd-dd-card__meta">Solicitudes pendientes de su club.</p>
+                        <h2 class="fvd-dd-card__title">
+                            Solicitudes pendientes
+                            <?php if ($nPendTrasp > 0): ?>
+                                <span class="fvd-dd-badge" aria-label="Pendientes"><?= (int) $nPendTrasp ?></span>
+                            <?php else: ?>
+                                <span class="fvd-dd-badge fvd-dd-badge--muted" aria-label="Sin pendientes">0</span>
+                            <?php endif; ?>
+                        </h2>
+                        <p class="fvd-dd-card__meta">Apruebe o rechace traspasos entrantes a su club.</p>
                     </div>
                 </div>
-                <div class="fvd-dd-card__cta"><span>Acceso rápido</span></div>
-            </a>
+                <div class="fvd-dd-card__actions">
+                    <a class="fvd-btn fvd-btn--primary" href="<?= htmlspecialchars($urlBandejaTraspasos, ENT_QUOTES, 'UTF-8') ?>">Abrir bandeja</a>
+                </div>
+            </div>
         </div>
-        <div class="col d-flex">
-            <a class="fvd-dd-card fvd-dd-card--car" href="<?= htmlspecialchars($urlEstadoCarnets, ENT_QUOTES, 'UTF-8') ?>">
+        <div class="fvd-dd-mosaic__cell">
+            <div class="fvd-dd-card fvd-dd-card--car fvd-dd-shadow-sm">
                 <div class="fvd-dd-card__row">
                     <div class="fvd-dd-card__icon" aria-hidden="true"><i class="fa-solid fa-id-card"></i></div>
                     <div class="fvd-dd-card__body">
-                        <p class="fvd-dd-card__label">Carnetización</p>
-                        <h2 class="fvd-dd-card__title">Estado de carnets</h2>
+                        <p class="fvd-dd-card__label">Carnets</p>
+                        <h2 class="fvd-dd-card__title">Carnetización</h2>
                         <p class="fvd-dd-card__meta">Activos sin carnet procesado: <strong><?= (int) $carnetFaltan ?></strong></p>
                     </div>
                 </div>
-                <div class="fvd-dd-card__cta"><span>Acceso rápido</span></div>
-            </a>
-        </div>
-        <div class="col d-flex">
-            <a class="fvd-dd-card fvd-dd-card--fin" href="<?= htmlspecialchars($urlTorneoInscripcion, ENT_QUOTES, 'UTF-8') ?>">
-                <div class="fvd-dd-card__row">
-                    <div class="fvd-dd-card__icon" aria-hidden="true"><i class="fa-solid fa-scale-balanced"></i></div>
-                    <div class="fvd-dd-card__body">
-                        <p class="fvd-dd-card__label">Finanzas</p>
-                        <h2 class="fvd-dd-card__title">Balance global</h2>
-                        <p class="fvd-dd-card__meta"><?= htmlspecialchars($saldoLinea, ENT_QUOTES, 'UTF-8') ?></p>
-                        <?php if (is_array($balanceCampeonato) && $campeonatoIdInt > 0): ?>
-                            <?php $totD = $balanceCampeonato['totales'] ?? []; ?>
-                            <p class="fvd-dd-card__meta" style="margin-top:0.35rem;font-size:0.75rem;opacity:0.9">
-                                Deuda ref. Bs: <?= $fvdFmtN((float) ($totD['monto_total_bs'] ?? 0)) ?>
-                                <?php if (isset($totD['monto_total_eur']) && $totD['monto_total_eur'] !== null && (float) $totD['monto_total_eur'] > 0): ?>
-                                    · Total EUR: <?= $fvdFmtN((float) $totD['monto_total_eur']) ?> €
-                                <?php endif; ?>
-                            </p>
-                        <?php endif; ?>
-                    </div>
+                <div class="fvd-dd-card__actions">
+                    <a class="fvd-btn fvd-btn--primary" href="<?= htmlspecialchars($urlEstadoCarnets, ENT_QUOTES, 'UTF-8') ?>">Ver reporte de carnetización</a>
                 </div>
-                <div class="fvd-dd-card__cta"><span>Ver en inscripción al torneo</span></div>
-            </a>
+            </div>
         </div>
     </div>
 
@@ -209,6 +249,7 @@ $fvdFmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
             </ul>
         </section>
     <?php endif; ?>
+</div>
 </div>
 
 <?php if ($campeonatoIdInt > 0 && $fvdDelegadoGrupoTorneos !== []): ?>

@@ -34,6 +34,7 @@ require_once dirname(__DIR__) . '/includes/fvd_asociacion_helpers.php';
 if (!function_exists('env')) {
     require_once $projRoot . '/config/paths.php';
 }
+require_once dirname(__DIR__) . '/services/AuthService.php';
 
 $bundle = StatsService::dashboardDetalleAsociacion($pdo, $aid, false);
 if ($bundle === null || ($bundle['asociacion'] ?? null) === null) {
@@ -86,12 +87,13 @@ if ($asocNombre === '') {
     $asocNombre = 'Asociación #' . $aid;
 }
 
+$fvdPanelPath = AuthService::isSuperAdmin() ? '/master_panel.php' : '/index.php';
 if ($fvd_rep_fin_embed) {
-    $selfUrl = rtrim($appBase, '/') . '/fvdmasteradmin/index.php';
+    $selfUrl = rtrim($appBase, '/') . '/fvdmasteradmin' . $fvdPanelPath;
 } else {
     $selfUrl = rtrim($appBase, '/') . '/fvdmasteradmin/asociacion_reporte_financiero.php';
 }
-$urlPanel = rtrim($appBase, '/') . '/fvdmasteradmin/index.php';
+$urlPanel = rtrim($appBase, '/') . '/fvdmasteradmin' . $fvdPanelPath;
 $urlPagosMod = '';
 $urlPagoNuevo = '';
 if (function_exists('fvd_master_module_url') && $aid > 0) {

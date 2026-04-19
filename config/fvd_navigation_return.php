@@ -77,18 +77,30 @@ if (!function_exists('fvd_return_append_to_url')) {
     /**
      * Añade ret=… a una URL conservando el origen indicado, o el ret ya en la URL,
      * o en su defecto la página actual (sin ret/return).
+     * Si la vista es embebida del panel maestro, añade también fvd_master_embed=1.
      */
     function fvd_return_append_to_url(string $url, ?string $returnTo = null): string
     {
+        $out = $url;
         if ($returnTo === null) {
             $returnTo = fvd_return_from_request() ?? fvd_return_current_for_link();
         }
-        if ($returnTo === '') {
-            return $url;
+        if ($returnTo !== '') {
+            $sep = str_contains($out, '?') ? '&' : '?';
+            $out .= $sep . 'ret=' . rawurlencode($returnTo);
         }
-        $sep = str_contains($url, '?') ? '&' : '?';
+        if (function_exists('fvd_master_embed_active') && fvd_master_embed_active()) {
+            if (preg_match('/[?&]embedded=1(?:&|$)/', $out) !== 1) {
+                $sep = str_contains($out, '?') ? '&' : '?';
+                $out .= $sep . 'embedded=1';
+            }
+            if (preg_match('/[?&]fvd_master_embed=1(?:&|$)/', $out) !== 1) {
+                $sep = str_contains($out, '?') ? '&' : '?';
+                $out .= $sep . 'fvd_master_embed=1';
+            }
+        }
 
-        return $url . $sep . 'ret=' . rawurlencode($returnTo);
+        return $out;
     }
 }
 
@@ -106,17 +118,69 @@ if (!function_exists('fvd_return_merge_get_params')) {
         } elseif (isset($_GET['return']) && is_string($_GET['return']) && $_GET['return'] !== '' && fvd_return_sanitize($_GET['return']) !== null) {
             $queryParams['return'] = $_GET['return'];
         }
+        if (isset($_GET['embedded']) && (string) $_GET['embedded'] === '1') {
+            $queryParams['embedded'] = '1';
+        }
+        if (isset($_GET['fvd_master_embed']) && (string) $_GET['fvd_master_embed'] === '1') {
+            $queryParams['fvd_master_embed'] = '1';
+        }
 
         return $queryParams;
+    }
+}
+
+if (!function_exists('fvd_master_embed_active')) {
+    /**
+     * Vista embebida desde el panel maestro (iframe): ocultar cabecera/nav/footer del layout
+     * y conservar flags en enlaces. Acepta `embedded=1` (canónico) o `fvd_master_embed=1` (compat).
+     */
+    function fvd_master_embed_active(): bool
+    {
+        if (isset($_GET['embedded']) && (string) $_GET['embedded'] === '1') {
+            return true;
+        }
+        if (isset($_POST['embedded']) && (string) $_POST['embedded'] === '1') {
+            return true;
+        }
+        if (isset($_GET['fvd_master_embed']) && (string) $_GET['fvd_master_embed'] === '1') {
+            return true;
+        }
+        if (isset($_POST['fvd_master_embed']) && (string) $_POST['fvd_master_embed'] === '1') {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('fvd_append_embed_to_url')) {
+    /**
+     * Añade embedded=1 y fvd_master_embed=1 a una URL si aún no están (panel maestro → iframes).
+     *
+     * @param non-empty-string $url
+     */
+    function fvd_append_embed_to_url(string $url): string
+    {
+        $out = $url;
+        if (preg_match('/[?&]embedded=1(?:&|$)/', $out) !== 1) {
+            $out .= (str_contains($out, '?') ? '&' : '?') . 'embedded=1';
+        }
+        if (preg_match('/[?&]fvd_master_embed=1(?:&|$)/', $out) !== 1) {
+            $out .= (str_contains($out, '?') ? '&' : '?') . 'fvd_master_embed=1';
+        }
+
+        return $out;
     }
 }
 
 if (!function_exists('fvd_return_preserve_query_params')) {
     /**
      * Añade ret=… a una URL de redirección si GET o POST traen un origen válido (p. ej. tras guardar formulario).
+     * Conserva también fvd_master_embed=1 cuando la petición viene del iframe del panel maestro.
      */
     function fvd_return_preserve_query_params(string $url): string
     {
+        $out = $url;
         $p = fvd_return_from_request();
         if ($p === null && isset($_POST['ret']) && is_string($_POST['ret'])) {
             $p = fvd_return_sanitize($_POST['ret']);
@@ -124,12 +188,22 @@ if (!function_exists('fvd_return_preserve_query_params')) {
         if ($p === null && isset($_POST['return']) && is_string($_POST['return'])) {
             $p = fvd_return_sanitize($_POST['return']);
         }
-        if ($p === null) {
-            return $url;
+        if ($p !== null) {
+            $sep = str_contains($out, '?') ? '&' : '?';
+            $out .= $sep . 'ret=' . rawurlencode($p);
         }
-        $sep = str_contains($url, '?') ? '&' : '?';
+        if (fvd_master_embed_active()) {
+            if (preg_match('/[?&]embedded=1(?:&|$)/', $out) !== 1) {
+                $sep = str_contains($out, '?') ? '&' : '?';
+                $out .= $sep . 'embedded=1';
+            }
+            if (preg_match('/[?&]fvd_master_embed=1(?:&|$)/', $out) !== 1) {
+                $sep = str_contains($out, '?') ? '&' : '?';
+                $out .= $sep . 'fvd_master_embed=1';
+            }
+        }
 
-        return $url . $sep . 'ret=' . rawurlencode($p);
+        return $out;
     }
 }
 

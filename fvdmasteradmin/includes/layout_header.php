@@ -16,6 +16,16 @@ require_once $fvdRoot . '/config/ui_settings.php';
 AuthService::ensureSession();
 AuthService::requireLogin();
 
+if (!function_exists('fvd_user_is_admin_gral')) {
+    /**
+     * Admin general FVD (rol fvd_admin en fvd_usuarios).
+     */
+    function fvd_user_is_admin_gral(): bool
+    {
+        return AuthService::isAdministradorGeneral();
+    }
+}
+
 if (isset($fvd_required_roles) && is_array($fvd_required_roles) && $fvd_required_roles !== []) {
     AuthService::requireRoles($fvd_required_roles);
 }
@@ -27,8 +37,40 @@ $fvd_page_title = isset($fvd_page_title) && is_string($fvd_page_title) && $fvd_p
 if (!isset($fvd_hide_sidebar)) {
     $fvd_hide_sidebar = false;
 }
+$fvd_master_embed = false;
+if (!function_exists('fvd_master_embed_active')) {
+    $fvdNavFile = dirname(__DIR__, 2) . '/config/fvd_navigation_return.php';
+    if (is_file($fvdNavFile)) {
+        require_once $fvdNavFile;
+    }
+}
+if (function_exists('fvd_master_embed_active')) {
+    $fvd_master_embed = fvd_master_embed_active();
+}
+if ($fvd_master_embed) {
+    $fvd_hide_sidebar = true;
+}
+
+// Admin general: no usar el layout con menú lateral salvo vistas embebidas (?embedded=1 / fvd_master_embed).
+$fvd_script_early = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+$fvd_legacy_layout_ok_admin = (!empty($fvd_allow_legacy_layout_admin) && $fvd_allow_legacy_layout_admin);
+if (!$fvd_legacy_layout_ok_admin) {
+    $fvd_legacy_layout_ok_admin = str_ends_with($fvd_script_early, '/fvdmasteradmin/perfil.php')
+        || str_ends_with($fvd_script_early, '/fvdmasteradmin/asociacion_reporte_financiero.php');
+}
+if (fvd_user_is_admin_gral() && !$fvd_master_embed && !$fvd_legacy_layout_ok_admin) {
+    $fvdNavBaseRedir = rtrim((string) env('APP_BASE_PATH', ''), '/') . '/fvdmasteradmin';
+    header('Location: ' . $fvdNavBaseRedir . '/master_panel.php');
+    exit;
+}
+unset($fvd_script_early, $fvd_legacy_layout_ok_admin);
+
 if (!isset($fvd_head_extra_html)) {
     $fvd_head_extra_html = '';
+}
+/** Si true, el menú lateral arranca ancho (sin modo “rail” estrecho). Opcional por página, p. ej. delegado_dashboard.php */
+if (!isset($fvd_sidebar_start_expanded)) {
+    $fvd_sidebar_start_expanded = false;
 }
 
 $fvd_user = AuthService::user();
@@ -53,7 +95,9 @@ require_once $fvdRoot . '/includes/fvd_brand.php';
 $fvd_brand_logo_url = fvd_brand_logo_public_url();
 $fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
 $fvdNavBase = rtrim((string) env('APP_BASE_PATH', ''), '/') . '/fvdmasteradmin';
-$fvdPanelUrl = $fvdNavBase . (AuthService::isDelegadoAsociacion() ? '/delegado_dashboard.php' : '/index.php');
+$fvdPanelUrl = $fvdNavBase . (AuthService::isDelegadoAsociacion()
+    ? '/delegado_dashboard.php'
+    : (AuthService::role() === AuthService::ROLE_FVD_ADMIN ? '/master_panel.php' : '/index.php'));
 
 $fvdScript = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 
@@ -66,6 +110,8 @@ if (!isset($fvd_sidebar_active)) {
     $fvd_sidebar_active = 'panel';
     if (preg_match('#/fvdmasteradmin/perfil\\.php#i', $fvdScript)) {
         $fvd_sidebar_active = 'perfil';
+    } elseif (str_contains($fvdScript, '/fvdmasteradmin/master_panel.php')) {
+        $fvd_sidebar_active = 'master_panel';
     } elseif (strpos($fvdScript, '/dashboard/') !== false) {
         $fvd_sidebar_active = 'dashboard_lite';
     } elseif (str_contains($fvdScript, '/admin/modules/asociaciones/')) {
@@ -142,7 +188,7 @@ if (str_contains($fvdScript, '/atletas/export.php')) {
     $fvd_sidebar_active = 'informe_export_atletas';
 }
 
-$fvd_perfil_url = $fvdNavBase . '/perfil.php';
+$fvd_perfil_url = AuthService::perfilUrl();
 $fvd_mi_ficha_url = $fvdNavBase . '/atleta/mi_ficha.php';
 $fvd_public_landing_url = url('index.php');
 
@@ -349,8 +395,12 @@ header('Content-Type: text/html; charset=UTF-8');
             inset: 0;
             background: rgba(0, 0, 0, 0.45);
             z-index: 140;
+            pointer-events: none;
         }
-        .fvd-shell--nav-open .fvd-sidebar-backdrop { display: block; }
+        .fvd-shell--nav-open .fvd-sidebar-backdrop {
+            display: block;
+            pointer-events: auto;
+        }
         .fvd-sidebar {
             width: 16.75rem;
             flex-shrink: 0;
@@ -359,9 +409,11 @@ header('Content-Type: text/html; charset=UTF-8');
             border-right: 2px solid var(--fvd-amarillo);
             display: flex;
             flex-direction: column;
-            z-index: 150;
+            position: relative;
+            z-index: 160;
             box-shadow: 2px 0 12px rgba(0, 0, 0, 0.12);
             transition: width 0.2s ease;
+            pointer-events: auto;
         }
         .fvd-shell--sidebar-rail .fvd-sidebar {
             width: 4.5rem;
@@ -376,14 +428,17 @@ header('Content-Type: text/html; charset=UTF-8');
             display: block;
             padding: 4px 2px;
         }
+        /* Sin overflow:hidden en ambos ejes: en rail recortaba la caja de clic; el texto largo se parte dentro del carril. */
         .fvd-shell--sidebar-rail .fvd-sn {
             font-size: 0.55rem;
             line-height: 1.1;
             padding: 6px 4px;
             margin: 2px 4px;
             text-align: center;
-            max-height: 2.8em;
-            overflow: hidden;
+            min-height: 2.25rem;
+            overflow-x: hidden;
+            overflow-y: visible;
+            word-break: break-word;
         }
         .fvd-shell--sidebar-rail .fvd-sn-acc {
             margin: 2px 4px;
@@ -453,7 +508,15 @@ header('Content-Type: text/html; charset=UTF-8');
             text-decoration: none;
         }
         .fvd-sidebar-brand:hover { color: var(--fvd-amarillo); }
-        .fvd-sidebar-nav { flex: 1; overflow-y: auto; padding: 10px 0 16px; }
+        .fvd-sidebar-nav {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: visible;
+            padding: 10px 0 16px;
+            position: relative;
+            z-index: 1;
+        }
         .fvd-sn {
             display: block;
             margin: 2px 8px;
@@ -569,6 +632,8 @@ header('Content-Type: text/html; charset=UTF-8');
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            position: relative;
+            z-index: 0;
         }
         .fvd-shell--no-sidebar .fvd-sidebar,
         .fvd-shell--no-sidebar .fvd-sidebar-backdrop,
@@ -586,6 +651,16 @@ header('Content-Type: text/html; charset=UTF-8');
             max-width: 100%;
             width: 100%;
         }
+        /* Evita que el contenido colapse en columnas flex (p. ej. dashboard delegado sin sidebar). */
+        main.fvd-main {
+            flex: 1 1 auto;
+            min-width: 0;
+            width: 100%;
+        }
+        /* Sin hueco residual si se retira un h1 u otros bloques superiores (p. ej. SPA / 13") */
+        #fvd-shell .fvd-main-column main.fvd-main {
+            padding-top: 0 !important;
+        }
         .fvd-shell--no-sidebar main.fvd-main {
             display: block;
             width: 100%;
@@ -596,6 +671,9 @@ header('Content-Type: text/html; charset=UTF-8');
         }
         .fvd-topbar {
             flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 50;
             border-bottom: 1px solid var(--fvd-border);
             background: rgba(0, 0, 0, 0.18);
         }
@@ -621,14 +699,20 @@ header('Content-Type: text/html; charset=UTF-8');
             text-decoration: none;
             color: inherit;
         }
+        /* Logo + título de página como un solo bloque de mando (sin saltos CLS) */
+        .fvd-topbar__fvd-lockup .fvd-topbar__fvd-logo {
+            align-self: center;
+        }
         .fvd-topbar__fvd-lockup:hover .fvd-topbar__page-title { color: var(--fvd-amarillo); }
         .fvd-topbar__fvd-logo {
             height: 40px;
-            width: auto;
+            width: 104px;
             max-width: 104px;
             object-fit: contain;
+            object-position: left center;
             flex-shrink: 0;
             display: block;
+            vertical-align: middle;
         }
         .fvd-topbar__page-title {
             font-size: clamp(0.72rem, 2.1vw, 0.92rem);
@@ -751,6 +835,7 @@ header('Content-Type: text/html; charset=UTF-8');
         .fvd-return-bar a:hover { text-decoration: underline; }
         .fvd-main-wrap {
             flex: 1;
+            min-width: 0;
             max-width: var(--fvd-max);
             width: 100%;
             margin: 0 auto;
@@ -841,10 +926,27 @@ header('Content-Type: text/html; charset=UTF-8');
             opacity: 1;
         }
         input.fvd-input::placeholder, textarea.fvd-input::placeholder { color: var(--fvd-muted); opacity: 0.85; }
+        /* Panel maestro / iframe: solo contenido, sin sidebar ni topbar */
+        .fvd-shell--embedded .fvd-main-column {
+            min-height: 100vh;
+        }
+        .fvd-shell--embedded .fvd-main-wrap {
+            max-width: 100%;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
-<div class="fvd-shell fvd-shell--sidebar-rail<?= !empty($fvd_hide_sidebar) ? ' fvd-shell--no-sidebar' : '' ?>" id="fvd-shell">
+<script>
+(function () {
+    if (window.self !== window.top || window.location.search.includes('embedded=1')) {
+        document.documentElement.classList.add('is-embedded-view');
+        document.body.classList.add('is-embedded');
+    }
+})();
+</script>
+<div class="fvd-shell<?= empty($fvd_sidebar_start_expanded) ? ' fvd-shell--sidebar-rail' : '' ?><?= !empty($fvd_hide_sidebar) ? ' fvd-shell--no-sidebar' : '' ?><?= !empty($fvd_master_embed) ? ' fvd-shell--embedded' : '' ?>" id="fvd-shell"<?= !empty($fvd_sidebar_start_expanded) ? ' data-fvd-sidebar-start-expanded="1"' : '' ?>>
+    <?php if (empty($fvd_master_embed)): ?>
     <button type="button" class="fvd-mnav-toggle" id="fvd-mnav-toggle" aria-controls="fvd-sidebar" aria-expanded="false" aria-label="Abrir menú">☰</button>
     <div class="fvd-sidebar-backdrop" id="fvd-sidebar-backdrop" aria-hidden="true"></div>
     <aside class="fvd-sidebar" id="fvd-sidebar" aria-label="Menú principal">
@@ -861,6 +963,9 @@ header('Content-Type: text/html; charset=UTF-8');
         </div>
         <nav class="fvd-sidebar-nav">
             <a class="fvd-sn<?= $fvd_sn_active('panel') ?>" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Panel / Inicio">Panel / Inicio</a>
+            <?php if ($fvd_es_admin_fvd): ?>
+                <a class="fvd-sn<?= $fvd_sn_active('master_panel') ?>" href="<?= htmlspecialchars($fvdNavBase . '/master_panel.php', ENT_QUOTES, 'UTF-8') ?>" title="Panel maestro (vista compacta SPA)">Panel maestro</a>
+            <?php endif; ?>
             <?php if ($fvd_es_admin_fvd && $fvd_revision_total > 0 && function_exists('admin_module_url') && function_exists('fvd_module_url')): ?>
                 <?php if ($fvd_revision_altas > 0): ?>
                     <a class="fvd-sn fvd-sn--pend" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=list'), ENT_QUOTES, 'UTF-8') ?>" title="Listado de atletas (incluye altas desde delegados pendientes de validar)">Revisar altas delegado<span class="fvd-pend-badge" aria-label="Cantidad"><?= (int) $fvd_revision_altas ?></span></a>
@@ -980,15 +1085,28 @@ header('Content-Type: text/html; charset=UTF-8');
                 <strong><?= htmlspecialchars((string) ($fvd_user['nombre'] ?? $fvd_user['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
                 <?= htmlspecialchars((string) ($fvd_user['rol'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
             <?php endif; ?>
-            <a class="fvd-logout" href="<?= htmlspecialchars(AuthService::logoutUrl(), ENT_QUOTES, 'UTF-8') ?>">Cerrar sesión</a>
+            <div class="fvd-sidebar-user__links" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center">
+                <a class="fvd-sn" style="font-size:0.8125rem;padding:4px 8px" href="<?= htmlspecialchars(AuthService::perfilUrl(), ENT_QUOTES, 'UTF-8') ?>">Mi perfil</a>
+                <a class="fvd-logout" href="<?= htmlspecialchars(AuthService::logoutUrl(), ENT_QUOTES, 'UTF-8') ?>">Cerrar sesión</a>
+            </div>
         </div>
     </aside>
+    <?php endif; ?>
     <div class="fvd-main-column">
+    <?php if (empty($fvd_master_embed)): ?>
     <header class="fvd-topbar">
         <div class="fvd-topbar__inner">
             <div class="fvd-topbar__brand">
                 <a class="fvd-topbar__fvd-lockup" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Ir al panel — FVD">
-                    <img class="fvd-topbar__fvd-logo" src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>" width="104" height="40" alt="" decoding="async">
+                    <img
+                        class="fvd-topbar__fvd-logo"
+                        src="<?= htmlspecialchars($fvd_brand_logo_url, ENT_QUOTES, 'UTF-8') ?>"
+                        width="104"
+                        height="40"
+                        alt="Federación Venezolana de Dominó"
+                        decoding="async"
+                        style="object-fit: contain;"
+                    >
                     <span class="fvd-topbar__page-title"><?= htmlspecialchars($fvd_page_title, ENT_QUOTES, 'UTF-8') ?></span>
                 </a>
                 <?php if ($fvd_topbar_asoc_logo_url !== null && $fvd_topbar_asoc_logo_url !== ''): ?>
@@ -1011,9 +1129,10 @@ header('Content-Type: text/html; charset=UTF-8');
             </div>
         </div>
     </header>
+    <?php endif; ?>
     <div class="fvd-main-wrap">
         <main class="fvd-main">
-        <?php if ($fvd_return_nav_url !== null && $fvd_return_nav_url !== ''): ?>
+        <?php if (empty($fvd_master_embed) && $fvd_return_nav_url !== null && $fvd_return_nav_url !== ''): ?>
             <nav class="fvd-return-bar no-print" aria-label="Volver al origen">
                 <a href="<?= htmlspecialchars($fvd_return_nav_url, ENT_QUOTES, 'UTF-8') ?>">← Volver al origen</a>
             </nav>

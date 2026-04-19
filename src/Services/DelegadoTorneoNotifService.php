@@ -70,6 +70,7 @@ final class DelegadoTorneoNotifService
         }
         self::ensureTable($pdo);
         self::ensureTokenColumns($pdo);
+        self::ensureAceptacionColumn($pdo);
         $ph = implode(',', array_fill(0, count($ids), '?'));
         try {
             $st = $pdo->prepare("SELECT DISTINCT delegado_id FROM fvd_delegado_notif_torneo WHERE torneo_id IN ($ph)");
@@ -100,6 +101,7 @@ final class DelegadoTorneoNotifService
                 asociacion_id = VALUES(asociacion_id),
                 creado_en = CURRENT_TIMESTAMP,
                 visto_en = NULL,
+                invitacion_aceptada_en = NULL,
                 access_token = IFNULL(fvd_delegado_notif_torneo.access_token, VALUES(access_token))'
         );
         foreach ($delegados as $did) {
@@ -152,6 +154,23 @@ final class DelegadoTorneoNotifService
     }
 
     /**
+     * El delegado debe confirmar la invitación antes de usar el enlace de inscripción.
+     */
+    public static function ensureAceptacionColumn(PDO $pdo): void
+    {
+        self::ensureTable($pdo);
+        try {
+            $pdo->exec(
+                'ALTER TABLE fvd_delegado_notif_torneo ADD COLUMN invitacion_aceptada_en TIMESTAMP NULL DEFAULT NULL COMMENT \'Confirmación explícita en panel\''
+            );
+        } catch (PDOException $e) {
+            if (stripos($e->getMessage(), 'Duplicate column') === false) {
+                error_log('[DelegadoTorneoNotifService] ensureAceptacionColumn: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
      * Crea o actualiza avisos para todos los delegados activos (mismo universo que el correo masivo).
      * Incluye token de acceso por fila y asociación para enlaces seguros en la tarjeta PDF.
      *
@@ -177,6 +196,7 @@ final class DelegadoTorneoNotifService
         }
         self::ensureTable($pdo);
         self::ensureTokenColumns($pdo);
+        self::ensureAceptacionColumn($pdo);
 
         $st = $pdo->prepare('SELECT invitacion FROM torneosact WHERE torneo = :t LIMIT 1');
         $st->execute([':t' => $torneoId]);
@@ -222,6 +242,7 @@ final class DelegadoTorneoNotifService
                 asociacion_id = VALUES(asociacion_id),
                 creado_en = CURRENT_TIMESTAMP,
                 visto_en = NULL,
+                invitacion_aceptada_en = NULL,
                 access_token = IFNULL(fvd_delegado_notif_torneo.access_token, VALUES(access_token))'
         );
         $n = 0;
@@ -241,6 +262,60 @@ final class DelegadoTorneoNotifService
         }
 
         return $n;
+    }
+
+    /**
+     * Solo delegados activos que aún no tienen fila para este torneo (p. ej. alta posterior al primer despacho).
+     *
+     * @return array{insertados: int, nuevos_delegado_ids: list<int>}
+     */
+    public static function crearNotificacionesFaltantesParaTorneo(PDO $pdo, int $torneoId): array
+    {
+        if ($torneoId <= 0) {
+            return ['insertados' => 0, 'nuevos_delegado_ids' => []];
+        }
+        self::ensureTable($pdo);
+        self::ensureTokenColumns($pdo);
+        self::ensureAceptacionColumn($pdo);
+
+        $st = $pdo->prepare('SELECT invitacion FROM torneosact WHERE torneo = :t LIMIT 1');
+        $st->execute([':t' => $torneoId]);
+        $inv = $st->fetchColumn();
+        $invFile = $inv !== false && $inv !== null && trim((string) $inv) !== '' ? trim((string) $inv) : null;
+
+        $sql = 'SELECT d.id, d.asociacion_id FROM delegados d
+            WHERE d.activo = 1 AND d.asociacion_id IS NOT NULL AND d.asociacion_id > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM fvd_delegado_notif_torneo n
+                  WHERE n.delegado_id = d.id AND n.torneo_id = :t
+              )';
+        $stD = $pdo->prepare($sql);
+        $stD->execute([':t' => $torneoId]);
+        $ins = $pdo->prepare(
+            'INSERT INTO fvd_delegado_notif_torneo (delegado_id, torneo_id, invitacion_archivo, access_token, asociacion_id)
+             VALUES (:d, :t, :inv, :tok, :a)'
+        );
+        $n = 0;
+        $ids = [];
+        while ($row = $stD->fetch(PDO::FETCH_ASSOC)) {
+            $did = (int) ($row['id'] ?? 0);
+            $aid = (int) ($row['asociacion_id'] ?? 0);
+            if ($did <= 0 || $aid <= 0) {
+                continue;
+            }
+            $token = bin2hex(random_bytes(32));
+            try {
+                $ins->execute([':d' => $did, ':t' => $torneoId, ':inv' => $invFile, ':tok' => $token, ':a' => $aid]);
+                if ($ins->rowCount() > 0) {
+                    ++$n;
+                    $ids[] = $did;
+                }
+            } catch (PDOException $e) {
+                error_log('[DelegadoTorneoNotifService] crearFaltantes: ' . $e->getMessage());
+            }
+        }
+
+        return ['insertados' => $n, 'nuevos_delegado_ids' => $ids];
     }
 
     /**
@@ -372,12 +447,13 @@ final class DelegadoTorneoNotifService
             return [];
         }
         self::ensureTable($pdo);
+        self::ensureAceptacionColumn($pdo);
         self::ensureCampeonatoGrupoTable($pdo);
         $limite = max(1, min(100, $limite));
         try {
             if ($asociacionId !== null && $asociacionId > 0) {
                 $st = $pdo->prepare(
-                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en, n.invitacion_aceptada_en,
                         COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
                         t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
@@ -391,7 +467,7 @@ final class DelegadoTorneoNotifService
                 $st->execute([':a' => $asociacionId]);
             } else {
                 $st = $pdo->prepare(
-                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en, n.invitacion_aceptada_en,
                         COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
                         t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
@@ -535,6 +611,78 @@ final class DelegadoTorneoNotifService
             error_log('[DelegadoTorneoNotifService] marcarTodasVistasParaTorneo: ' . $e->getMessage());
 
             return 0;
+        }
+    }
+
+    /**
+     * Hay invitación al torneo en contexto y aún no se pulsó «Aceptar invitación».
+     */
+    public static function invitacionPendienteDeAceptacion(PDO $pdo, int $delegadoId, int $torneoId, ?int $asociacionId = null): bool
+    {
+        if ($torneoId <= 0) {
+            return false;
+        }
+        self::ensureTable($pdo);
+        self::ensureAceptacionColumn($pdo);
+        try {
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'SELECT 1 FROM fvd_delegado_notif_torneo n
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     WHERE n.torneo_id = :t AND del.asociacion_id = :a AND del.activo = 1
+                       AND n.invitacion_aceptada_en IS NULL
+                     LIMIT 1'
+                );
+                $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+            } else {
+                if ($delegadoId <= 0) {
+                    return false;
+                }
+                $st = $pdo->prepare(
+                    'SELECT 1 FROM fvd_delegado_notif_torneo
+                     WHERE delegado_id = :d AND torneo_id = :t AND invitacion_aceptada_en IS NULL
+                     LIMIT 1'
+                );
+                $st->execute([':d' => $delegadoId, ':t' => $torneoId]);
+            }
+
+            return (bool) $st->fetchColumn();
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] invitacionPendienteDeAceptacion: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
+    public static function marcarInvitacionAceptada(PDO $pdo, int $delegadoId, int $torneoId, ?int $asociacionId = null): bool
+    {
+        if ($torneoId <= 0 || ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0))) {
+            return false;
+        }
+        self::ensureTable($pdo);
+        self::ensureAceptacionColumn($pdo);
+        try {
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'UPDATE fvd_delegado_notif_torneo n
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     SET n.invitacion_aceptada_en = NOW()
+                     WHERE n.torneo_id = :t AND del.asociacion_id = :a AND del.activo = 1'
+                );
+                $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+            } else {
+                $st = $pdo->prepare(
+                    'UPDATE fvd_delegado_notif_torneo SET invitacion_aceptada_en = NOW()
+                     WHERE delegado_id = :d AND torneo_id = :t'
+                );
+                $st->execute([':d' => $delegadoId, ':t' => $torneoId]);
+            }
+
+            return $st->rowCount() > 0;
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] marcarInvitacionAceptada: ' . $e->getMessage());
+
+            return false;
         }
     }
 }

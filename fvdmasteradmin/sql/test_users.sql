@@ -1,11 +1,11 @@
 -- =============================================================================
 -- Prueba de acceso FVD Master Admin — credenciales simples
 -- =============================================================================
--- RECOMENDADO (hashes siempre correctos): desde la raíz del proyecto ejecute:
---   php fvdmasteradmin/cli/seed_test_users.php
--- Ese script crea la tabla si falta y actualiza Trinoamez / Asociacion / usuario.
+-- RECOMENDADO: desde la raíz del proyecto ejecute:
+--   php fvdmasteradmin/cli/seed_all_pruebas.php
+-- Cuentas canónicas y contraseña: fvdmasteradmin/config/test_accounts.php
 -- =============================================================================
--- Usuario (campo email en BD) | Contraseña | Rol
+-- (Histórico) Usuario (campo email en BD) | Contraseña | Rol
 --   Trinoamez                  | npi$2025   | fvd_admin
 --   Asociacion                 | npi$2025   | aso_admin  (asociación 9901)
 --   usuario                    | npi$2025   | usuario    (asociación 9901)

@@ -68,6 +68,17 @@ $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== nu
                 <input class="fvd-input" id="lugar" name="lugar" value="<?= htmlspecialchars((string) ($r['lugar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
             </div>
 
+            <?php if ($fvdEsAdminGeneral && $isEdit): ?>
+            <div>
+                <label for="fecha_limite_cambios">Límite de cambios de nómina</label>
+                <input class="fvd-input" type="date" id="fecha_limite_cambios" name="fecha_limite_cambios"
+                    value="<?= htmlspecialchars(substr((string) ($r['fecha_limite_cambios'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8') ?>">
+                <small style="display:block;font-size:0.7rem;color:var(--fvd-muted,#94a3b8);margin-top:4px">
+                    A partir del día siguiente, el delegado solo podrá consultar inscripciones y cambios de plantilla (sin edición).
+                </small>
+            </div>
+            <?php endif; ?>
+
             <div>
                 <label for="tipo">Tipo</label>
                 <select class="fvd-input" id="tipo" name="tipo" style="max-width:14rem">

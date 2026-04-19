@@ -9,6 +9,10 @@ declare(strict_types=1);
 (function () {
     var shell = document.getElementById('fvd-shell');
     var wideBtn = document.getElementById('fvd-sidebar-wide-toggle');
+    /* Páginas que arrancan con menú ancho: guardar preferencia para que otras pantallas del admin no vuelvan al rail. */
+    if (shell && shell.getAttribute('data-fvd-sidebar-start-expanded') === '1') {
+        try { localStorage.setItem('fvdSidebarWide', '1'); } catch (e) {}
+    }
     /* No quitar sidebar-rail en vistas sin menú lateral: el layout depende de la clase inicial. */
     if (shell && !shell.classList.contains('fvd-shell--no-sidebar') && localStorage.getItem('fvdSidebarWide') === '1') {
         shell.classList.remove('fvd-shell--sidebar-rail');
@@ -48,5 +52,27 @@ declare(strict_types=1);
     });
 })();
 </script>
+<?php if (!empty($fvd_master_embed ?? false)) : ?>
+<script>
+(function () {
+    document.querySelectorAll('form[method="post"]').forEach(function (f) {
+        if (!f.querySelector('input[name="embedded"]')) {
+            var e = document.createElement('input');
+            e.type = 'hidden';
+            e.name = 'embedded';
+            e.value = '1';
+            f.appendChild(e);
+        }
+        if (!f.querySelector('input[name="fvd_master_embed"]')) {
+            var i = document.createElement('input');
+            i.type = 'hidden';
+            i.name = 'fvd_master_embed';
+            i.value = '1';
+            f.appendChild(i);
+        }
+    });
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>

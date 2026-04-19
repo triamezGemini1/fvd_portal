@@ -22,7 +22,7 @@ if (!AuthService::checkAccess([AuthService::ROLE_DELEGADO_ASOC, AuthService::ROL
     exit;
 }
 
-$redir = $fvdAppBasePath . '/fvdmasteradmin/index.php';
+$redir = AuthService::homeUrl();
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || ($_POST['_action'] ?? '') !== 'generar_deuda_torneo') {
     header('Location: ' . $redir);

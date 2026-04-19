@@ -5,9 +5,9 @@
  * Requisito: exista al menos una fila en `asociaciones`. Usa la asociación con id más bajo
  * (o ASOCIACION_ID en entorno si la define).
  *
- * Credenciales por defecto (cambiar en producción):
+ * Credenciales (misma contraseña que seed_test_users — ver config/test_accounts.php):
  *   Email (campo login): delegado.prueba@fvd.local
- *   Contraseña:           Delegado2026!
+ *   Contraseña:           PruebaFVD2026! (constante FVD_TEST_PASSWORD)
  *
  * Uso (desde la raíz del proyecto):
  *   php fvdmasteradmin/cli/seed_delegado_prueba.php
@@ -18,9 +18,10 @@ $root = dirname(__DIR__, 2);
 chdir($root);
 
 require_once $root . '/fvdmasteradmin/config/db.php';
+require_once dirname(__DIR__) . '/config/test_accounts.php';
 
 $email = 'delegado.prueba@fvd.local';
-$plain = 'Delegado2026!';
+$plain = FVD_TEST_PASSWORD;
 $forcedAid = (int) (getenv('ASOCIACION_ID') ?: 0);
 
 try {

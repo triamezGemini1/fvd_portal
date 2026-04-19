@@ -2929,3 +2929,23 @@ table.tabla-atletas.fvd-atletas-view--tech .fvd-col-contact {
 .fvd-traspaso-modal__body {
   padding: 12px;
 }
+
+/* Vista embebida (iframe panel / ?embedded=1): suprimir menú lateral y ancho completo */
+body.is-embedded .fvd-sidebar,
+body.is-embedded aside,
+#fvd-shell:has(iframe) .fvd-sidebar {
+  display: none !important;
+  width: 0 !important;
+}
+
+body.is-embedded .fvd-main-column,
+body.is-embedded main {
+  margin-left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+
+html.is-embedded-view body.is-embedded {
+  overflow-x: hidden;
+}

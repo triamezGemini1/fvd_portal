@@ -13,6 +13,10 @@ require_once __DIR__ . '/TorneoDelegadoTarjetaService.php';
 require_once __DIR__ . '/FvdAdminRevisionPendienteService.php';
 require_once __DIR__ . '/DeudaAsociacionGeneratorService.php';
 require_once __DIR__ . '/DelegadoTorneoVentanasService.php';
+require_once __DIR__ . '/FvdNotificacionesService.php';
+require_once __DIR__ . '/FvdAccessManager.php';
+
+use FvdPortal\Services\FvdNotificacionesService;
 
 /**
  * Operaciones de persistencia para el panel admin (/admin/modules).
@@ -74,7 +78,7 @@ final class FvdAdminService
     private const TORNEOS_PERSIST = [
         'organizacion_id', 'clavetor', 'nombre', 'lugar', 'fechator', 'tipo', 'clase', 'tiempo',
         'puntos', 'rondas', 'estatus', 'costotor', 'ranking', 'pareclub', 'invitacion', 'afiche', 'publicar_landing',
-        'grupo_evento_id', 'apertura_anual',
+        'grupo_evento_id', 'apertura_anual', 'fecha_limite_cambios',
     ];
 
     public function __construct(?PDO $pdo = null, ?string $projectRoot = null)
@@ -840,6 +844,75 @@ final class FvdAdminService
         );
     }
 
+    /**
+     * Añade a cada fila del listado: invitaciones_despachadas, despacho_enviados (filas en fvd_delegado_notif_torneo),
+     * despacho_total_delegados (delegados activos con asociación).
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    public function torneosListEnrichDespachoMonitor(array $rows): array
+    {
+        if ($rows === []) {
+            return $rows;
+        }
+        $ids = [];
+        foreach ($rows as $r) {
+            $t = (int) ($r['torneo'] ?? 0);
+            if ($t > 0) {
+                $ids[] = $t;
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        if ($ids === []) {
+            return $rows;
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $invMap = [];
+        try {
+            $st = $this->pdo->prepare(
+                'SELECT torneo, COALESCE(invitaciones_despachadas, 0) AS invitaciones_despachadas FROM torneosact WHERE torneo IN (' . $ph . ')'
+            );
+            $st->execute($ids);
+            while ($x = $st->fetch(PDO::FETCH_ASSOC)) {
+                $invMap[(int) ($x['torneo'] ?? 0)] = (int) ($x['invitaciones_despachadas'] ?? 0);
+            }
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService] torneosListEnrichDespachoMonitor inv: ' . $e->getMessage());
+        }
+        $cntMap = [];
+        try {
+            $stn = $this->pdo->prepare(
+                'SELECT torneo_id, COUNT(*) AS c FROM fvd_delegado_notif_torneo WHERE torneo_id IN (' . $ph . ') GROUP BY torneo_id'
+            );
+            $stn->execute($ids);
+            while ($x = $stn->fetch(PDO::FETCH_ASSOC)) {
+                $cntMap[(int) ($x['torneo_id'] ?? 0)] = (int) ($x['c'] ?? 0);
+            }
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService] torneosListEnrichDespachoMonitor count: ' . $e->getMessage());
+        }
+        $totalDel = 0;
+        try {
+            $stc = $this->pdo->query(
+                'SELECT COUNT(*) FROM delegados WHERE activo = 1 AND asociacion_id IS NOT NULL AND asociacion_id > 0'
+            );
+            if ($stc !== false) {
+                $totalDel = (int) $stc->fetchColumn();
+            }
+        } catch (Throwable $e) {
+        }
+        foreach ($rows as &$r) {
+            $tid = (int) ($r['torneo'] ?? 0);
+            $r['invitaciones_despachadas'] = $invMap[$tid] ?? 0;
+            $r['despacho_enviados'] = $cntMap[$tid] ?? 0;
+            $r['despacho_total_delegados'] = $totalDel;
+        }
+        unset($r);
+
+        return $rows;
+    }
+
     public function torneosFind(?int $torneo): ?array
     {
         if ($torneo === null) {
@@ -971,6 +1044,7 @@ final class FvdAdminService
     public function torneosSave(?int $torneoId, array $post, array $files): int
     {
         $this->torneosRequireGestionTorneo();
+        \FvdPortal\Services\DelegadoTorneoVentanasService::ensureFechaLimiteCambiosColumn($this->pdo);
 
         $data = [];
         foreach (self::TORNEOS_PERSIST as $col) {
@@ -986,6 +1060,8 @@ final class FvdAdminService
                 $data[$col] = $v === '' || $v === null ? null : (int) $v;
             } elseif ($col === 'costotor') {
                 $data[$col] = $v === '' ? null : (float) $v;
+            } elseif ($col === 'fecha_limite_cambios') {
+                $data[$col] = $v === '' || $v === null ? null : substr((string) $v, 0, 10);
             } else {
                 $data[$col] = $v === '' ? null : (string) $v;
             }
@@ -1094,11 +1170,160 @@ final class FvdAdminService
             return;
         }
         try {
-            \FvdPortal\Services\DelegadoTorneoNotifService::crearNotificacionesParaTorneo($this->pdo, $newTorneoId);
-            \FvdPortal\Services\TorneoDelegadoTarjetaService::generarTarjetasParaTorneo($this->pdo, $newTorneoId, $this->projectRoot);
+            $this->despacharInvitacionesMasivas($newTorneoId);
         } catch (Throwable $e) {
-            error_log('[FvdAdminService] torneosPostCreacionInvitacionesDelegados notif/pdf: ' . $e->getMessage());
+            error_log('[FvdAdminService] despacharInvitacionesMasivas: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Notificaciones en panel, tarjetas PDF, Telegram (si hay chat_id) y marca el torneo como invitaciones despachadas.
+     */
+    public function despacharInvitacionesMasivas(int $torneoId): void
+    {
+        if ($torneoId <= 0) {
+            return;
+        }
+        $role = AuthService::role();
+        if ($role !== AuthService::ROLE_FVD_ADMIN && $role !== AuthService::ROLE_ASO_ADMIN) {
+            return;
+        }
+        $projRoot = dirname(__DIR__, 2);
+        require_once $projRoot . '/fvdmasteradmin/fvd_notifier_bot.php';
+        fvd_notifier_ensure_schema($this->pdo);
+        \FvdPortal\Services\DelegadoTorneoNotifService::crearNotificacionesParaTorneo($this->pdo, $torneoId);
+        \FvdPortal\Services\TorneoDelegadoTarjetaService::generarTarjetasParaTorneo($this->pdo, $torneoId, $this->projectRoot);
+        fvd_notifier_despachar_telegram_para_torneo($this->pdo, $torneoId);
+        try {
+            $st = $this->pdo->prepare('UPDATE torneosact SET invitaciones_despachadas = 1 WHERE torneo = :t');
+            $st->execute([':t' => $torneoId]);
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService] invitaciones_despachadas: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Tras vincular campeonatos al mismo grupo: Telegram (sin duplicar creación de filas) y marca torneos.
+     *
+     * @param list<int> $torneoIds
+     */
+    private function despacharTelegramYMarcaTrasVinculacionGrupo(array $torneoIds): void
+    {
+        $ids = [];
+        foreach ($torneoIds as $x) {
+            $n = (int) $x;
+            if ($n > 0) {
+                $ids[$n] = $n;
+            }
+        }
+        $ids = array_values($ids);
+        if ($ids === []) {
+            return;
+        }
+        $projRoot = dirname(__DIR__, 2);
+        require_once $projRoot . '/fvdmasteradmin/fvd_notifier_bot.php';
+        fvd_notifier_ensure_schema($this->pdo);
+        fvd_notifier_despachar_telegram_tras_grupo($this->pdo, $ids);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $st = $this->pdo->prepare('UPDATE torneosact SET invitaciones_despachadas = 1 WHERE torneo IN (' . $ph . ')');
+            $st->execute($ids);
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService] despacharTelegramYMarcaTrasVinculacionGrupo: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Convocatoria nacional FVD: filas en `fvd_delegado_notif_torneo` (token), `fvd_notificaciones`, tarjetas PDF y Telegram con botón al panel embebido.
+     *
+     * @return array{delegados: int, notificaciones: int, telegram_enviados: int}
+     */
+    public function lanzarConvocatoriaNacional(int $torneoId): array
+    {
+        $this->torneosRequireFvdAdminForGestion();
+        if ($torneoId <= 0) {
+            throw new InvalidArgumentException('Torneo no válido.');
+        }
+        $row = $this->torneosFind($torneoId);
+        if ($row === null) {
+            throw new InvalidArgumentException('Torneo no encontrado.');
+        }
+        \FvdPortal\Services\DelegadoTorneoVentanasService::ensureFechaLimiteCambiosColumn($this->pdo);
+        \FvdPortal\Services\DelegadoTorneoNotifService::crearNotificacionesParaTorneo($this->pdo, $torneoId);
+        \FvdPortal\Services\TorneoDelegadoTarjetaService::generarTarjetasParaTorneo($this->pdo, $torneoId, $this->projectRoot);
+        $nNotif = FvdNotificacionesService::sincronizarDesdeDelegadoNotifTorneo($this->pdo, $torneoId);
+        $projRoot = dirname(__DIR__, 2);
+        require_once $projRoot . '/fvdmasteradmin/fvd_notifier_bot.php';
+        fvd_notifier_ensure_schema($this->pdo);
+        $tg = fvd_notifier_convocatoria_nacional_telegram($this->pdo, $torneoId);
+        try {
+            $st = $this->pdo->prepare('UPDATE torneosact SET invitaciones_despachadas = 1 WHERE torneo = :t');
+            $st->execute([':t' => $torneoId]);
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService] lanzarConvocatoriaNacional marca: ' . $e->getMessage());
+        }
+        $stC = $this->pdo->prepare('SELECT COUNT(*) FROM fvd_delegado_notif_torneo WHERE torneo_id = :t');
+        $stC->execute([':t' => $torneoId]);
+        $nDel = (int) $stC->fetchColumn();
+
+        return [
+            'delegados' => $nDel,
+            'notificaciones' => $nNotif,
+            'telegram_enviados' => $tg,
+        ];
+    }
+
+    /**
+     * Tras el primer envío nacional: crea filas/token solo para delegados pendientes, sincroniza tarjetas y notifica por Telegram a esos delegados.
+     *
+     * @return array{insertados: int, notificaciones: int, telegram_enviados: int}
+     */
+    public function lanzarConvocatoriaPendientes(int $torneoId): array
+    {
+        $this->torneosRequireFvdAdminForGestion();
+        if ($torneoId <= 0) {
+            throw new InvalidArgumentException('Torneo no válido.');
+        }
+        $row = $this->torneosFind($torneoId);
+        if ($row === null) {
+            throw new InvalidArgumentException('Torneo no encontrado.');
+        }
+        $projRootEarly = dirname(__DIR__, 2);
+        require_once $projRootEarly . '/fvdmasteradmin/fvd_notifier_bot.php';
+        fvd_notifier_ensure_schema($this->pdo);
+        try {
+            $stM = $this->pdo->prepare('SELECT COALESCE(invitaciones_despachadas, 0) FROM torneosact WHERE torneo = :t');
+            $stM->execute([':t' => $torneoId]);
+            if ((int) $stM->fetchColumn() !== 1) {
+                throw new RuntimeException('Primero debe enviarse el lote nacional; el monitor no marca el torneo como despachado.');
+            }
+        } catch (InvalidArgumentException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            throw new RuntimeException('No se pudo comprobar el estado del despacho.');
+        }
+        \FvdPortal\Services\DelegadoTorneoVentanasService::ensureFechaLimiteCambiosColumn($this->pdo);
+        $falt = \FvdPortal\Services\DelegadoTorneoNotifService::crearNotificacionesFaltantesParaTorneo($this->pdo, $torneoId);
+        $insertados = (int) ($falt['insertados'] ?? 0);
+        $nuevos = $falt['nuevos_delegado_ids'] ?? [];
+        $nNotif = 0;
+        if ($insertados > 0) {
+            \FvdPortal\Services\TorneoDelegadoTarjetaService::generarTarjetasParaTorneo($this->pdo, $torneoId, $this->projectRoot);
+            $nNotif = FvdNotificacionesService::sincronizarDesdeDelegadoNotifTorneo($this->pdo, $torneoId);
+        }
+        $projRoot = $projRootEarly;
+        $tg = 0;
+        if ($nuevos !== []) {
+            $tg = fvd_notifier_convocatoria_pendientes_telegram($this->pdo, $torneoId, $nuevos);
+        }
+
+        return [
+            'insertados' => $insertados,
+            'notificaciones' => $nNotif,
+            'telegram_enviados' => $tg,
+        ];
     }
 
     /**
@@ -1583,7 +1808,9 @@ final class FvdAdminService
     }
 
     /**
-     * Asigna el mismo grupo_evento_id (nuevo) a varios campeonatos y guarda el nombre nominal en la tabla maestra.
+     * Asigna el mismo grupo_evento_id a varios campeonatos y guarda el nombre nominal en la tabla maestra.
+     * Evita repetir el proceso si todos ya comparten el mismo grupo; permite incorporar campeonatos sin grupo
+     * a un grupo ya existente (misma selección, distintos grupos → error).
      *
      * @param list<mixed> $torneoIds
      */
@@ -1613,43 +1840,122 @@ final class FvdAdminService
         }
         $this->torneosRelacionGrupoValidarDispersionFechas($ids);
         $ph = implode(',', array_fill(0, count($ids), '?'));
-        $st = $this->pdo->prepare("SELECT torneo, tipo FROM torneosact WHERE torneo IN ($ph)");
+        $st = $this->pdo->prepare("SELECT torneo, tipo, grupo_evento_id FROM torneosact WHERE torneo IN ($ph)");
         $st->execute($ids);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
         if (count($rows) !== count($ids)) {
             throw new InvalidArgumentException('Uno o más eventos no existen.');
         }
+        $grupoPorId = [];
         foreach ($rows as $r) {
             if ((int) ($r['tipo'] ?? 0) !== 2) {
                 throw new InvalidArgumentException('Solo se pueden vincular campeonatos (tipo Campeonato).');
             }
+            $tid = (int) ($r['torneo'] ?? 0);
+            $g = (int) ($r['grupo_evento_id'] ?? 0);
+            $grupoPorId[$tid] = $g > 0 ? $g : null;
         }
+
+        $gidsNoNulos = [];
+        foreach ($ids as $tid) {
+            $g = $grupoPorId[$tid] ?? null;
+            if ($g !== null && $g > 0) {
+                $gidsNoNulos[] = $g;
+            }
+        }
+        $gidsUnicos = array_values(array_unique($gidsNoNulos));
+        if (count($gidsUnicos) > 1) {
+            throw new InvalidArgumentException(
+                'Los campeonatos seleccionados pertenecen a grupos de evento distintos. '
+                . 'No se puede unificar en un solo paso; revise la selección o corrija grupos en la base de datos si fue un error.'
+            );
+        }
+
+        if (count($gidsUnicos) === 1) {
+            $gidExistente = $gidsUnicos[0];
+            $todosIgualesAlMismoGrupo = true;
+            foreach ($ids as $tid) {
+                $g = $grupoPorId[$tid] ?? null;
+                if ($g === null || $g !== $gidExistente) {
+                    $todosIgualesAlMismoGrupo = false;
+                    break;
+                }
+            }
+            if ($todosIgualesAlMismoGrupo) {
+                throw new InvalidArgumentException(
+                    'Estos campeonatos ya están vinculados al mismo grupo de evento (#' . $gidExistente . '). '
+                    . 'No es necesario repetir el proceso; la relación se mantiene.'
+                );
+            }
+        }
+
+        $this->campeonatoGrupoEnsureTable();
+        $insMaestro = $this->pdo->prepare(
+            'INSERT INTO fvd_campeonato_grupo (grupo_evento_id, nombre_nominal) VALUES (:g, :n)
+             ON DUPLICATE KEY UPDATE nombre_nominal = VALUES(nombre_nominal)'
+        );
+
+        if (count($gidsUnicos) === 1) {
+            $gidFinal = $gidsUnicos[0];
+            $this->pdo->beginTransaction();
+            try {
+                $upd = $this->pdo->prepare('UPDATE torneosact SET grupo_evento_id = :g WHERE torneo = :id');
+                foreach ($ids as $tid) {
+                    $upd->execute([':g' => $gidFinal, ':id' => $tid]);
+                }
+                $insMaestro->execute([':g' => $gidFinal, ':n' => $nombreNominalCampeonato]);
+                $this->pdo->commit();
+            } catch (Throwable $e) {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+                error_log('[FvdAdminService::torneosRelacionGrupoAplicar] merge: ' . $e->getMessage());
+                throw new RuntimeException('No se pudo incorporar los campeonatos al grupo existente.');
+            }
+            try {
+                \FvdPortal\Services\DelegadoTorneoNotifService::sincronizarInvitacionesTrasVincularGrupo($this->pdo, $ids);
+            } catch (Throwable $e) {
+                error_log('[FvdAdminService::torneosRelacionGrupoAplicar] notif sync: ' . $e->getMessage());
+            }
+            try {
+                $this->despacharTelegramYMarcaTrasVinculacionGrupo($ids);
+            } catch (Throwable $e) {
+                error_log('[FvdAdminService::torneosRelacionGrupoAplicar] telegram/marca: ' . $e->getMessage());
+            }
+
+            return $gidFinal;
+        }
+
         $stMax = $this->pdo->query('SELECT COALESCE(MAX(grupo_evento_id), 0) FROM torneosact');
         $next = (int) $stMax->fetchColumn() + 1;
         if ($next <= 0) {
             $next = 1;
         }
-        $upd = $this->pdo->prepare('UPDATE torneosact SET grupo_evento_id = :g WHERE torneo = :id');
-        foreach ($ids as $tid) {
-            $upd->execute([':g' => $next, ':id' => $tid]);
-        }
-
-        $this->campeonatoGrupoEnsureTable();
+        $this->pdo->beginTransaction();
         try {
-            $ins = $this->pdo->prepare(
-                'INSERT INTO fvd_campeonato_grupo (grupo_evento_id, nombre_nominal) VALUES (:g, :n)
-                 ON DUPLICATE KEY UPDATE nombre_nominal = VALUES(nombre_nominal)'
-            );
-            $ins->execute([':g' => $next, ':n' => $nombreNominalCampeonato]);
+            $upd = $this->pdo->prepare('UPDATE torneosact SET grupo_evento_id = :g WHERE torneo = :id');
+            foreach ($ids as $tid) {
+                $upd->execute([':g' => $next, ':id' => $tid]);
+            }
+            $insMaestro->execute([':g' => $next, ':n' => $nombreNominalCampeonato]);
+            $this->pdo->commit();
         } catch (Throwable $e) {
-            error_log('[FvdAdminService::torneosRelacionGrupoAplicar] maestro: ' . $e->getMessage());
-            throw new RuntimeException('No se pudo guardar el nombre nominal del campeonato. Compruebe que exista la tabla fvd_campeonato_grupo.');
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            error_log('[FvdAdminService::torneosRelacionGrupoAplicar] nuevo grupo: ' . $e->getMessage());
+            throw new RuntimeException('No se pudo crear el grupo de evento. Compruebe que exista la tabla fvd_campeonato_grupo.');
         }
 
         try {
             \FvdPortal\Services\DelegadoTorneoNotifService::sincronizarInvitacionesTrasVincularGrupo($this->pdo, $ids);
         } catch (Throwable $e) {
             error_log('[FvdAdminService::torneosRelacionGrupoAplicar] notif sync: ' . $e->getMessage());
+        }
+        try {
+            $this->despacharTelegramYMarcaTrasVinculacionGrupo($ids);
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService::torneosRelacionGrupoAplicar] telegram/marca: ' . $e->getMessage());
         }
 
         return $next;
@@ -2012,7 +2318,9 @@ final class FvdAdminService
      *   clase: int,
      *   modo: string,
      *   integrantes_equipo: int|null,
-     *   cupo: array{usado: int, max: int|null, restante: int|null}
+     *   cupo: array{usado: int, max: int|null, restante: int|null},
+     *   ventana_delegado: array<string, mixed>|null,
+     *   acceso_delegado: array<string, mixed>|null
      * }|null
      */
     public function torneoInscripcionMetaParaVista(int $torneoId, int $asociacionId, ?bool $cupoDesdeBandera = null): ?array
@@ -2033,6 +2341,7 @@ final class FvdAdminService
             : null;
 
         $ventanaDelegado = null;
+        $accesoDelegado = null;
         if (AuthService::isDelegadoAsociacion()) {
             try {
                 $aidV = AuthService::idAsociacion();
@@ -2044,6 +2353,15 @@ final class FvdAdminService
             } catch (\Throwable $e) {
                 $ventanaDelegado = null;
             }
+            try {
+                $accesoDelegado = \FvdPortal\Services\FvdAccessManager::estadoDelegadoTorneo(
+                    $this->pdo,
+                    $torneoId,
+                    $asociacionId > 0 ? $asociacionId : null
+                );
+            } catch (\Throwable $e) {
+                $accesoDelegado = null;
+            }
         }
 
         return [
@@ -2053,6 +2371,7 @@ final class FvdAdminService
             'integrantes_equipo'  => $intEq,
             'cupo'                => $cupo,
             'ventana_delegado'    => $ventanaDelegado,
+            'acceso_delegado'     => $accesoDelegado,
         ];
     }
 

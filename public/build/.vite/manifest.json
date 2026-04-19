@@ -1,0 +1,34 @@
+{
+  "_UserGroupIcon-BBNh24C2.css": {
+    "file": "assets/UserGroupIcon-BBNh24C2.css",
+    "src": "_UserGroupIcon-BBNh24C2.css"
+  },
+  "_UserGroupIcon-CZB-HOIa.js": {
+    "file": "assets/UserGroupIcon-CZB-HOIa.js",
+    "name": "UserGroupIcon",
+    "css": [
+      "assets/UserGroupIcon-BBNh24C2.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-bNkTIsfh.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "imports": [
+      "_UserGroupIcon-CZB-HOIa.js"
+    ],
+    "css": [
+      "assets/app-By4UDWWH.css"
+    ]
+  },
+  "resources/js/delegado-app.js": {
+    "file": "assets/delegado-app-DOPAP8eq.js",
+    "name": "delegado-app",
+    "src": "resources/js/delegado-app.js",
+    "isEntry": true,
+    "imports": [
+      "_UserGroupIcon-CZB-HOIa.js"
+    ]
+  }
+}

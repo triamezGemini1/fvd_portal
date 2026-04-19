@@ -64,6 +64,14 @@ function fvd_public_header(string $title, string $active = ''): void
                 <span class="fvd-p-header__title hidden max-w-[10rem] truncate text-sm font-medium sm:block md:max-w-xs">Federación Venezolana del Dominó</span>
             </a>
             <div class="flex flex-wrap items-center justify-end gap-2">
+                <?php
+                require_once dirname(__DIR__) . '/fvdmasteradmin/services/AuthService.php';
+                AuthService::ensureSession();
+                if (AuthService::isAuthenticated()):
+                ?>
+                <a href="<?= htmlspecialchars(AuthService::perfilUrl(), ENT_QUOTES, 'UTF-8') ?>" class="rounded-lg border border-amber-300/50 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-500/25 sm:text-sm">Mi perfil</a>
+                <a href="<?= htmlspecialchars(AuthService::logoutUrl(), ENT_QUOTES, 'UTF-8') ?>" class="rounded-lg border border-white/35 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10 sm:text-sm">Cerrar sesión</a>
+                <?php endif; ?>
                 <a href="<?= htmlspecialchars(url('fvdmasteradmin/login.php'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-p-btn-dorado rounded-lg px-3 py-1.5 text-xs sm:text-sm">Master Admin</a>
                 <a href="<?= htmlspecialchars(url('gestion_modulos.php'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-p-btn-ghost rounded-lg px-3 py-1.5 text-xs font-medium sm:text-sm">Gestión interna</a>
             </div>

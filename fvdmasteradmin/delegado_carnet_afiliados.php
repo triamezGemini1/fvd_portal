@@ -211,7 +211,7 @@ require __DIR__ . '/includes/layout_header.php';
     <?php endif; ?>
 
     <p style="margin-top:1.25rem;font-size:0.8125rem">
-        <a href="<?= htmlspecialchars(url('fvdmasteradmin/index.php'), ENT_QUOTES, 'UTF-8') ?>">← Panel del delegado</a>
+        <a href="<?= htmlspecialchars(url('fvdmasteradmin/delegado_dashboard.php'), ENT_QUOTES, 'UTF-8') ?>">← Panel del delegado</a>
         · <a href="<?= htmlspecialchars(url('modules/atletas/reporte_carnets.php'), ENT_QUOTES, 'UTF-8') ?>">Reporte carnets</a>
     </p>
 </div>

@@ -10,7 +10,9 @@ $ctrl = new RelacionPagoController();
 
 $selfUrl = fvd_module_url('relacion_pago/index.php');
 $fvdRpAppBase = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
-$fvdRpPanelUrl = $fvdRpAppBase . '/fvdmasteradmin/index.php';
+$fvdRpPanelUrl = AuthService::isSuperAdmin()
+    ? $fvdRpAppBase . '/fvdmasteradmin/master_panel.php'
+    : $fvdRpAppBase . '/fvdmasteradmin/index.php';
 $fvd_error = '';
 
 $rpRef = isset($_GET['ref']) ? trim((string) $_GET['ref']) : '';

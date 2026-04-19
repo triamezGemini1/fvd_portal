@@ -211,6 +211,45 @@ final class DelegadoTorneoVentanasService
         }
     }
 
+    public static function ensureFechaLimiteCambiosColumn(PDO $pdo): void
+    {
+        try {
+            $pdo->exec(
+                'ALTER TABLE torneosact ADD COLUMN fecha_limite_cambios date DEFAULT NULL COMMENT \'Tras esta fecha: nómina solo consulta\''
+            );
+        } catch (\Throwable $e) {
+            if (stripos($e->getMessage(), 'Duplicate column') === false) {
+                error_log('[DelegadoTorneoVentanasService] ensureFechaLimiteCambiosColumn: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Si el torneo define `fecha_limite_cambios` y hoy es posterior, la nómina (inscripciones/cambios) pasa a solo consulta.
+     */
+    public static function fechaLimiteCambiosNominaSuperada(PDO $pdo, int $torneoId): bool
+    {
+        if ($torneoId <= 0) {
+            return false;
+        }
+        self::ensureFechaLimiteCambiosColumn($pdo);
+        try {
+            $st = $pdo->prepare('SELECT fecha_limite_cambios FROM torneosact WHERE torneo = :t LIMIT 1');
+            $st->execute([':t' => $torneoId]);
+            $raw = $st->fetchColumn();
+            if ($raw === false || $raw === null || trim((string) $raw) === '') {
+                return false;
+            }
+            $lim = substr((string) $raw, 0, 10);
+            $tz = self::timezoneApp();
+            $today = (new \DateTimeImmutable('today', $tz))->format('Y-m-d');
+
+            return $today > $lim;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private static function delegadoAsociacionParaVentana(): ?int
     {
         if (!self::aplicaRestriccionDelegado()) {
@@ -241,6 +280,11 @@ final class DelegadoTorneoVentanasService
         if (!self::aplicaRestriccionDelegado()) {
             return;
         }
+        if (self::fechaLimiteCambiosNominaSuperada($pdo, $torneoId)) {
+            throw new RuntimeException(
+                'La fecha límite de cambios de nómina para este torneo ya ha pasado. Solo puede consultar la información; no se permiten inscripciones ni modificaciones de plantilla.'
+            );
+        }
         $st = self::estadoParaTorneo($pdo, $torneoId, self::delegadoAsociacionParaVentana());
         if (!$st['fase2_inscripciones']) {
             throw new RuntimeException(
@@ -268,6 +312,11 @@ final class DelegadoTorneoVentanasService
             return;
         }
         $st = self::estadoParaTorneo($pdo, $torneoId, self::delegadoAsociacionParaVentana());
+        if (self::fechaLimiteCambiosNominaSuperada($pdo, $torneoId) && $st['fase2_inscripciones']) {
+            throw new RuntimeException(
+                'La fecha límite de cambios de nómina para este torneo ya ha pasado. Solo puede consultar la plantilla; no modificar inscripciones ni bajas de nómina.'
+            );
+        }
         if (!$st['fase1_afiliados_carnets_traspasos'] && !$st['fase2_inscripciones']) {
             throw new RuntimeException(
                 'El periodo de gestión de atletas para este torneo ha finalizado. Solo puede consultar información y registrar pagos.'

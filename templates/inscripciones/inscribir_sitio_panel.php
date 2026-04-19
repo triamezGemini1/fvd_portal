@@ -13,23 +13,33 @@ $clSitio = (int) ($torneoMeta['clase'] ?? 1);
 $tnom = htmlspecialchars((string) ($torneoMeta['torneo']['nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
 $esInd = $clSitio === 1;
 $vdDeleg = $torneoMeta['ventana_delegado'] ?? null;
-$fvdDelegadoInscripcionCerrada = !empty($fvd_inscripcion_bandera_modo)
+$accesoDeleg = $torneoMeta['acceso_delegado'] ?? null;
+$fvdNominaSoloLectura = is_array($accesoDeleg) && !empty($accesoDeleg['nomina_solo_lectura']);
+$fvdFechaLimiteNominaFmt = is_array($accesoDeleg) ? trim((string) ($accesoDeleg['fecha_limite_cambios_formato'] ?? '')) : '';
+$fvdDelegadoInscripcionCerradaVentana = !empty($fvd_inscripcion_bandera_modo)
     && is_array($vdDeleg)
     && !($vdDeleg['fase2_inscripciones'] ?? false);
+$fvdSitioSoloLectura = $fvdDelegadoInscripcionCerradaVentana || $fvdNominaSoloLectura;
 $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'] ?? '') : '';
 ?>
 <link rel="stylesheet" href="<?= htmlspecialchars(url('assets/css/fvd-inscripcion-sitio.css'), ENT_QUOTES, 'UTF-8') ?>">
-<?php if ($fvdDelegadoInscripcionCerrada): ?>
+<?php if ($fvdSitioSoloLectura): ?>
 <style>
 .fvd-insc-sitio--solo-lectura .fvd-insc-sitio__btn,
 .fvd-insc-sitio--solo-lectura .fvd-insc-sitio__btn--ok,
 .fvd-insc-sitio--solo-lectura .fvd-insc-sitio__btn--sec { opacity: 0.45; pointer-events: none; cursor: not-allowed; }
+.fvd-insc-sitio--solo-lectura .fvd-insc-sitio__table tbody tr { cursor: default; }
+.fvd-insc-sitio__lockcell { width: 2rem; text-align: center; font-size: 0.85rem; }
 </style>
 <?php endif; ?>
 
-<section class="fvd-insc-sitio<?= $fvdDelegadoInscripcionCerrada ? ' fvd-insc-sitio--solo-lectura' : '' ?>" aria-label="<?= $tnom ?>">
+<section class="fvd-insc-sitio<?= $fvdSitioSoloLectura ? ' fvd-insc-sitio--solo-lectura' : '' ?>" aria-label="<?= $tnom ?>">
     <div class="fvd-insc-sitio__body">
-        <?php if ($fvdDelegadoInscripcionCerrada): ?>
+        <?php if ($fvdNominaSoloLectura): ?>
+            <p class="fvd-mod-msg" style="margin:0 0 0.75rem;font-size:0.875rem;border-left:4px solid #94a3b8;padding-left:10px;background:rgba(241,245,249,0.95);color:#334155">
+                ⚠️ Periodo de cambios finalizado el <?= htmlspecialchars($fvdFechaLimiteNominaFmt !== '' ? $fvdFechaLimiteNominaFmt : '—', ENT_QUOTES, 'UTF-8') ?> — Vista de consulta solamente.
+            </p>
+        <?php elseif ($fvdDelegadoInscripcionCerradaVentana): ?>
             <p class="fvd-mod-msg" style="margin:0 0 0.75rem;font-size:0.875rem;border-left:4px solid #f59e0c;padding-left:10px">
                 <strong>Calendario del torneo:</strong> <?= htmlspecialchars($fvdDelegadoVentanaMsg !== '' ? $fvdDelegadoVentanaMsg : 'Fuera del periodo de inscripciones y retiros solo puede consultar listados y registrar pagos.', ENT_QUOTES, 'UTF-8') ?>
             </p>
@@ -75,7 +85,7 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
                 </div>
                 <div class="fvd-insc-sitio__table-wrap">
                     <table class="fvd-insc-sitio__table">
-                        <thead><tr><th>Nombre</th><th>Nº FVD</th><th>CI</th></tr></thead>
+                        <thead><tr><th>Nombre</th><th>Nº FVD</th><th>CI</th><?php if ($fvdNominaSoloLectura): ?><th class="fvd-insc-sitio__lockcell" title="Solo consulta">🔒</th><?php endif; ?></tr></thead>
                         <tbody id="fvd-sitio-tbody-disp">
                             <?php foreach ($fvdSitioDisponibles as $u): ?>
                             <tr data-aid="<?= (int) $u['atleta_id'] ?>" data-nombre="<?= htmlspecialchars($u['nombre'], ENT_QUOTES, 'UTF-8') ?>"
@@ -83,6 +93,7 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
                                 <td><strong><?= htmlspecialchars($u['nombre'], ENT_QUOTES, 'UTF-8') ?></strong></td>
                                 <td><?= (int) $u['numfvd'] ?></td>
                                 <td><?= htmlspecialchars($u['cedula'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <?php if ($fvdNominaSoloLectura): ?><td class="fvd-insc-sitio__lockcell" title="Solo consulta">🔒</td><?php endif; ?>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -96,7 +107,7 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
                 </div>
                 <div class="fvd-insc-sitio__table-wrap">
                     <table class="fvd-insc-sitio__table">
-                        <thead><tr><th>Nombre</th><th>Nº FVD</th><th>CI</th></tr></thead>
+                        <thead><tr><th>Nombre</th><th>Nº FVD</th><th>CI</th><?php if ($fvdNominaSoloLectura): ?><th class="fvd-insc-sitio__lockcell" title="Solo consulta">🔒</th><?php endif; ?></tr></thead>
                         <tbody id="fvd-sitio-tbody-insc">
                             <?php foreach ($fvdSitioInscritos as $i):
                                 $iAid = (int) $i['atleta_id'];
@@ -116,6 +127,7 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
                                 <td><strong><?= htmlspecialchars($i['nombre'], ENT_QUOTES, 'UTF-8') ?></strong></td>
                                 <td><?= (int) $i['numfvd'] ?></td>
                                 <td><?= htmlspecialchars($i['cedula'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <?php if ($fvdNominaSoloLectura): ?><td class="fvd-insc-sitio__lockcell" title="Solo consulta">🔒</td><?php endif; ?>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -139,7 +151,8 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
     var esFvd = <?= $esFvd ? 'true' : 'false' ?>;
     var banderaMode = <?= $fvd_inscripcion_bandera_modo ? 'true' : 'false' ?>;
     var esInd = <?= $esInd ? 'true' : 'false' ?>;
-    var delegadoInscripcionCerrada = <?= $fvdDelegadoInscripcionCerrada ? 'true' : 'false' ?>;
+    var delegadoInscripcionCerrada = <?= $fvdSitioSoloLectura ? 'true' : 'false' ?>;
+    var nominaSoloLectura = <?= $fvdNominaSoloLectura ? 'true' : 'false' ?>;
     var usuarioEncontrado = null;
 
     function qs(id) { return document.getElementById(id); }
@@ -228,6 +241,9 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
             .catch(function () { msg('Error de red.', 'err'); });
     }
     function postInscribir(aid) {
+        if (nominaSoloLectura) {
+            return Promise.resolve({ ok: false, error: 'Periodo de cambios de nómina finalizado: solo consulta.' });
+        }
         if (banderaMode && delegadoInscripcionCerrada) {
             return Promise.resolve({ ok: false, error: 'Periodo de inscripción cerrado para delegados según calendario del torneo.' });
         }
@@ -241,6 +257,9 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
         }).then(function (r) { return r.json(); });
     }
     function postRetirar(aid) {
+        if (nominaSoloLectura) {
+            return Promise.resolve({ ok: false, error: 'Periodo de cambios de nómina finalizado: solo consulta.' });
+        }
         if (banderaMode && delegadoInscripcionCerrada) {
             return Promise.resolve({ ok: false, error: 'Periodo de retiros cerrado según calendario del torneo.' });
         }
@@ -252,6 +271,9 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
         }).then(function (r) { return r.json(); });
     }
     function postRetirarTabla(cedulaNum) {
+        if (nominaSoloLectura) {
+            return Promise.resolve({ ok: false, error: 'Periodo de cambios de nómina finalizado: solo consulta.' });
+        }
         var body = { action: 'retirar_tabla', torneo_id: torneoId, cedula: cedulaNum };
         if (esFvd) body.asociacion_id = asocId;
         return fetch(api, {
@@ -304,6 +326,13 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
         tr.appendChild(t0);
         tr.appendChild(t1);
         tr.appendChild(t2);
+        if (nominaSoloLectura) {
+            var t3 = document.createElement('td');
+            t3.className = 'fvd-insc-sitio__lockcell';
+            t3.title = 'Solo consulta';
+            t3.textContent = '🔒';
+            tr.appendChild(t3);
+        }
         tbi.appendChild(tr);
         updateBadges();
     }
@@ -357,6 +386,10 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
         var tbd = qs('fvd-sitio-tbody-disp');
         if (tbd) {
             tbd.addEventListener('click', function (e) {
+                if (nominaSoloLectura) {
+                    msg('Periodo de cambios de nómina finalizado: solo consulta.', 'warn');
+                    return;
+                }
                 var tr = e.target.closest('tr');
                 if (!tr || !tr.getAttribute('data-aid')) return;
                 var aid = parseInt(tr.getAttribute('data-aid'), 10);
@@ -386,6 +419,10 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
         var tbi = qs('fvd-sitio-tbody-insc');
         if (tbi) {
             tbi.addEventListener('click', function (e) {
+                if (nominaSoloLectura) {
+                    msg('Periodo de cambios de nómina finalizado: solo consulta.', 'warn');
+                    return;
+                }
                 var tr = e.target.closest('tr');
                 if (!tr || !tr.getAttribute('data-aid')) return;
                 var mode = tr.getAttribute('data-retirar') || '0';

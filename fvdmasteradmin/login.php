@@ -21,10 +21,6 @@ AuthService::ensureSession();
 if (AuthService::isAuthenticated()) {
     $redir = $_SESSION['fvd_redirect_after_login'] ?? '';
     unset($_SESSION['fvd_redirect_after_login']);
-    if (is_string($redir) && $redir !== '' && isset($redir[0]) && $redir[0] === '/') {
-        header('Location: ' . $redir);
-        exit;
-    }
     if (AuthService::isDelegadoAsociacion()) {
         require_once __DIR__ . '/config/db.php';
         require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
@@ -40,7 +36,7 @@ if (AuthService::isAuthenticated()) {
             exit;
         }
     }
-    header('Location: ' . AuthService::homeUrl());
+    header('Location: ' . AuthService::safeRedirectAfterLogin(is_string($redir) ? $redir : null));
     exit;
 }
 
@@ -51,10 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (AuthService::attemptLogin($email, $pass)) {
         $redir = $_SESSION['fvd_redirect_after_login'] ?? '';
         unset($_SESSION['fvd_redirect_after_login']);
-        if (is_string($redir) && $redir !== '' && isset($redir[0]) && $redir[0] === '/') {
-            header('Location: ' . $redir);
-            exit;
-        }
         if (AuthService::isAthletePortalUser()) {
             $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
             header('Location: ' . $base . '/fvdmasteradmin/atleta/mi_ficha.php');
@@ -75,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
         }
-        header('Location: ' . AuthService::homeUrl());
+        header('Location: ' . AuthService::safeRedirectAfterLogin(is_string($redir) ? $redir : null));
         exit;
     }
     $code = AuthService::getLastLoginFailure();
