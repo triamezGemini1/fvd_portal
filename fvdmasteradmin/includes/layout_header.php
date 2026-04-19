@@ -191,11 +191,24 @@ if (AuthService::isDelegadoAsociacion()) {
 }
 
 $fvd_deleg_ctx_tid = 0;
+$fvd_deleg_campeonato_id = 0;
 if (AuthService::isDelegadoAsociacion()) {
     $cCtx = AuthService::delegadoTorneoContextId();
     $fvd_deleg_ctx_tid = ($cCtx !== null && (int) $cCtx > 0) ? (int) $cCtx : 0;
+    $cCamp = AuthService::delegadoCampeonatoGrupoId();
+    $fvd_deleg_campeonato_id = ($cCamp !== null && (int) $cCamp > 0) ? (int) $cCamp : 0;
 }
-$fvd_deleg_torneo_q = $fvd_deleg_ctx_tid > 0 ? ('?torneo_id=' . $fvd_deleg_ctx_tid) : '';
+$fvd_deleg_torneo_q = '';
+if ($fvd_deleg_ctx_tid > 0 || $fvd_deleg_campeonato_id > 0) {
+    $qDel = [];
+    if ($fvd_deleg_ctx_tid > 0) {
+        $qDel['torneo_id'] = $fvd_deleg_ctx_tid;
+    }
+    if ($fvd_deleg_campeonato_id > 0) {
+        $qDel['campeonato_id'] = $fvd_deleg_campeonato_id;
+    }
+    $fvd_deleg_torneo_q = '?' . http_build_query($qDel);
+}
 
 $fvd_acc_datos_open = in_array(
     $fvd_sidebar_active,
@@ -881,6 +894,16 @@ header('Content-Type: text/html; charset=UTF-8');
                         <a class="fvd-sn<?= $fvd_sn_active('atletas') ?>" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=list'), ENT_QUOTES, 'UTF-8') ?>" title="Atletas">Atletas</a>
                     </div>
                 </details>
+                <?php if (AuthService::isDelegadoAsociacion()): ?>
+                <details class="fvd-sn-acc"<?= (str_contains($fvdScript, 'delegado_bandeja_traspasos') || str_contains($fvdScript, 'delegado_estado_carnetizacion')) ? ' open' : '' ?>>
+                    <summary class="fvd-sn-acc__summary" title="Delegación de asociación">Mi delegación <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
+                    <div class="fvd-sn-acc__body">
+                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=form'), ENT_QUOTES, 'UTF-8') ?>" title="Alta de nuevos atletas (su asociación)">Gestión de afiliados</a>
+                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_bandeja_traspasos') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_bandeja_traspasos.php', ENT_QUOTES, 'UTF-8') ?>" title="Solicitudes de traspaso pendientes">Bandeja de traspasos</a>
+                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_estado_carnetizacion') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_estado_carnetizacion.php', ENT_QUOTES, 'UTF-8') ?>" title="Atletas activos sin carnet">Estado de carnetización</a>
+                    </div>
+                </details>
+                <?php endif; ?>
                 <?php if (AuthService::role() === AuthService::ROLE_ASO_ADMIN): ?>
                 <details class="fvd-sn-acc"<?= $fvd_acc_asoc_torneos_open ? ' open' : '' ?>>
                     <summary class="fvd-sn-acc__summary" title="Torneos">Torneos <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>

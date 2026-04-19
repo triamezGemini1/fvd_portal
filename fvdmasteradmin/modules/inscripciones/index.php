@@ -8,17 +8,37 @@ fvd_module_require_roles();
 require_once __DIR__ . '/Controller.php';
 $ctrl = new InscripcionesController();
 
+$fvd_rep_campeonato_error = '';
 $myAid = AuthService::idAsociacion();
 $ctxTorneo = AuthService::delegadoTorneoContextId();
 $tidGet = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : 0;
-$fvdRepTorneos = $ctrl->listTorneosParaSelector(
-    $myAid !== null && (int) $myAid > 0 ? (int) $myAid : null,
-    $ctxTorneo
-);
-if ($fvdRepTorneos === [] && $ctxTorneo !== null && $ctxTorneo > 0) {
-    $one = $ctrl->fetchTorneoActo($ctxTorneo);
-    if ($one !== null) {
-        $fvdRepTorneos = [$one];
+$campGet = isset($_GET['campeonato_id']) ? (int) $_GET['campeonato_id'] : 0;
+if ($campGet <= 0) {
+    $sessCg = AuthService::delegadoCampeonatoGrupoId();
+    $campGet = $sessCg !== null && $sessCg > 0 ? $sessCg : 0;
+}
+
+$fvdRepTorneos = [];
+$fvd_rep_campeonato_error = '';
+if (AuthService::isDelegadoAsociacion() && $myAid !== null && (int) $myAid > 0) {
+    if ($campGet <= 0) {
+        $fvd_rep_campeonato_error = 'Indique campeonato_id (grupo de evento o ID de torneo del campeonato) en la URL.';
+    } else {
+        $fvdRepTorneos = $ctrl->listTorneosPorCampeonatoParaDelegado((int) $myAid, $campGet);
+        if ($fvdRepTorneos === []) {
+            $fvd_rep_campeonato_error = 'No hay torneos de este campeonato con convocatoria para su asociación, o el campeonato no es válido.';
+        }
+    }
+} else {
+    $fvdRepTorneos = $ctrl->listTorneosParaSelector(
+        $myAid !== null && (int) $myAid > 0 ? (int) $myAid : null,
+        $ctxTorneo
+    );
+    if ($fvdRepTorneos === [] && $ctxTorneo !== null && $ctxTorneo > 0) {
+        $one = $ctrl->fetchTorneoActo($ctxTorneo);
+        if ($one !== null) {
+            $fvdRepTorneos = [$one];
+        }
     }
 }
 // Si el usuario pasa ?torneo_id=X, ese torneo debe figurar en el selector aunque no haya atletas aún
@@ -74,6 +94,8 @@ if ($fvdRepDefaultTorneo > 0) {
 }
 
 $fvd_page_title = 'Reportes de inscripciones y finanzas';
+$fvd_rep_campeonato_id = isset($campGet) ? (int) $campGet : 0;
+
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';
 require FVD_MASTER_ROOT . '/includes/layout_footer.php';

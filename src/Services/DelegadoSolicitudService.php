@@ -124,6 +124,41 @@ SQL;
         return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
     }
 
+    /**
+     * Solicitudes pendientes donde la asociación del delegado es origen o destino (traspasos).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function listarPendientesParaAsociacion(PDO $pdo, int $asociacionId): array
+    {
+        if ($asociacionId <= 0) {
+            return [];
+        }
+        self::ensureTable($pdo);
+        $sql = 'SELECT s.*, at.nombre AS atleta_nombre, at.cedula AS atleta_cedula,
+            ao.nombre AS asoc_origen_nombre, ad.nombre AS asoc_destino_nombre
+            FROM fvd_solicitudes_delegado s
+            INNER JOIN atletas at ON at.id = s.atleta_id
+            LEFT JOIN asociaciones ao ON ao.id = s.asociacion_id
+            LEFT JOIN asociaciones ad ON ad.id = s.asociacion_destino_id
+            WHERE s.estado = \'pendiente\'
+            AND (
+                s.asociacion_id = :a
+                OR (s.tipo = \'traspaso\' AND s.asociacion_destino_id = :a2)
+            )
+            ORDER BY s.id ASC';
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([':a' => $asociacionId, ':a2' => $asociacionId]);
+
+            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('[DelegadoSolicitudService::listarPendientesParaAsociacion] ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
     public static function aprobar(PDO $pdo, int $solicitudId, ?int $fvdUsuarioId): void
     {
         if (!\AuthService::isSuperAdmin()) {

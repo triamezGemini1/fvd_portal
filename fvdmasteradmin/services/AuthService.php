@@ -33,6 +33,9 @@ class AuthService
     /** Contexto opcional: delegado gestiona solo este torneo (panel evento). */
     private const SESSION_DELEGADO_TORNEO_CTX = 'fvd_delegado_torneo_context_id';
 
+    /** Grupo de evento (campeonato vinculado: M/F/juvenil) para inscripciones y reportes del delegado. */
+    private const SESSION_DELEGADO_CAMPEONATO_GRUPO = 'fvd_delegado_campeonato_grupo_id';
+
     /** @var string Código interno del último fallo (solo para depuración con APP_DEBUG). */
     private static $lastLoginFailure = '';
 
@@ -210,6 +213,47 @@ class AuthService
     {
         self::ensureSession();
         unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX]);
+    }
+
+    /**
+     * ID de grupo de campeonato (grupo_evento_id) en flujos de delegado (inscripciones / reportes).
+     */
+    public static function delegadoCampeonatoGrupoId(): ?int
+    {
+        self::ensureSession();
+        if (!self::isDelegadoAsociacion()) {
+            return null;
+        }
+        if (!isset($_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO])) {
+            return null;
+        }
+        $v = $_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO];
+        if ($v === null || $v === '') {
+            return null;
+        }
+        $n = (int) $v;
+
+        return $n > 0 ? $n : null;
+    }
+
+    public static function setDelegadoCampeonatoGrupo(?int $grupoEventoId): void
+    {
+        self::ensureSession();
+        if (!self::isDelegadoAsociacion()) {
+            return;
+        }
+        if ($grupoEventoId === null || $grupoEventoId <= 0) {
+            unset($_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO]);
+
+            return;
+        }
+        $_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO] = $grupoEventoId;
+    }
+
+    public static function clearDelegadoCampeonatoGrupo(): void
+    {
+        self::ensureSession();
+        unset($_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO]);
     }
 
     /**

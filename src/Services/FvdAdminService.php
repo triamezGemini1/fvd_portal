@@ -1571,6 +1571,146 @@ final class FvdAdminService
     }
 
     /**
+     * Resuelve el grupo de evento (campeonato vinculado) desde un ID de torneo o desde un grupo_evento_id directo.
+     */
+    public function resolverGrupoDesdeCampeonatoParam(int $param): ?int
+    {
+        if ($param <= 0 || !$this->torneosactGrupoEventoColumnExists()) {
+            return null;
+        }
+        try {
+            $st = $this->pdo->prepare('SELECT grupo_evento_id FROM torneosact WHERE torneo = :p LIMIT 1');
+            $st->execute([':p' => $param]);
+            $g = $st->fetchColumn();
+            if ($g !== false && $g !== null && (int) $g > 0) {
+                return (int) $g;
+            }
+            $st2 = $this->pdo->prepare('SELECT COUNT(*) FROM torneosact WHERE grupo_evento_id = :g');
+            $st2->execute([':g' => $param]);
+            if ((int) $st2->fetchColumn() > 0) {
+                return $param;
+            }
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService::resolverGrupoDesdeCampeonatoParam] ' . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Torneos del mismo campeonato (grupo) con convocatoria para la asociación.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function torneosPorGrupoCampeonato(int $asociacionId, int $grupoEventoId): array
+    {
+        if ($asociacionId <= 0 || $grupoEventoId <= 0 || !$this->torneosactGrupoEventoColumnExists()) {
+            return [];
+        }
+        try {
+            $sql = 'SELECT t.torneo, t.nombre, t.lugar, DATE(t.fechator) AS fechator, t.tipo, t.clase
+                FROM torneosact t
+                INNER JOIN torneo_convocatoria_asoc c ON c.torneo_id = t.torneo AND c.asociacion_id = :a
+                WHERE t.grupo_evento_id = :g
+                ORDER BY t.tipo ASC, t.nombre ASC';
+            $st = $this->pdo->prepare($sql);
+            $st->execute([':a' => $asociacionId, ':g' => $grupoEventoId]);
+
+            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService::torneosPorGrupoCampeonato] ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * Etiqueta corta para UI (Masculino / Femenino / Juvenil / primera palabra).
+     */
+    public function nombreCortaTorneoCampeonato(string $nombre): string
+    {
+        $n = mb_strtolower($nombre, 'UTF-8');
+        if (str_contains($n, 'juvenil')) {
+            return 'Juvenil';
+        }
+        if (str_contains($n, 'femen')) {
+            return 'Femenino';
+        }
+        if (str_contains($n, 'masc')) {
+            return 'Masculino';
+        }
+        $parts = preg_split('/\s+/u', trim($nombre)) ?: [];
+
+        return $parts[0] !== '' && $parts[0] !== null ? (string) $parts[0] : $nombre;
+    }
+
+    /**
+     * @return 'M'|'F'|null
+     */
+    public function torneoFiltroSexoEsperadoDesdeNombre(string $nombreTorneo): ?string
+    {
+        $n = mb_strtolower($nombreTorneo, 'UTF-8');
+        if (str_contains($n, 'juvenil')) {
+            return null;
+        }
+        if (str_contains($n, 'femen')) {
+            return 'F';
+        }
+        if (str_contains($n, 'masc')) {
+            return 'M';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $atletaRow
+     */
+    public function atletaCoincideSexoTorneo(array $atletaRow, string $nombreTorneo): bool
+    {
+        $esp = $this->torneoFiltroSexoEsperadoDesdeNombre($nombreTorneo);
+        if ($esp === null) {
+            return true;
+        }
+        $sx = $atletaRow['sexo'] ?? null;
+        if (is_string($sx)) {
+            $sx = strtoupper(trim($sx));
+        }
+        if ($esp === 'F') {
+            return $sx === 'F' || $sx === '2' || (int) $sx === 2;
+        }
+        if ($esp === 'M') {
+            return $sx === 'M' || $sx === '1' || (int) $sx === 1;
+        }
+
+        return true;
+    }
+
+    /**
+     * Listado de elegibles con filtro por género inferido del nombre del torneo (Masculino/Femenino).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function torneosAtletasInscribiblesFiltradoTorneo(int $torneoId, int $asociacionId): array
+    {
+        $rows = $this->torneosAtletasInscribibles($torneoId, $asociacionId);
+        $st = $this->pdo->prepare('SELECT nombre FROM torneosact WHERE torneo = :t LIMIT 1');
+        $st->execute([':t' => $torneoId]);
+        $nom = (string) ($st->fetchColumn() ?: '');
+        if ($nom === '' || $this->torneoFiltroSexoEsperadoDesdeNombre($nom) === null) {
+            return $rows;
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if ($this->atletaCoincideSexoTorneo($row, $nom)) {
+                $out[] = $row;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Torneos del mismo grupo de inscripción que el contexto (o solo el contexto si no hay grupo).
      * Sin filtro de fecha: el delegado trabaja el evento activo invitado.
      *
@@ -1825,7 +1965,8 @@ final class FvdAdminService
         string $q,
         int $page = 1,
         int $perPage = 8,
-        ?int $omitirInscritosEnTorneoId = null
+        ?int $omitirInscritosEnTorneoId = null,
+        ?int $filtroSexoDesdeTorneoId = null
     ): array {
         if (!AuthService::canManageAsociacion($asociacionId)) {
             throw new RuntimeException('Sin permiso para esta asociación.');
@@ -1844,6 +1985,21 @@ final class FvdAdminService
         if ($omitirInscritosEnTorneoId !== null && $omitirInscritosEnTorneoId > 0) {
             // Mismo criterio legado "disponibles": inscripcion=0 o sin torneo; excluye ya inscritos en cualquier torneo activo en ficha.
             $exSql = ' AND (COALESCE(a.inscripcion, 0) = 0 OR COALESCE(a.torneo_id, 0) = 0) ';
+        }
+        if ($filtroSexoDesdeTorneoId !== null && $filtroSexoDesdeTorneoId > 0) {
+            try {
+                $stn = $this->pdo->prepare('SELECT nombre FROM torneosact WHERE torneo = :t LIMIT 1');
+                $stn->execute([':t' => $filtroSexoDesdeTorneoId]);
+                $nomT = (string) ($stn->fetchColumn() ?: '');
+                $esp = $this->torneoFiltroSexoEsperadoDesdeNombre($nomT);
+                if ($esp === 'M') {
+                    $exSql .= ' AND (COALESCE(a.sexo, 0) = 1 OR UPPER(TRIM(CAST(a.sexo AS CHAR))) IN (\'M\', \'MASCULINO\')) ';
+                } elseif ($esp === 'F') {
+                    $exSql .= ' AND (COALESCE(a.sexo, 0) = 2 OR UPPER(TRIM(CAST(a.sexo AS CHAR))) IN (\'F\', \'FEMENINO\', \'FEMENINA\')) ';
+                }
+            } catch (Throwable $e) {
+                error_log('[FvdAdminService::atletasBuscarInscripcionPaginado sexo] ' . $e->getMessage());
+            }
         }
         $stc = $this->pdo->prepare(
             'SELECT COUNT(*) FROM atletas a WHERE a.asociacion = :a

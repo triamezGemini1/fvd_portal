@@ -67,6 +67,70 @@ if (!AuthService::canManageAsociacion($asoc)) {
 }
 
 try {
+    if ($method === 'GET' && ($_GET['action'] ?? '') === 'delegado_inscripcion_panel') {
+        if (!AuthService::isDelegadoAsociacion()) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Solo delegados.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $tid = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : 0;
+        $camp = isset($_GET['campeonato_id']) ? (int) $_GET['campeonato_id'] : 0;
+        if ($tid <= 0 || $camp <= 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'torneo_id y campeonato_id son obligatorios.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $gr = $svc->resolverGrupoDesdeCampeonatoParam($camp);
+        if ($gr === null || $gr <= 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Campeonato no válido.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $lista = $svc->torneosPorGrupoCampeonato($asoc, $gr);
+        $enLista = false;
+        foreach ($lista as $r) {
+            if ((int) ($r['torneo'] ?? 0) === $tid) {
+                $enLista = true;
+                break;
+            }
+        }
+        if (!$enLista) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Torneo no pertenece a este campeonato para su asociación.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        AuthService::setDelegadoTorneoContext($tid);
+        AuthService::setDelegadoCampeonatoGrupo($gr);
+        $tieneCols = $svc->atletasTieneColumnasInscripcionTorneo();
+        require_once dirname(__DIR__) . '/admin/modules/torneo_inscripcion/sitio_arrays.inc.php';
+        $sitio = fvd_torneo_inscripcion_build_sitio_arrays($svc, $pdo, $tid, $asoc, $tieneCols);
+        $meta = $svc->torneoInscripcionMetaParaVista($tid, $asoc, true);
+        if ($meta === null) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Torneo no encontrado.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $clInsc = (int) ($meta['clase'] ?? 1);
+        $vdVenInscDet = $meta['ventana_delegado'] ?? null;
+        $delegadoInscripcionCerradaDet = is_array($vdVenInscDet) && !($vdVenInscDet['fase2_inscripciones'] ?? false);
+        echo json_encode([
+            'ok' => true,
+            'torneo_id' => $tid,
+            'campeonato_id' => $gr,
+            'torneo_meta' => $meta,
+            'fvdSitioDisponibles' => $sitio['fvdSitioDisponibles'],
+            'fvdSitioInscritos' => $sitio['fvdSitioInscritos'],
+            'fvd_insc' => [
+                'torneoId' => $tid,
+                'modo' => (string) ($meta['modo'] ?? 'individual'),
+                'clase' => $clInsc,
+                'maxNomina' => $clInsc === 2 ? 2 : ($clInsc === 3 ? (int) ($meta['integrantes_equipo'] ?? 4) : 80),
+                'delegadoInscripcionCerrada' => $delegadoInscripcionCerradaDet,
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if ($method === 'GET' && ($_GET['action'] ?? '') === 'buscar') {
         $q = isset($_GET['q']) ? (string) $_GET['q'] : '';
         $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
@@ -78,7 +142,8 @@ try {
             exit;
         }
         $omitirTor = (AuthService::isDelegadoAsociacion() && $tidBus > 0) ? $tidBus : null;
-        $pack = $svc->atletasBuscarInscripcionPaginado($asoc, $q, $page, $perPage, $omitirTor);
+        $filtroSexo = AuthService::isDelegadoAsociacion() && $tidBus > 0 ? $tidBus : null;
+        $pack = $svc->atletasBuscarInscripcionPaginado($asoc, $q, $page, $perPage, $omitirTor, $filtroSexo);
         echo json_encode(['ok' => true] + $pack, JSON_UNESCAPED_UNICODE);
         exit;
     }

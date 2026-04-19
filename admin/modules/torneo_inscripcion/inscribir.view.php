@@ -18,12 +18,17 @@
 /** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int}> $fvdSitioInscritos */
 /** @var string $fvdSitioNuevoAtletaUrl */
 /** @var list<array<string,mixed>> $fvdDelegadoGrupoTorneos */
+/** @var string $fvd_error_campeonato */
+/** @var int $fvd_campeonato_grupo */
+/** @var string $fvd_campeonato_q query &campeonato_id=… para enlaces del delegado */
 $fvd_inscripcion_bandera_modo = !empty($fvd_inscripcion_bandera_modo);
 $fvdSitioDisponibles = $fvdSitioDisponibles ?? [];
 $fvdSitioInscritos = $fvdSitioInscritos ?? [];
 $fvdSitioNuevoAtletaUrl = $fvdSitioNuevoAtletaUrl ?? (rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/') . '/modules/atletas/index.php?action=form');
-$inscritosBandera = $inscritosBandera ?? [];
 $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
+$fvd_error_campeonato = $fvd_error_campeonato ?? '';
+$fvd_campeonato_grupo = isset($fvd_campeonato_grupo) ? (int) $fvd_campeonato_grupo : 0;
+$fvd_campeonato_q = $fvd_campeonato_q ?? '';
 ?>
 <?php if (!empty($fvd_ok)): ?>
     <p class="fvd-mod-msg" style="color:#86efac"><?= htmlspecialchars($fvd_ok, ENT_QUOTES, 'UTF-8') ?></p>
@@ -73,28 +78,41 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
 <?php endif; ?>
 
 <?php if ($asocId > 0): ?>
-    <?php if ($torneosAbiertos === []): ?>
+    <?php if ($fvd_inscripcion_bandera_modo && $fvd_error_campeonato !== ''): ?>
+        <p class="fvd-mod-msg"><?= htmlspecialchars($fvd_error_campeonato, ENT_QUOTES, 'UTF-8') ?></p>
+    <?php elseif ($torneosAbiertos === [] && !($fvd_inscripcion_bandera_modo && $fvdDelegadoGrupoTorneos !== [])): ?>
         <p class="fvd-atl-muted" style="font-size:0.875rem">Sin eventos disponibles.</p>
     <?php elseif ($torneoSel > 0): ?>
 
         <?php if ($torneoMeta === null): ?>
             <p class="fvd-mod-msg">No se encontró el torneo o no está disponible.</p>
         <?php else: ?>
-            <?php if ($fvd_inscripcion_bandera_modo && count($fvdDelegadoGrupoTorneos) > 1): ?>
-            <form method="get" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-insc-delegado-grupo" style="margin:0 0 1rem">
-                <label for="fvd-insc-grupo-torneo" style="font-size:.8125rem;color:var(--fvd-muted);display:block">Evento / categoría / género</label>
-                <select id="fvd-insc-grupo-torneo" class="fvd-input" name="torneo_id" style="max-width:36rem" onchange="this.form.submit()">
+            <?php if ($fvd_inscripcion_bandera_modo && $fvdDelegadoGrupoTorneos !== []): ?>
+            <div class="fvd-insc-camp-switch" role="group" aria-label="Torneo del campeonato" style="margin:0 0 1rem">
+                <span style="font-size:.75rem;color:var(--fvd-muted);display:block;margin-bottom:6px">Categoría</span>
+                <div class="fvd-insc-camp-switch__bg" style="display:inline-flex;flex-wrap:wrap;gap:6px">
                     <?php foreach ($fvdDelegadoGrupoTorneos as $tg): ?>
-                        <?php $tgId = (int) ($tg['torneo'] ?? 0); ?>
-                        <?php if ($tgId <= 0) {
+                        <?php
+                        $tgId = (int) ($tg['torneo'] ?? 0);
+                        if ($tgId <= 0) {
                             continue;
-                        } ?>
-                        <option value="<?= $tgId ?>" <?= $torneoSel === $tgId ? 'selected' : '' ?>>
-                            <?= htmlspecialchars((string) ($tg['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                        </option>
+                        }
+                        $short = (string) ($tg['nombre_corta'] ?? $tg['nombre'] ?? '');
+                        $isActive = $torneoSel === $tgId;
+                        ?>
+                        <button type="button" class="fvd-insc-camp-switch__btn<?= $isActive ? ' fvd-insc-camp-switch__btn--on' : '' ?>"
+                            data-torneo-id="<?= $tgId ?>"
+                            data-campeonato-id="<?= (int) $fvd_campeonato_grupo ?>"
+                            style="padding:6px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.45);background:<?= $isActive ? 'rgba(255,242,0,.18)' : 'rgba(15,23,42,.35)' ?>;color:var(--fvd-text);font-size:.8125rem;cursor:pointer;font-weight:<?= $isActive ? '700' : '500' ?>">
+                            <?= htmlspecialchars($short, ENT_QUOTES, 'UTF-8') ?>
+                        </button>
                     <?php endforeach; ?>
-                </select>
-            </form>
+                </div>
+            </div>
+            <style>
+            .fvd-insc-camp-switch__btn:hover { filter: brightness(1.08); }
+            .fvd-insc-camp-switch__btn--on { border-color: var(--fvd-amarillo, #fff200) !important; }
+            </style>
             <?php endif; ?>
             <?php
             require FVD_PROJECT_ROOT . '/templates/inscripciones/inscribir_sitio_panel.php';
@@ -137,7 +155,7 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
                 <div class="fvd-insc-actions">
                     <button type="button" class="fvd-insc-btn fvd-insc-btn--inscribir" id="fvd-insc-submit">Inscribir</button>
                     <button type="button" class="fvd-insc-btn fvd-insc-btn--pendiente" id="fvd-insc-clear" type="button">Vaciar nómina</button>
-                    <a class="fvd-insc-btn fvd-insc-btn--comprobante" id="fvd-insc-ver-listado" href="<?= htmlspecialchars($selfUrl . '?torneo_id=' . $torneoSel . ($esFvd ? '&asociacion_id=' . $asocId : ''), ENT_QUOTES, 'UTF-8') ?>">Actualizar página</a>
+                    <a class="fvd-insc-btn fvd-insc-btn--comprobante" id="fvd-insc-ver-listado" href="<?= htmlspecialchars($selfUrl . '?torneo_id=' . $torneoSel . ($fvd_campeonato_q !== '' ? $fvd_campeonato_q : '') . ($esFvd ? '&asociacion_id=' . $asocId : ''), ENT_QUOTES, 'UTF-8') ?>">Actualizar página</a>
                 </div>
 
             </div>
@@ -420,6 +438,104 @@ $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
                 renderNomina();
             })();
             </script>
+            <?php if ($fvd_inscripcion_bandera_modo && $fvd_campeonato_grupo > 0): ?>
+            <script>
+            (function () {
+                var root = document.querySelector('.fvd-insc-camp-switch');
+                if (!root) return;
+                var api = <?= json_encode($inscripcionApiUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                var campeonatoId = <?= (int) $fvd_campeonato_grupo ?>;
+                var selfBase = <?= json_encode($selfUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                var campeonatoQ = <?= json_encode($fvd_campeonato_q, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+                function esc(s) {
+                    var d = document.createElement('div');
+                    d.textContent = s == null ? '' : String(s);
+                    return d.innerHTML;
+                }
+
+                function fillDisp(rows) {
+                    var tb = document.getElementById('fvd-sitio-tbody-disp');
+                    if (!tb) return;
+                    tb.innerHTML = '';
+                    (rows || []).forEach(function (row) {
+                        var tr = document.createElement('tr');
+                        tr.setAttribute('data-aid', String(row.atleta_id || 0));
+                        tr.setAttribute('data-nombre', String(row.nombre || ''));
+                        tr.setAttribute('data-cedula-num', String(row.cedula_num || 0));
+                        tr.innerHTML = '<td><strong>' + esc(row.nombre) + '</strong></td><td>' + esc(row.numfvd) + '</td><td>' + esc(row.cedula) + '</td>';
+                        tb.appendChild(tr);
+                    });
+                    var nd = document.getElementById('fvd-sitio-n-disp');
+                    if (nd) nd.textContent = String((rows || []).length);
+                }
+
+                function fillInsc(rows) {
+                    var tb = document.getElementById('fvd-sitio-tbody-insc');
+                    if (!tb) return;
+                    tb.innerHTML = '';
+                    (rows || []).forEach(function (row) {
+                        var tr = document.createElement('tr');
+                        var rm = row.retirar_mode != null ? String(row.retirar_mode) : '0';
+                        tr.setAttribute('data-aid', String(row.atleta_id || 0));
+                        tr.setAttribute('data-nombre', String(row.nombre || ''));
+                        tr.setAttribute('data-cedula-num', String(row.cedula_num || 0));
+                        tr.setAttribute('data-retirar', rm);
+                        tr.innerHTML = '<td><strong>' + esc(row.nombre) + '</strong></td><td>' + esc(row.numfvd) + '</td><td>' + esc(row.cedula) + '</td>';
+                        tb.appendChild(tr);
+                    });
+                    var ni = document.getElementById('fvd-sitio-n-insc');
+                    if (ni) ni.textContent = String((rows || []).length);
+                }
+
+                root.querySelectorAll('.fvd-insc-camp-switch__btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var tid = parseInt(btn.getAttribute('data-torneo-id'), 10);
+                        if (!tid || !campeonatoId) return;
+                        var sep = api.indexOf('?') >= 0 ? '&' : '?';
+                        var u = api + sep + 'action=delegado_inscripcion_panel&torneo_id=' + encodeURIComponent(String(tid)) + '&campeonato_id=' + encodeURIComponent(String(campeonatoId));
+                        fetch(u, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+                            .then(function (r) { return r.json(); })
+                            .then(function (d) {
+                                if (!d || !d.ok) {
+                                    window.alert((d && d.error) ? d.error : 'No se pudo cambiar de torneo.');
+                                    return;
+                                }
+                                var prevClase = window.FVD_INSC && window.FVD_INSC.clase ? (window.FVD_INSC.clase | 0) : 1;
+                                var newClase = d.fvd_insc && d.fvd_insc.clase != null ? (d.fvd_insc.clase | 0) : 1;
+                                if (newClase !== prevClase) {
+                                    window.location.href = selfBase + '?torneo_id=' + tid + (campeonatoQ || '');
+                                    return;
+                                }
+                                root.querySelectorAll('.fvd-insc-camp-switch__btn').forEach(function (b) {
+                                    var on = (parseInt(b.getAttribute('data-torneo-id'), 10) === tid);
+                                    b.classList.toggle('fvd-insc-camp-switch__btn--on', on);
+                                    b.style.fontWeight = on ? '700' : '500';
+                                    b.style.background = on ? 'rgba(255,242,0,.18)' : 'rgba(15,23,42,.35)';
+                                });
+                                if (window.FVD_INSC && d.fvd_insc) {
+                                    window.FVD_INSC.torneoId = tid;
+                                    window.FVD_INSC.modo = d.fvd_insc.modo || 'individual';
+                                    window.FVD_INSC.clase = newClase;
+                                    window.FVD_INSC.maxNomina = Math.max(1, (d.fvd_insc.maxNomina | 0) || 1);
+                                    if (typeof d.fvd_insc.delegadoInscripcionCerrada === 'boolean') {
+                                        window.FVD_INSC.delegadoInscripcionCerrada = d.fvd_insc.delegadoInscripcionCerrada;
+                                    }
+                                }
+                                fillDisp(d.fvdSitioDisponibles);
+                                fillInsc(d.fvdSitioInscritos);
+                                var listA = document.getElementById('fvd-insc-ver-listado');
+                                if (listA) listA.href = selfBase + '?torneo_id=' + tid + (campeonatoQ || '');
+                                try {
+                                    history.replaceState(null, '', selfBase + '?torneo_id=' + tid + (campeonatoQ || ''));
+                                } catch (e) { /* ignore */ }
+                            })
+                            .catch(function () { window.alert('Error de red.'); });
+                    });
+                });
+            })();
+            </script>
+            <?php endif; ?>
             </details>
         <?php endif; ?>
     <?php endif; ?>

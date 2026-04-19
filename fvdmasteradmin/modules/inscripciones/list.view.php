@@ -1,5 +1,6 @@
 <?php
 /** @var InscripcionesController $ctrl */
+$fvd_rep_campeonato_error = $fvd_rep_campeonato_error ?? '';
 $fvdUrlSelf = fvd_module_url('inscripciones/index.php');
 $fvdUrlDeuda = fvd_module_url('deuda_asociacion/index.php');
 $fvdUrlPagos = fvd_module_url('relacion_pago/index.php');
@@ -12,6 +13,9 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
 };
 ?>
 <h1 class="fvd-atletas-title">Reportes del torneo</h1>
+<?php if (!empty($fvd_rep_campeonato_error)): ?>
+    <p class="fvd-mod-msg" style="max-width:42rem"><?= htmlspecialchars((string) $fvd_rep_campeonato_error, ENT_QUOTES, 'UTF-8') ?></p>
+<?php endif; ?>
 <p style="font-size:0.875rem;color:var(--fvd-muted);max-width:48rem;margin:0 0 1.25rem">
     Elija <strong>torneo</strong><?php if (AuthService::role() === AuthService::ROLE_FVD_ADMIN): ?> y <strong>asociación</strong><?php endif; ?>, aplique el filtro y descargue los PDF (o HTML si no hay Dompdf).
     Los listados usan las marcas en <code>atletas</code> para el club en ese torneo. Los informes contables toman <code>deuda_asociaciones</code> y <code>relacion_pagos</code>.
@@ -20,10 +24,13 @@ $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $
     <?php endif; ?>
 </p>
 
-<?php if ($fvdRepTorneos === []): ?>
+<?php if ($fvdRepTorneos === [] && empty($fvd_rep_campeonato_error)): ?>
     <p class="fvd-mod-msg">No hay torneos en el selector. Si es delegado, confirme que existan atletas del club con <code>torneo_id</code> o un evento activo en contexto.</p>
-<?php else: ?>
+<?php elseif ($fvdRepTorneos !== []): ?>
 <form method="get" action="<?= htmlspecialchars($fvdUrlSelf, ENT_QUOTES, 'UTF-8') ?>" class="fvd-card" style="padding:14px;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+    <?php if (AuthService::isDelegadoAsociacion() && isset($fvd_rep_campeonato_id) && (int) $fvd_rep_campeonato_id > 0): ?>
+        <input type="hidden" name="campeonato_id" value="<?= (int) $fvd_rep_campeonato_id ?>">
+    <?php endif; ?>
     <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
     <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
     <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>

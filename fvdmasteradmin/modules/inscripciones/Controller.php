@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/FvdModuleController.php';
+require_once dirname(__DIR__, 3) . '/src/Services/FvdAdminService.php';
+require_once dirname(__DIR__, 2) . '/services/AuthService.php';
 
 /**
  * Hub de reportes por torneo + asociación (PDF/HTML vía ReportService).
@@ -61,6 +63,31 @@ class InscripcionesController extends FvdModuleController
         }
 
         return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Torneos del campeonato (grupo_evento_id) con convocatoria para la asociación del delegado.
+     * Requiere {@see $campeonatoParam} resuelto a un grupo válido (ID de torneo o de grupo).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listTorneosPorCampeonatoParaDelegado(int $asociacionId, int $campeonatoParam): array
+    {
+        if ($asociacionId <= 0 || $campeonatoParam <= 0) {
+            return [];
+        }
+        $svc = new \FvdAdminService($this->pdo);
+        $grupo = $svc->resolverGrupoDesdeCampeonatoParam($campeonatoParam);
+        if ($grupo === null || $grupo <= 0) {
+            return [];
+        }
+
+        $rows = $svc->torneosPorGrupoCampeonato($asociacionId, $grupo);
+        if ($rows !== []) {
+            AuthService::setDelegadoCampeonatoGrupo($grupo);
+        }
+
+        return $rows;
     }
 
     /**

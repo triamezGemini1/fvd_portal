@@ -914,4 +914,205 @@ final class StatsService
             'pagos'      => $pagos,
         ];
     }
+
+    /**
+     * Estado de cuenta global por campeonato (grupo_evento_id): suma de deudas y pagos de los torneos vinculados.
+     * Desglose por categoría = una fila por torneo del grupo (nombre corto inferido del nombre del evento).
+     *
+     * @return array{
+     *   campeonato_id:int,
+     *   asociacion_id:int,
+     *   asoc_nombre:string,
+     *   totales: array{n_inscritos:int,monto_total_bs:float,monto_total_eur:float|null,pagado_eur:float,saldo_eur:float|null},
+     *   por_categoria: list<array{
+     *     torneo_id:int,
+     *     etiqueta:string,
+     *     n_inscritos:int,
+     *     n_carnets:int,
+     *     n_afiliados:int,
+     *     monto_total_bs:float,
+     *     monto_total_eur:float|null,
+     *     pagado_eur:float,
+     *     saldo_eur:float|null
+     *   }>
+     * }
+     */
+    public static function obtenerBalanceCampeonato(PDO $pdo, int $campeonato_id, int $asociacion_id): array
+    {
+        $campeonato_id = max(0, $campeonato_id);
+        $asociacion_id = max(0, $asociacion_id);
+        $base = [
+            'campeonato_id' => $campeonato_id,
+            'asociacion_id'   => $asociacion_id,
+            'asoc_nombre'     => '',
+            'totales'         => [
+                'n_inscritos'    => 0,
+                'monto_total_bs' => 0.0,
+                'monto_total_eur'=> null,
+                'pagado_eur'     => 0.0,
+                'saldo_eur'      => null,
+            ],
+            'por_categoria'   => [],
+        ];
+        if ($campeonato_id <= 0 || $asociacion_id <= 0) {
+            return $base;
+        }
+
+        $nomAsoc = '';
+        try {
+            $stN = $pdo->prepare('SELECT nombre FROM asociaciones WHERE id = :id LIMIT 1');
+            $stN->execute([':id' => $asociacion_id]);
+            $nomAsoc = trim((string) ($stN->fetchColumn() ?: ''));
+        } catch (PDOException $e) {
+            error_log('[StatsService::obtenerBalanceCampeonato asoc] ' . $e->getMessage());
+        }
+        $base['asoc_nombre'] = $nomAsoc;
+
+        try {
+            $stT = $pdo->prepare(
+                'SELECT torneo, nombre FROM torneosact WHERE grupo_evento_id = :g ORDER BY tipo ASC, nombre ASC'
+            );
+            $stT->execute([':g' => $campeonato_id]);
+            $torneos = $stT->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('[StatsService::obtenerBalanceCampeonato torneos] ' . $e->getMessage());
+
+            return $base;
+        }
+
+        require_once __DIR__ . '/FvdAdminService.php';
+        $svc = new FvdAdminService($pdo);
+
+        $sumInsc = 0;
+        $sumBs = 0.0;
+        $sumEurDeuda = null;
+        $sumPag = 0.0;
+        $porCat = [];
+
+        foreach ($torneos as $tr) {
+            $tid = (int) ($tr['torneo'] ?? 0);
+            if ($tid <= 0) {
+                continue;
+            }
+            $etiqueta = $svc->nombreCortaTorneoCampeonato((string) ($tr['nombre'] ?? ''));
+
+            $nInsc = 0;
+            $nCarn = 0;
+            $nAfi = 0;
+            try {
+                $stA = $pdo->prepare(
+                    'SELECT
+                        SUM(CASE WHEN COALESCE(a.inscripcion,0)=1 THEN 1 ELSE 0 END) AS n_insc,
+                        SUM(CASE WHEN COALESCE(a.carnet,0)=1 THEN 1 ELSE 0 END) AS n_carn,
+                        SUM(CASE WHEN COALESCE(a.afiliacion,0)=1 THEN 1 ELSE 0 END) AS n_afi
+                    FROM atletas a
+                    WHERE a.torneo_id = :t AND a.asociacion = :a'
+                );
+                $stA->execute([':t' => $tid, ':a' => $asociacion_id]);
+                $rowA = $stA->fetch(PDO::FETCH_ASSOC) ?: [];
+                $nInsc = (int) ($rowA['n_insc'] ?? 0);
+                $nCarn = (int) ($rowA['n_carn'] ?? 0);
+                $nAfi = (int) ($rowA['n_afi'] ?? 0);
+            } catch (PDOException $e) {
+                error_log('[StatsService::obtenerBalanceCampeonato atletas] ' . $e->getMessage());
+            }
+
+            $montoBs = 0.0;
+            $montoEur = null;
+            try {
+                $stD = $pdo->prepare('SELECT monto_total, monto_total_eur FROM deuda_asociaciones WHERE torneo_id = :t AND asociacion_id = :a LIMIT 1');
+                $stD->execute([':t' => $tid, ':a' => $asociacion_id]);
+                $rowD = $stD->fetch(PDO::FETCH_ASSOC);
+                if (is_array($rowD)) {
+                    $montoBs = (float) ($rowD['monto_total'] ?? 0);
+                    if (isset($rowD['monto_total_eur']) && $rowD['monto_total_eur'] !== null && $rowD['monto_total_eur'] !== '') {
+                        $montoEur = (float) $rowD['monto_total_eur'];
+                    }
+                }
+            } catch (PDOException $e) {
+                error_log('[StatsService::obtenerBalanceCampeonato deuda] ' . $e->getMessage());
+            }
+
+            $pagEur = 0.0;
+            try {
+                $stP = $pdo->prepare('SELECT COALESCE(SUM(monto_dolares),0) FROM relacion_pagos WHERE torneo_id = :t AND asociacion_id = :a');
+                $stP->execute([':t' => $tid, ':a' => $asociacion_id]);
+                $pagEur = (float) $stP->fetchColumn();
+            } catch (PDOException $e) {
+                error_log('[StatsService::obtenerBalanceCampeonato pagos] ' . $e->getMessage());
+            }
+
+            $saldoEur = null;
+            if ($montoEur !== null && $montoEur > 0) {
+                $saldoEur = max(0.0, round($montoEur - $pagEur, 2));
+            }
+
+            $sumInsc += $nInsc;
+            $sumBs += $montoBs;
+            $sumPag += $pagEur;
+            if ($montoEur !== null) {
+                $sumEurDeuda = ($sumEurDeuda ?? 0.0) + $montoEur;
+            }
+
+            $porCat[] = [
+                'torneo_id'      => $tid,
+                'etiqueta'       => $etiqueta,
+                'n_inscritos'    => $nInsc,
+                'n_carnets'      => $nCarn,
+                'n_afiliados'    => $nAfi,
+                'monto_total_bs' => $montoBs,
+                'monto_total_eur'=> $montoEur,
+                'pagado_eur'     => round($pagEur, 2),
+                'saldo_eur'      => $saldoEur,
+            ];
+        }
+
+        $totSaldo = null;
+        if ($sumEurDeuda !== null && $sumEurDeuda > 0) {
+            $totSaldo = max(0.0, round((float) $sumEurDeuda - $sumPag, 2));
+        }
+
+        $base['totales'] = [
+            'n_inscritos'    => $sumInsc,
+            'monto_total_bs' => $sumBs,
+            'monto_total_eur'=> $sumEurDeuda,
+            'pagado_eur'     => round($sumPag, 2),
+            'saldo_eur'      => $totSaldo,
+        ];
+        $base['por_categoria'] = $porCat;
+
+        return $base;
+    }
+
+    /**
+     * Atletas activos de la asociación que aún no tienen carnet solicitado (pendientes de carnetización).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function listadoAtletasActivosCarnetPendiente(PDO $pdo, int $asociacionId, int $limit = 500): array
+    {
+        $asociacionId = max(0, $asociacionId);
+        $limit = max(1, min(2000, $limit));
+        if ($asociacionId <= 0) {
+            return [];
+        }
+        $sql = 'SELECT a.id, a.cedula, a.nombre, a.numfvd, a.estatus, a.carnet
+            FROM atletas a
+            WHERE a.asociacion = :aid
+            AND COALESCE(a.estatus, 0) = 1
+            AND (a.carnet IS NULL OR a.carnet = 0)
+            ORDER BY a.nombre ASC, a.id ASC
+            LIMIT ' . (int) $limit;
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([':aid' => $asociacionId]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('[StatsService::listadoAtletasActivosCarnetPendiente] ' . $e->getMessage());
+
+            return [];
+        }
+
+        return \is_array($rows) ? $rows : [];
+    }
 }
