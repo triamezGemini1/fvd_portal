@@ -1507,16 +1507,98 @@ final class FvdAdminService
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /** Máxima diferencia en días entre fechas de inicio de campeonatos vinculados (alerta operativa). */
+    public const RELACION_GRUPO_MAX_DIAS_ENTRE_FECHAS = 7;
+
     /**
-     * Asigna el mismo grupo_evento_id (nuevo) a varios campeonatos seleccionados.
+     * Crea la tabla maestra de nombres nominales por grupo si no existe.
+     */
+    public function campeonatoGrupoEnsureTable(): void
+    {
+        $sqlPath = dirname(__DIR__, 2) . '/fvdmasteradmin/sql/install_fvd_campeonato_grupo.sql';
+        if (!is_readable($sqlPath)) {
+            return;
+        }
+        $sql = file_get_contents($sqlPath);
+        if ($sql === false || strpos($sql, 'CREATE TABLE') === false) {
+            return;
+        }
+        try {
+            $this->pdo->exec($sql);
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService::campeonatoGrupoEnsureTable] ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Comprueba que las fechas de inicio de los torneos no estén demasiado alejadas entre sí.
+     *
+     * @param list<int> $ids
+     */
+    public function torneosRelacionGrupoValidarDispersionFechas(array $ids): void
+    {
+        if ($ids === []) {
+            return;
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $st = $this->pdo->prepare("SELECT DATE(t.fechator) AS fd FROM torneosact t WHERE t.torneo IN ($ph)");
+        $st->execute($ids);
+        $dates = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $fd = $row['fd'] ?? null;
+            if ($fd === null || $fd === false) {
+                continue;
+            }
+            $s = (string) $fd;
+            if ($s === '' || strncmp($s, '0000', 4) === 0) {
+                continue;
+            }
+            try {
+                $dates[] = new \DateTimeImmutable($s . ' 00:00:00');
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+        if (count($dates) < 2) {
+            return;
+        }
+        $min = $dates[0];
+        $max = $dates[0];
+        foreach ($dates as $d) {
+            if ($d < $min) {
+                $min = $d;
+            }
+            if ($d > $max) {
+                $max = $d;
+            }
+        }
+        $diff = (int) $min->diff($max)->days;
+        if ($diff > self::RELACION_GRUPO_MAX_DIAS_ENTRE_FECHAS) {
+            throw new InvalidArgumentException(
+                'Las fechas de inicio de los campeonatos seleccionados difieren en '
+                . $diff . ' días (máximo permitido: ' . self::RELACION_GRUPO_MAX_DIAS_ENTRE_FECHAS
+                . '). Revise la selección o corrija las fechas en cada evento antes de vincular.'
+            );
+        }
+    }
+
+    /**
+     * Asigna el mismo grupo_evento_id (nuevo) a varios campeonatos y guarda el nombre nominal en la tabla maestra.
      *
      * @param list<mixed> $torneoIds
      */
-    public function torneosRelacionGrupoAplicar(array $torneoIds): int
+    public function torneosRelacionGrupoAplicar(array $torneoIds, string $nombreNominalCampeonato): int
     {
         $this->torneosRequireFvdAdminForGestion();
         if (!$this->torneosactGrupoEventoColumnExists()) {
             throw new RuntimeException('No existe la columna grupo_evento_id en torneosact.');
+        }
+        $nombreNominalCampeonato = trim($nombreNominalCampeonato);
+        if ($nombreNominalCampeonato === '' || mb_strlen($nombreNominalCampeonato) < 2) {
+            throw new InvalidArgumentException('Indique el nombre nominal del campeonato (mínimo 2 caracteres).');
+        }
+        if (mb_strlen($nombreNominalCampeonato) > 255) {
+            throw new InvalidArgumentException('El nombre nominal del campeonato no puede superar 255 caracteres.');
         }
         $ids = [];
         foreach ($torneoIds as $x) {
@@ -1529,6 +1611,7 @@ final class FvdAdminService
         if (count($ids) < 2) {
             throw new InvalidArgumentException('Seleccione al menos dos campeonatos para vincular.');
         }
+        $this->torneosRelacionGrupoValidarDispersionFechas($ids);
         $ph = implode(',', array_fill(0, count($ids), '?'));
         $st = $this->pdo->prepare("SELECT torneo, tipo FROM torneosact WHERE torneo IN ($ph)");
         $st->execute($ids);
@@ -1549,6 +1632,24 @@ final class FvdAdminService
         $upd = $this->pdo->prepare('UPDATE torneosact SET grupo_evento_id = :g WHERE torneo = :id');
         foreach ($ids as $tid) {
             $upd->execute([':g' => $next, ':id' => $tid]);
+        }
+
+        $this->campeonatoGrupoEnsureTable();
+        try {
+            $ins = $this->pdo->prepare(
+                'INSERT INTO fvd_campeonato_grupo (grupo_evento_id, nombre_nominal) VALUES (:g, :n)
+                 ON DUPLICATE KEY UPDATE nombre_nominal = VALUES(nombre_nominal)'
+            );
+            $ins->execute([':g' => $next, ':n' => $nombreNominalCampeonato]);
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService::torneosRelacionGrupoAplicar] maestro: ' . $e->getMessage());
+            throw new RuntimeException('No se pudo guardar el nombre nominal del campeonato. Compruebe que exista la tabla fvd_campeonato_grupo.');
+        }
+
+        try {
+            \FvdPortal\Services\DelegadoTorneoNotifService::sincronizarInvitacionesTrasVincularGrupo($this->pdo, $ids);
+        } catch (Throwable $e) {
+            error_log('[FvdAdminService::torneosRelacionGrupoAplicar] notif sync: ' . $e->getMessage());
         }
 
         return $next;

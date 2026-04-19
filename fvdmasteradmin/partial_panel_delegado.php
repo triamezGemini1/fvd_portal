@@ -199,6 +199,10 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
             $tn = htmlspecialchars((string) ($nf['torneo_nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
 
+            $ramaRaw = trim((string) ($nf['torneo_rama_nombre'] ?? ''));
+
+            $tnRaw = trim((string) ($nf['torneo_nombre'] ?? ''));
+
             $fd = htmlspecialchars(substr((string) ($nf['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8');
 
             $sinAbrir = empty($nf['visto_en']);
@@ -212,6 +216,12 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
             <li class="fvd-deleg-notif-wrap__li">
 
                 <span class="fvd-deleg-notif-wrap__tn"><?= $tn ?></span>
+
+                <?php if ($ramaRaw !== '' && strcasecmp($ramaRaw, $tnRaw) !== 0): ?>
+
+                    <span class="fvd-deleg-notif-wrap__rama" style="display:block;font-size:0.8125rem;color:var(--fvd-muted);margin-top:0.15rem">Rama: <?= htmlspecialchars($ramaRaw, ENT_QUOTES, 'UTF-8') ?></span>
+
+                <?php endif; ?>
 
                 <span class="fvd-deleg-notif-wrap__fd"><?= $fd ?></span>
 

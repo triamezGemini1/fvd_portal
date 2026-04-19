@@ -30,6 +30,99 @@ final class DelegadoTorneoNotifService
     }
 
     /**
+     * Tabla maestra de nombre nominal por grupo (vinculación explícita de campeonatos).
+     */
+    public static function ensureCampeonatoGrupoTable(PDO $pdo): void
+    {
+        $sqlPath = dirname(__DIR__, 2) . '/fvdmasteradmin/sql/install_fvd_campeonato_grupo.sql';
+        if (!is_readable($sqlPath)) {
+            return;
+        }
+        $sql = file_get_contents($sqlPath);
+        if ($sql === false || strpos($sql, 'CREATE TABLE') === false) {
+            return;
+        }
+        try {
+            $pdo->exec($sql);
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] ensureCampeonatoGrupoTable: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Tras vincular campeonatos al mismo grupo: asegura una notificación por cada torneo del grupo
+     * para los delegados que ya tenían al menos una invitación en ese conjunto, y refresca fechas/no visto.
+     *
+     * @param list<int> $torneoIds
+     */
+    public static function sincronizarInvitacionesTrasVincularGrupo(PDO $pdo, array $torneoIds): void
+    {
+        $ids = [];
+        foreach ($torneoIds as $x) {
+            $n = (int) $x;
+            if ($n > 0) {
+                $ids[$n] = $n;
+            }
+        }
+        $ids = array_values($ids);
+        if (count($ids) < 2) {
+            return;
+        }
+        self::ensureTable($pdo);
+        self::ensureTokenColumns($pdo);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $st = $pdo->prepare("SELECT DISTINCT delegado_id FROM fvd_delegado_notif_torneo WHERE torneo_id IN ($ph)");
+            $st->execute($ids);
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] sincronizarInvitaciones delegados: ' . $e->getMessage());
+
+            return;
+        }
+        $delegados = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $d = (int) ($row['delegado_id'] ?? 0);
+            if ($d > 0) {
+                $delegados[$d] = $d;
+            }
+        }
+        $delegados = array_values($delegados);
+        if ($delegados === []) {
+            return;
+        }
+        $stInv = $pdo->prepare('SELECT invitacion FROM torneosact WHERE torneo = :t LIMIT 1');
+        $stAsoc = $pdo->prepare('SELECT asociacion_id FROM delegados WHERE id = :id AND activo = 1 LIMIT 1');
+        $ins = $pdo->prepare(
+            'INSERT INTO fvd_delegado_notif_torneo (delegado_id, torneo_id, invitacion_archivo, access_token, asociacion_id)
+             VALUES (:d, :t, :inv, :tok, :a)
+             ON DUPLICATE KEY UPDATE
+                invitacion_archivo = VALUES(invitacion_archivo),
+                asociacion_id = VALUES(asociacion_id),
+                creado_en = CURRENT_TIMESTAMP,
+                visto_en = NULL,
+                access_token = IFNULL(fvd_delegado_notif_torneo.access_token, VALUES(access_token))'
+        );
+        foreach ($delegados as $did) {
+            $stAsoc->execute([':id' => $did]);
+            $aid = (int) $stAsoc->fetchColumn();
+            if ($aid <= 0) {
+                continue;
+            }
+            foreach ($ids as $tid) {
+                $stInv->execute([':t' => $tid]);
+                $inv = $stInv->fetchColumn();
+                $invFile = $inv !== false && $inv !== null && trim((string) $inv) !== '' ? trim((string) $inv) : null;
+                $token = bin2hex(random_bytes(32));
+                try {
+                    $ins->execute([':d' => $did, ':t' => $tid, ':inv' => $invFile, ':tok' => $token, ':a' => $aid]);
+                } catch (PDOException $e) {
+                    error_log('[DelegadoTorneoNotifService] sincronizarInvitaciones upsert: ' . $e->getMessage());
+                }
+            }
+        }
+    }
+
+    /**
      * Añade columnas de token, asociación y PDF de tarjeta (idempotente).
      */
     public static function ensureTokenColumns(PDO $pdo): void
@@ -234,22 +327,26 @@ final class DelegadoTorneoNotifService
             return null;
         }
         self::ensureTable($pdo);
+        self::ensureCampeonatoGrupoTable($pdo);
+        $selTorneo = 'COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre, t.nombre AS torneo_rama_nombre';
         try {
             if ($asociacionId !== null && $asociacionId > 0) {
                 $st = $pdo->prepare(
-                    'SELECT n.*, t.nombre AS torneo_nombre, t.fechator, t.lugar
+                    "SELECT n.*, {$selTorneo}, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
                      INNER JOIN delegados del ON del.id = n.delegado_id
-                     WHERE n.id = :id AND del.asociacion_id = :a AND del.activo = 1 LIMIT 1'
+                     WHERE n.id = :id AND del.asociacion_id = :a AND del.activo = 1 LIMIT 1"
                 );
                 $st->execute([':id' => $notifId, ':a' => $asociacionId]);
             } else {
                 $st = $pdo->prepare(
-                    'SELECT n.*, t.nombre AS torneo_nombre, t.fechator, t.lugar
+                    "SELECT n.*, {$selTorneo}, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
-                     WHERE n.id = :id AND n.delegado_id = :d LIMIT 1'
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
+                     WHERE n.id = :id AND n.delegado_id = :d LIMIT 1"
                 );
                 $st->execute([':id' => $notifId, ':d' => $delegadoId]);
             }
@@ -275,14 +372,17 @@ final class DelegadoTorneoNotifService
             return [];
         }
         self::ensureTable($pdo);
+        self::ensureCampeonatoGrupoTable($pdo);
         $limite = max(1, min(100, $limite));
         try {
             if ($asociacionId !== null && $asociacionId > 0) {
                 $st = $pdo->prepare(
                     'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
                      INNER JOIN delegados del ON del.id = n.delegado_id
                      WHERE del.asociacion_id = :a AND del.activo = 1
                      ORDER BY n.creado_en DESC
@@ -292,9 +392,11 @@ final class DelegadoTorneoNotifService
             } else {
                 $st = $pdo->prepare(
                     'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
                      WHERE n.delegado_id = :d
                      ORDER BY n.creado_en DESC
                      LIMIT ' . (int) $limite
@@ -346,13 +448,16 @@ final class DelegadoTorneoNotifService
             return null;
         }
         self::ensureTable($pdo);
+        self::ensureCampeonatoGrupoTable($pdo);
         try {
             if ($asociacionId !== null && $asociacionId > 0) {
                 $st = $pdo->prepare(
                     'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
                      INNER JOIN delegados del ON del.id = n.delegado_id
                      WHERE del.asociacion_id = :a AND del.activo = 1 AND n.visto_en IS NULL
                      ORDER BY n.creado_en DESC
@@ -362,9 +467,11 @@ final class DelegadoTorneoNotifService
             } else {
                 $st = $pdo->prepare(
                     'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                        t.nombre AS torneo_nombre, t.fechator, t.lugar
+                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
                      WHERE n.delegado_id = :d AND n.visto_en IS NULL
                      ORDER BY n.creado_en DESC
                      LIMIT 1'

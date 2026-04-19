@@ -153,8 +153,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rela
         if ($fechaRel === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRel)) {
             $fechaRel = date('Y-m-d');
         }
-        $gid = $svc->torneosRelacionGrupoAplicar($ids);
-        $_SESSION['fvd_torneo_relacion_flash'] = 'Relación aplicada: grupo de evento #' . $gid . ' asignado a los campeonatos seleccionados.';
+        $nombreNominal = trim((string) ($_POST['nombre_nominal_campeonato'] ?? ''));
+        $gid = $svc->torneosRelacionGrupoAplicar($ids, $nombreNominal);
+        $_SESSION['fvd_torneo_relacion_flash'] = 'Relación aplicada: grupo #' . $gid . ' — nombre nominal guardado. Las invitaciones a delegados se han actualizado cuando correspondía.';
         header('Location: ' . $selfUrl . '?action=relacion_grupo&fecha=' . rawurlencode($fechaRel) . '&msg=ok');
         exit;
     } catch (Throwable $e) {
@@ -463,6 +464,7 @@ if ($action === 'relacion_grupo') {
     }
     $relacionGrupoFilas = $svc->torneosRelacionGrupoCandidatosPorFecha($fechaRel);
     $relacionGrupoColumnaOk = $svc->torneosactGrupoEventoColumnExists();
+    $fvd_relacion_max_dias_fechas = FvdAdminService::RELACION_GRUPO_MAX_DIAS_ENTRE_FECHAS;
     $fvd_page_title = 'Relacionar campeonatos (mismo día)';
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/relacion_grupo.view.php';

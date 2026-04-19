@@ -8,7 +8,9 @@ declare(strict_types=1);
 /** @var bool $relacionGrupoColumnaOk */
 /** @var string $fvd_torneo_relacion_flash */
 /** @var string $fvd_torneo_relacion_err */
+/** @var int $fvd_relacion_max_dias_fechas */
 $tipoLabels = [1 => 'Torneo', 2 => 'Campeonato'];
+$maxDiasFechas = isset($fvd_relacion_max_dias_fechas) ? (int) $fvd_relacion_max_dias_fechas : 7;
 ?>
 
 <h1>Relacionar campeonatos (mismo día)</h1>
@@ -40,9 +42,15 @@ $tipoLabels = [1 => 'Torneo', 2 => 'Campeonato'];
 <?php elseif ($relacionGrupoFilas === []): ?>
     <p style="color:var(--fvd-muted)">No hay eventos registrados para la fecha <?= htmlspecialchars($fechaRel, ENT_QUOTES, 'UTF-8') ?>.</p>
 <?php else: ?>
-    <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=relacion_grupo&fecha=' . rawurlencode($fechaRel), ENT_QUOTES, 'UTF-8') ?>" id="fvd_form_relacion_grupo">
+    <form method="post" action="<?= htmlspecialchars($selfUrl . '?action=relacion_grupo&fecha=' . rawurlencode($fechaRel), ENT_QUOTES, 'UTF-8') ?>" id="fvd_form_relacion_grupo" data-max-dias-fechas="<?= $maxDiasFechas ?>">
         <input type="hidden" name="_action" value="relacion_grupo_aplicar">
         <input type="hidden" name="fecha_relacion" value="<?= htmlspecialchars($fechaRel, ENT_QUOTES, 'UTF-8') ?>">
+
+        <div style="margin-bottom:1rem;max-width:32rem">
+            <label for="fvd_nombre_nominal_campeonato" style="font-size:.8125rem;color:var(--fvd-muted);display:block;margin-bottom:0.35rem">Nombre nominal del campeonato</label>
+            <input class="fvd-input" type="text" name="nombre_nominal_campeonato" id="fvd_nombre_nominal_campeonato" required minlength="2" maxlength="255" placeholder="Ej. Nacional Máster 2026" autocomplete="off" style="width:100%;box-sizing:border-box">
+            <p style="font-size:0.75rem;color:var(--fvd-muted);margin:0.35rem 0 0">Se guarda en la tabla maestra y es el título que verán los delegados para el bloque vinculado (M / F / J).</p>
+        </div>
 
         <p style="font-size:0.8125rem;margin:0 0 0.5rem">
             <button type="button" class="fvd-input" style="width:auto;padding:4px 10px;font-size:0.8125rem" id="fvd_rel_sel_todos_camp">Seleccionar todos los campeonatos</button>
@@ -68,7 +76,7 @@ $tipoLabels = [1 => 'Torneo', 2 => 'Campeonato'];
                     $tid = (int) ($r['torneo'] ?? 0);
                     $esCamp = (int) ($r['tipo'] ?? 0) === 2;
                     ?>
-                    <tr<?= $esCamp ? '' : ' style="opacity:0.65"' ?>>
+                    <tr<?= $esCamp ? ' data-fecha="' . htmlspecialchars(substr((string) ($r['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8') . '"' : '' ?><?= $esCamp ? '' : ' style="opacity:0.65"' ?>>
                         <td>
                             <?php if ($esCamp): ?>
                                 <input type="checkbox" name="torneo_id[]" value="<?= $tid ?>" class="fvd-rel-camp-cb">
@@ -120,12 +128,49 @@ $tipoLabels = [1 => 'Torneo', 2 => 'Campeonato'];
         });
         form.addEventListener('submit', function (e) {
             var n = 0;
-            cbs.forEach(function (el) { if (el.checked) n++; });
+            var fechas = [];
+            cbs.forEach(function (el) {
+                if (!el.checked) return;
+                n++;
+                var tr = el.closest ? el.closest('tr') : null;
+                if (tr && tr.getAttribute('data-fecha')) {
+                    fechas.push(tr.getAttribute('data-fecha'));
+                }
+            });
             if (n < 2) {
                 e.preventDefault();
                 return false;
             }
-            return confirm('Se asignará un nuevo número de grupo compartido a los campeonatos seleccionados. ¿Continuar?');
+            var maxD = parseInt(form.getAttribute('data-max-dias-fechas') || '7', 10);
+            if (!isNaN(maxD) && maxD > 0 && fechas.length >= 2) {
+                var ts = [];
+                fechas.forEach(function (s) {
+                    var p = (s || '').split('-');
+                    if (p.length === 3) {
+                        var t = Date.UTC(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+                        if (!isNaN(t)) ts.push(t);
+                    }
+                });
+                if (ts.length >= 2) {
+                    var mn = Math.min.apply(null, ts);
+                    var mx = Math.max.apply(null, ts);
+                    var dias = Math.round((mx - mn) / 86400000);
+                    if (dias > maxD) {
+                        if (!window.confirm('Las fechas de inicio de los campeonatos marcados difieren en ' + dias + ' días (superior a ' + maxD + '). Suele indicar un error. ¿Desea continuar de todos modos?')) {
+                            e.preventDefault();
+                            return false;
+                        }
+                    }
+                }
+            }
+            var nom = document.getElementById('fvd_nombre_nominal_campeonato');
+            if (nom && (!nom.value || String(nom.value).trim().length < 2)) {
+                e.preventDefault();
+                alert('Indique el nombre nominal del campeonato (mínimo 2 caracteres).');
+                if (nom.focus) nom.focus();
+                return false;
+            }
+            return confirm('Se asignará un nuevo grupo compartido, se guardará el nombre nominal y se actualizarán las invitaciones de delegados cuando corresponda. ¿Continuar?');
         });
         sync();
     })();
