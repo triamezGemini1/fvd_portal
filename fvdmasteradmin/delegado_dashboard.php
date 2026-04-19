@@ -127,8 +127,10 @@ $inscripcionApiUrl = $appBase . '/fvdmasteradmin/delegado_inscripcion_api.php';
 $fvd_campeonato_q = $campeonatoIdInt > 0 ? ('&campeonato_id=' . $campeonatoIdInt) : '';
 
 $fvd_hide_sidebar = true;
-$fvd_head_extra_html = '<link rel="stylesheet" href="' . htmlspecialchars(url('assets/css/bootstrap-grid.css'), ENT_QUOTES, 'UTF-8') . '">'
-    . '<link rel="stylesheet" href="' . htmlspecialchars(url('assets/css/fvd-delegado-dashboard.css'), ENT_QUOTES, 'UTF-8') . '">'
+$fvdDdCssV = (string) (@filemtime($projRoot . '/assets/css/fvd-delegado-dashboard.css') ?: time());
+$fvdBsGridV = (string) (@filemtime($projRoot . '/assets/css/bootstrap-grid.css') ?: time());
+$fvd_head_extra_html = '<link rel="stylesheet" href="' . htmlspecialchars(url('assets/css/bootstrap-grid.css'), ENT_QUOTES, 'UTF-8') . '?v=' . rawurlencode($fvdBsGridV) . '">'
+    . '<link rel="stylesheet" href="' . htmlspecialchars(url('assets/css/fvd-delegado-dashboard.css'), ENT_QUOTES, 'UTF-8') . '?v=' . rawurlencode($fvdDdCssV) . '">'
     . '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">';
 
 $fvd_page_title = 'Panel de delegación';

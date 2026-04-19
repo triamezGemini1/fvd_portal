@@ -1,0 +1,19 @@
+-- Notas (no ejecutar ciego): alinear el despliegue con solo administrador general + delegados.
+--
+-- 1) Administrador general
+--    Mantener una o pocas cuentas en fvd_usuarios con rol 'fvd_admin'.
+--
+-- 2) Gestión de club
+--    La política objetivo es usar SOLO la tabla `delegados` (login → AuthService::ROLE_DELEGADO_ASOC).
+--    Si existen usuarios con rol 'aso_admin' en fvd_usuarios:
+--      - Crear/ajustar la fila correspondiente en `delegados` (email_acceso, asociacion_id, etc.).
+--      - Desactivar o eliminar la cuenta aso_admin cuando el delegado ya pueda entrar.
+--    No hay valor ENUM 'delegado_asoc' en fvd_usuarios: el delegado no es un rol de esa tabla.
+--
+-- 3) Portal atleta
+--    El rol 'usuario' en fvd_usuarios sigue siendo útil para cuentas vinculadas a atleta_id (Mi ficha).
+--    Si no usan portal atleta con login, pueden ignorar ese caso.
+--
+-- 4) Cambiar ENUM de fvd_usuarios.rol para quitar 'aso_admin' requiere:
+--      migrar datos primero; luego ALTER TABLE ... MODIFY rol ENUM(...);
+--    Hacer copia de seguridad antes.

@@ -13,5 +13,6 @@ if (AuthService::isDelegadoAsociacion()) {
     AuthService::clearDelegadoTorneoContext();
 }
 
-header('Location: ' . $base . '/fvdmasteradmin/index.php');
+$dest = ($base . '/fvdmasteradmin/') . (AuthService::isDelegadoAsociacion() ? 'delegado_dashboard.php' : 'index.php');
+header('Location: ' . $dest);
 exit;

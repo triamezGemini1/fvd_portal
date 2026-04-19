@@ -1,6 +1,15 @@
 <?php
 /**
  * Autenticación y contexto de sesión para FVD Master Admin.
+ *
+ * Modelo previsto para gestión deportiva/administrativa:
+ * - Rol federación: {@see ROLE_FVD_ADMIN} — administrador general (cuenta en `fvd_usuarios`).
+ * - Rol club: {@see ROLE_DELEGADO_ASOC} — delegado (cuenta en tabla `delegados`, un vínculo por asociación).
+ *
+ * Otros valores en `fvd_usuarios.rol` se mantienen por compatibilidad con datos y código existente:
+ * - {@see ROLE_ASO_ADMIN} — administrador de club vía `fvd_usuarios`; si la política es solo delegado,
+ *   conviene migrar esos usuarios a filas en `delegados` y dejar de usar este rol.
+ * - {@see ROLE_USUARIO} — acceso ligero (p. ej. portal atleta con `atleta_id`); no es gestión de club.
  */
 
 declare(strict_types=1);
@@ -57,12 +66,26 @@ class AuthService
         self::$lastLoginFailure = $code;
     }
 
-    /** @var list<string> */
+    /**
+     * Roles que pueden aparecer en sesión o en BD (compatibilidad).
+     *
+     * @var list<string>
+     */
     public const ROLES = [
         self::ROLE_FVD_ADMIN,
         self::ROLE_ASO_ADMIN,
         self::ROLE_DELEGADO_ASOC,
         self::ROLE_USUARIO,
+    ];
+
+    /**
+     * Modelo reducido: solo administración general FVD + delegado de club (objetivo de despliegue).
+     *
+     * @var list<string>
+     */
+    public const ROLES_MODELO_PRINCIPAL = [
+        self::ROLE_FVD_ADMIN,
+        self::ROLE_DELEGADO_ASOC,
     ];
 
     public static function ensureSession(): void
@@ -135,6 +158,12 @@ class AuthService
     public static function isSuperAdmin(): bool
     {
         return self::role() === self::ROLE_FVD_ADMIN;
+    }
+
+    /** Administrador general de la federación (sinónimo claro de {@see isSuperAdmin}). */
+    public static function isAdministradorGeneral(): bool
+    {
+        return self::isSuperAdmin();
     }
 
     public static function isDelegadoAsociacion(): bool
@@ -566,6 +595,9 @@ class AuthService
     public static function homeUrl(): string
     {
         $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        if (self::isDelegadoAsociacion()) {
+            return $base . '/fvdmasteradmin/delegado_dashboard.php';
+        }
 
         return $base . '/fvdmasteradmin/index.php';
     }
