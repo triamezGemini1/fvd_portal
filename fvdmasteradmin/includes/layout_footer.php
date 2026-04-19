@@ -9,7 +9,8 @@ declare(strict_types=1);
 (function () {
     var shell = document.getElementById('fvd-shell');
     var wideBtn = document.getElementById('fvd-sidebar-wide-toggle');
-    if (shell && localStorage.getItem('fvdSidebarWide') === '1') {
+    /* No quitar sidebar-rail en vistas sin menú lateral: el layout depende de la clase inicial. */
+    if (shell && !shell.classList.contains('fvd-shell--no-sidebar') && localStorage.getItem('fvdSidebarWide') === '1') {
         shell.classList.remove('fvd-shell--sidebar-rail');
     }
     if (shell && wideBtn) {

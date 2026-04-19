@@ -3,6 +3,8 @@
  */
 .fvd-dd-root {
     max-width: 100%;
+    position: relative;
+    z-index: 1;
 }
 
 .fvd-dd-banner {

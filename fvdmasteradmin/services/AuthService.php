@@ -410,6 +410,10 @@ class AuthService
 
     /**
      * Intenta autenticar: primero `fvd_usuarios`, luego tabla `delegados`.
+     *
+     * Si el correo existe en `fvd_usuarios` pero la contraseña no coincide, aun así se intenta
+     * `delegados` (mismo email). Así un delegado no queda bloqueado por una fila residual o de
+     * prueba en `fvd_usuarios` con otra clave.
      */
     public static function attemptLogin(string $email, string $password): bool
     {
@@ -426,12 +430,21 @@ class AuthService
             return true;
         }
 
-        $fail = self::getLastLoginFailure();
-        if ($fail === 'db_error' || $fail === 'bad_password' || $fail === 'user_inactive') {
+        $failFvd = self::getLastLoginFailure();
+        if ($failFvd === 'db_error' || $failFvd === 'user_inactive') {
             return false;
         }
 
-        return self::attemptDelegadoLogin($email, $password);
+        if (self::attemptDelegadoLogin($email, $password)) {
+            return true;
+        }
+
+        $failDel = self::getLastLoginFailure();
+        if ($failFvd === 'bad_password' && $failDel === 'user_not_found') {
+            self::setLoginFailure('bad_password');
+        }
+
+        return false;
     }
 
     private static function attemptFvdUsuarioLogin(string $emailNorm, string $password): bool

@@ -575,6 +575,22 @@ header('Content-Type: text/html; charset=UTF-8');
         .fvd-shell--no-sidebar .fvd-mnav-toggle {
             display: none !important;
         }
+        /* Panel sin menú lateral: la columna principal ocupa todo el ancho (también si JS quitó --sidebar-rail). */
+        .fvd-shell--no-sidebar .fvd-main-column {
+            width: 100%;
+            max-width: 100%;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .fvd-shell--no-sidebar .fvd-main-wrap {
+            max-width: 100%;
+            width: 100%;
+        }
+        .fvd-shell--no-sidebar main.fvd-main {
+            display: block;
+            width: 100%;
+            min-height: 40vh;
+        }
         .fvd-shell--no-sidebar.fvd-shell--sidebar-rail .fvd-main-column {
             width: 100%;
         }
