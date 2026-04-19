@@ -24,6 +24,13 @@ $fvd_page_title = isset($fvd_page_title) && is_string($fvd_page_title) && $fvd_p
     ? $fvd_page_title
     : 'FVD Master Admin';
 
+if (!isset($fvd_hide_sidebar)) {
+    $fvd_hide_sidebar = false;
+}
+if (!isset($fvd_head_extra_html)) {
+    $fvd_head_extra_html = '';
+}
+
 $fvd_user = AuthService::user();
 
 if (!function_exists('fvd_module_url')) {
@@ -46,7 +53,7 @@ require_once $fvdRoot . '/includes/fvd_brand.php';
 $fvd_brand_logo_url = fvd_brand_logo_public_url();
 $fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
 $fvdNavBase = rtrim((string) env('APP_BASE_PATH', ''), '/') . '/fvdmasteradmin';
-$fvdPanelUrl = $fvdNavBase . '/index.php';
+$fvdPanelUrl = $fvdNavBase . (AuthService::isDelegadoAsociacion() ? '/delegado_dashboard.php' : '/index.php');
 
 $fvdScript = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 
@@ -275,6 +282,7 @@ header('Content-Type: text/html; charset=UTF-8');
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= htmlspecialchars($fvdUiCss, ENT_QUOTES, 'UTF-8') ?>">
+    <?= is_string($fvd_head_extra_html) ? $fvd_head_extra_html : '' ?>
     <style>
         :root {
             --fvd-font-body: <?= FVD_UI_FONT_BODY_13IN ?>;
@@ -562,6 +570,14 @@ header('Content-Type: text/html; charset=UTF-8');
             flex-direction: column;
             min-height: 100vh;
         }
+        .fvd-shell--no-sidebar .fvd-sidebar,
+        .fvd-shell--no-sidebar .fvd-sidebar-backdrop,
+        .fvd-shell--no-sidebar .fvd-mnav-toggle {
+            display: none !important;
+        }
+        .fvd-shell--no-sidebar.fvd-shell--sidebar-rail .fvd-main-column {
+            width: 100%;
+        }
         .fvd-topbar {
             flex-shrink: 0;
             border-bottom: 1px solid var(--fvd-border);
@@ -812,7 +828,7 @@ header('Content-Type: text/html; charset=UTF-8');
     </style>
 </head>
 <body>
-<div class="fvd-shell fvd-shell--sidebar-rail" id="fvd-shell">
+<div class="fvd-shell fvd-shell--sidebar-rail<?= !empty($fvd_hide_sidebar) ? ' fvd-shell--no-sidebar' : '' ?>" id="fvd-shell">
     <button type="button" class="fvd-mnav-toggle" id="fvd-mnav-toggle" aria-controls="fvd-sidebar" aria-expanded="false" aria-label="Abrir menú">☰</button>
     <div class="fvd-sidebar-backdrop" id="fvd-sidebar-backdrop" aria-hidden="true"></div>
     <aside class="fvd-sidebar" id="fvd-sidebar" aria-label="Menú principal">

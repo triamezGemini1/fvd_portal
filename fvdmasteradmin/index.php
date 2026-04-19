@@ -31,42 +31,7 @@ if (!function_exists('url')) {
 $fvdEsDelegadoPanel = AuthService::isDelegadoAsociacion();
 
 if ($fvdEsDelegadoPanel) {
-    require_once $projRoot . '/fvdmasteradmin/config/db.php';
-    require_once $projRoot . '/src/Services/StatsService.php';
-    require_once $projRoot . '/src/Services/DelegadoTorneoNotifService.php';
-    require_once $projRoot . '/src/Services/InscripcionService.php';
-    require_once $projRoot . '/src/Services/DelegadoTorneoVentanasService.php';
-    $pdo = fvd_db();
-    $delegSnap = \FvdPortal\Services\StatsService::snapshotDelegadoPanel($pdo);
-    $delegadoUid = (int) AuthService::userId();
-    $delegAid = AuthService::idAsociacion();
-    $delegAidInt = ($delegAid !== null && (int) $delegAid > 0) ? (int) $delegAid : null;
-    $delegNotifs = \FvdPortal\Services\DelegadoTorneoNotifService::listarParaDelegado($pdo, $delegadoUid, 25, $delegAidInt);
-    $delegNotifNoVistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $delegadoUid, $delegAidInt);
-    $urlRegistrarAtleta = $appBase . '/modules/atletas/index.php';
-    $delegCupoInsc = null;
-    $tidCtx = (int) ($delegSnap['torneo_id'] ?? 0);
-    $myAs = AuthService::idAsociacion();
-    if ($tidCtx > 0 && $myAs !== null && (int) $myAs > 0) {
-        $delegCupoInsc = \FvdPortal\Services\InscripcionService::estadoCupoAsociacionBandera($pdo, $tidCtx, (int) $myAs);
-    }
-    $delegVentana = null;
-    if ($tidCtx > 0) {
-        try {
-            $aidVent = AuthService::idAsociacion();
-            $delegVentana = \FvdPortal\Services\DelegadoTorneoVentanasService::estadoParaTorneo(
-                $pdo,
-                $tidCtx,
-                $aidVent !== null && (int) $aidVent > 0 ? (int) $aidVent : null
-            );
-        } catch (Throwable $e) {
-            $delegVentana = null;
-        }
-    }
-    $fvd_page_title = 'Panel de administración de torneos';
-    require __DIR__ . '/includes/layout_header.php';
-    require __DIR__ . '/partial_panel_delegado.php';
-    require __DIR__ . '/includes/layout_footer.php';
+    header('Location: ' . $appBase . '/fvdmasteradmin/delegado_dashboard.php');
     exit;
 }
 
