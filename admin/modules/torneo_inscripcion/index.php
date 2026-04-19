@@ -120,6 +120,15 @@ if ($esDelegadoBandera && $tablasOk && $asocId > 0) {
                         exit;
                     }
                 }
+                // URL canónica: campeonato_id siempre = grupo_evento_id (unifica invitación por torneo o por grupo).
+                $getCamp = (int) ($_GET['campeonato_id'] ?? 0);
+                if ($torneoSel > 0 && $getCamp !== $grupoRes) {
+                    header('Location: ' . $selfUrl . '?' . http_build_query([
+                        'campeonato_id' => $grupoRes,
+                        'torneo_id'     => $torneoSel,
+                    ]));
+                    exit;
+                }
             }
         }
     }
@@ -172,6 +181,16 @@ if ($tablasOk && $torneoSel > 0 && $asocId > 0) {
 
 $fvdSitioNuevoAtletaUrl = rtrim($appBase, '/') . '/modules/atletas/index.php?action=form';
 $fvd_campeonato_q = ($esDelegadoBandera && $fvd_campeonato_grupo > 0) ? ('&campeonato_id=' . $fvd_campeonato_grupo) : '';
+
+$fvd_balance_invitacion = null;
+if ($esDelegadoBandera && $fvd_campeonato_grupo > 0 && $asocId > 0 && $fvd_error_campeonato === '') {
+    require_once dirname(__DIR__, 3) . '/src/Services/StatsService.php';
+    $fvd_balance_invitacion = \FvdPortal\Services\StatsService::obtenerBalanceCampeonato(
+        fvd_db(),
+        $fvd_campeonato_grupo,
+        (int) $asocId
+    );
+}
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/inscribir.view.php';

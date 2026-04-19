@@ -21,7 +21,9 @@
 /** @var string $fvd_error_campeonato */
 /** @var int $fvd_campeonato_grupo */
 /** @var string $fvd_campeonato_q query &campeonato_id=… para enlaces del delegado */
+/** @var array<string,mixed>|null $fvd_balance_invitacion */
 $fvd_inscripcion_bandera_modo = !empty($fvd_inscripcion_bandera_modo);
+$fvd_balance_invitacion = $fvd_balance_invitacion ?? null;
 $fvdSitioDisponibles = $fvdSitioDisponibles ?? [];
 $fvdSitioInscritos = $fvdSitioInscritos ?? [];
 $fvdSitioNuevoAtletaUrl = $fvdSitioNuevoAtletaUrl ?? (rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/') . '/modules/atletas/index.php?action=form');
@@ -113,6 +115,57 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
             .fvd-insc-camp-switch__btn:hover { filter: brightness(1.08); }
             .fvd-insc-camp-switch__btn--on { border-color: var(--fvd-amarillo, #fff200) !important; }
             </style>
+            <?php endif; ?>
+            <?php
+            if ($fvd_inscripcion_bandera_modo && is_array($fvd_balance_invitacion) && $fvd_error_campeonato === ''):
+                $fvdTot = $fvd_balance_invitacion['totales'] ?? [];
+                $fvdPor = $fvd_balance_invitacion['por_categoria'] ?? [];
+                $fvdFmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
+                $fvdEurTot = $fvdTot['monto_total_eur'] ?? null;
+                $fvdPagTot = (float) ($fvdTot['pagado_eur'] ?? 0);
+                $fvdSaldoTot = $fvdTot['saldo_eur'] ?? null;
+                ?>
+            <section class="fvd-card" style="padding:12px;margin-bottom:1rem" aria-label="Balance global de invitación">
+                <h2 style="margin:0 0 8px;font-size:1rem">Balance global de invitación</h2>
+                <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--fvd-muted)">Suma de los torneos de este campeonato para <strong><?= htmlspecialchars((string) ($fvd_balance_invitacion['asoc_nombre'] ?? 'su asociación'), ENT_QUOTES, 'UTF-8') ?></strong> (deudas y pagos centralizados por <code>asociacion_id</code>).</p>
+                <div style="display:flex;flex-wrap:wrap;gap:12px 24px;margin-bottom:12px;font-size:0.875rem">
+                    <span>Deuda ref. Bs: <strong><?= $fvdFmtN((float) ($fvdTot['monto_total_bs'] ?? 0)) ?></strong></span>
+                    <?php if ($fvdEurTot !== null && (float) $fvdEurTot > 0): ?>
+                        <span>Total deuda EUR: <strong><?= $fvdFmtN((float) $fvdEurTot) ?> €</strong></span>
+                        <span>Pagado (EUR): <strong><?= $fvdFmtN($fvdPagTot) ?> €</strong></span>
+                        <span>Saldo (EUR): <strong><?= $fvdSaldoTot !== null ? $fvdFmtN((float) $fvdSaldoTot) . ' €' : '—' ?></strong></span>
+                    <?php else: ?>
+                        <span style="color:var(--fvd-muted)">Sin montos EUR en deuda para este grupo (o use Pagos para el detalle).</span>
+                    <?php endif; ?>
+                    <span>Inscripciones (suma categorías): <strong><?= (int) ($fvdTot['n_inscritos'] ?? 0) ?></strong></span>
+                </div>
+                <?php if ($fvdPor !== []): ?>
+                <div class="fvd-mod-table-wrap" style="max-height:16rem;overflow:auto">
+                    <table class="fvd-mod-table" style="font-size:0.78rem">
+                        <thead>
+                        <tr>
+                            <th>Categoría</th>
+                            <th style="text-align:right">Insc.</th>
+                            <th style="text-align:right">Deuda Bs</th>
+                            <th style="text-align:right">Pagado €</th>
+                            <th style="text-align:right">Saldo €</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($fvdPor as $fila): ?>
+                            <tr>
+                                <td><?= htmlspecialchars((string) ($fila['etiqueta'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td style="text-align:right"><?= (int) ($fila['n_inscritos'] ?? 0) ?></td>
+                                <td style="text-align:right"><?= $fvdFmtN((float) ($fila['monto_total_bs'] ?? 0)) ?></td>
+                                <td style="text-align:right"><?= $fvdFmtN((float) ($fila['pagado_eur'] ?? 0)) ?> €</td>
+                                <td style="text-align:right"><?= isset($fila['saldo_eur']) && $fila['saldo_eur'] !== null ? $fvdFmtN((float) $fila['saldo_eur']) . ' €' : '—' ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </section>
             <?php endif; ?>
             <?php
             require FVD_PROJECT_ROOT . '/templates/inscripciones/inscribir_sitio_panel.php';

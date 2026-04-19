@@ -20,6 +20,13 @@ if ($aid === null || (int) $aid <= 0) {
     echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Acceso</title></head><body><p>Su usuario no tiene asociación asignada.</p></body></html>';
     exit;
 }
+$aidGet = isset($_GET['asociacion_id']) ? (int) $_GET['asociacion_id'] : 0;
+if ($aidGet > 0 && $aidGet !== (int) $aid) {
+    http_response_code(403);
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Acceso</title></head><body><p>El identificador de asociación no coincide con su sesión.</p></body></html>';
+    exit;
+}
 
 require_once __DIR__ . '/config/db.php';
 require_once dirname(__DIR__) . '/src/Services/StatsService.php';

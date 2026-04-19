@@ -210,6 +210,14 @@ if ($fvd_deleg_ctx_tid > 0 || $fvd_deleg_campeonato_id > 0) {
     $fvd_deleg_torneo_q = '?' . http_build_query($qDel);
 }
 
+$fvd_deleg_asoc_q = '';
+if (AuthService::isDelegadoAsociacion()) {
+    $aidNavDeleg = AuthService::idAsociacion();
+    if ($aidNavDeleg !== null && (int) $aidNavDeleg > 0) {
+        $fvd_deleg_asoc_q = '?asociacion_id=' . (int) $aidNavDeleg;
+    }
+}
+
 $fvd_acc_datos_open = in_array(
     $fvd_sidebar_active,
     ['asociaciones', 'atletas', 'invitaciones', 'solicitudes_delegado'],
@@ -898,9 +906,17 @@ header('Content-Type: text/html; charset=UTF-8');
                 <details class="fvd-sn-acc"<?= (str_contains($fvdScript, 'delegado_bandeja_traspasos') || str_contains($fvdScript, 'delegado_estado_carnetizacion')) ? ' open' : '' ?>>
                     <summary class="fvd-sn-acc__summary" title="Delegación de asociación">Mi delegación <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
-                        <a class="fvd-sn" href="<?= htmlspecialchars(fvd_module_url('atletas/index.php?action=form'), ENT_QUOTES, 'UTF-8') ?>" title="Alta de nuevos atletas (su asociación)">Gestión de afiliados</a>
-                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_bandeja_traspasos') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_bandeja_traspasos.php', ENT_QUOTES, 'UTF-8') ?>" title="Solicitudes de traspaso pendientes">Bandeja de traspasos</a>
-                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_estado_carnetizacion') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_estado_carnetizacion.php', ENT_QUOTES, 'UTF-8') ?>" title="Atletas activos sin carnet">Estado de carnetización</a>
+                        <?php
+                        $fvd_q_afiliados_deleg = ['action' => 'form'];
+                        $fvd_aid_afiliados_nav = AuthService::idAsociacion();
+                        if ($fvd_aid_afiliados_nav !== null && (int) $fvd_aid_afiliados_nav > 0) {
+                            $fvd_q_afiliados_deleg['asociacion_id'] = (int) $fvd_aid_afiliados_nav;
+                        }
+                        $fvd_url_afiliados_deleg = fvd_module_url('atletas/index.php?' . http_build_query($fvd_q_afiliados_deleg));
+                        ?>
+                        <a class="fvd-sn" href="<?= htmlspecialchars($fvd_url_afiliados_deleg, ENT_QUOTES, 'UTF-8') ?>" title="Alta de nuevos atletas (su asociación)">Gestión de afiliados</a>
+                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_bandeja_traspasos') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_bandeja_traspasos.php' . $fvd_deleg_asoc_q, ENT_QUOTES, 'UTF-8') ?>" title="Solicitudes de traspaso pendientes">Bandeja de traspasos</a>
+                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_estado_carnetizacion') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_estado_carnetizacion.php' . $fvd_deleg_asoc_q, ENT_QUOTES, 'UTF-8') ?>" title="Atletas activos sin carnet">Estado de carnetización</a>
                     </div>
                 </details>
                 <?php endif; ?>
