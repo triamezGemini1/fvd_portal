@@ -32,9 +32,8 @@ public_layout_header('inicio');
 public_layout_main_open();
 
 $logoLanding = public_layout_logo_url();
-$urlAdminFvd = url('fvdmasteradmin/login.php');
-$urlAdminAsoc = url('fvdmasteradmin/login.php');
-$urlPerfilAtleta = url('fvdmasteradmin/atleta/solicitar_acceso.php');
+/* Login fijo para todos los accesos administrativos de la landing. */
+$urlLogin = '/fvd_portal/login.php';
 ?>
 
 <?php if ($dbError !== ''): ?>
@@ -94,25 +93,25 @@ $urlPerfilAtleta = url('fvdmasteradmin/atleta/solicitar_acceso.php');
         Entrada a paneles según su perfil. Use las credenciales que le haya facilitado la FVD o su asociación.
     </p>
     <div class="mx-auto grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <a class="fvd-p-access-card" href="<?= htmlspecialchars($urlAdminFvd, ENT_QUOTES, 'UTF-8') ?>">
+        <a class="fvd-p-access-card" href="<?= htmlspecialchars($urlLogin, ENT_QUOTES, 'UTF-8') ?>">
             <h3 class="fvd-p-access-card__title">Administración general FVD</h3>
             <p class="fvd-p-access-card__desc">Panel nacional Master Admin: configuración federativa, usuarios centrales y módulos de gestión FVD.</p>
             <span class="fvd-p-access-card__cta">Entrar al panel FVD</span>
         </a>
-        <a class="fvd-p-access-card" href="<?= htmlspecialchars($urlAdminAsoc, ENT_QUOTES, 'UTF-8') ?>">
+        <a class="fvd-p-access-card" href="<?= htmlspecialchars($urlLogin, ENT_QUOTES, 'UTF-8') ?>">
             <h3 class="fvd-p-access-card__title">Administración de asociación</h3>
             <p class="fvd-p-access-card__desc">Delegados y gestores regionales: mismo acceso FVD Master Admin con rol de asociación (credenciales emitidas por la FVD).</p>
             <span class="fvd-p-access-card__cta">Acceso asociación</span>
         </a>
-        <a class="fvd-p-access-card sm:col-span-2 lg:col-span-1" href="<?= htmlspecialchars($urlPerfilAtleta, ENT_QUOTES, 'UTF-8') ?>">
-            <h3 class="fvd-p-access-card__title">Perfil del atleta</h3>
-            <p class="fvd-p-access-card__desc">Primer acceso: solicitud con correo y teléfono de su ficha. Luego inicio de sesión y consulta de datos en el portal de atleta.</p>
-            <span class="fvd-p-access-card__cta">Acceso atleta</span>
+        <a class="fvd-p-access-card sm:col-span-2 lg:col-span-1" href="<?= htmlspecialchars($urlLogin, ENT_QUOTES, 'UTF-8') ?>">
+            <h3 class="fvd-p-access-card__title">Delegados</h3>
+            <p class="fvd-p-access-card__desc">Ingreso de delegados al mismo acceso administrativo unificado de la plataforma FVD.</p>
+            <span class="fvd-p-access-card__cta">Acceso delegado</span>
         </a>
     </div>
     <p class="fvd-p-muted mx-auto mt-8 max-w-xl text-center text-xs leading-relaxed opacity-90">
         Torneos, atletas, finanzas e inscripciones se gestionan en
-        <a href="<?= htmlspecialchars(url('fvdmasteradmin/login.php'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-p-link font-medium underline decoration-white/25 underline-offset-2">FVD Master Admin</a>
+        <a href="<?= htmlspecialchars($urlLogin, ENT_QUOTES, 'UTF-8') ?>" class="fvd-p-link font-medium underline decoration-white/25 underline-offset-2">FVD Master Admin</a>
         (tabla <code>fvd_usuarios</code>).
     </p>
 </section>

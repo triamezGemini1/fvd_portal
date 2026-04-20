@@ -1,0 +1,55 @@
+/* Login mínimo — sin dependencias de build ni variables PHP */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2e3092;
+  color: #f8fafc;
+}
+.box {
+  background: #3a3eb5;
+  padding: 1.25rem 1.5rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 3px solid #fff200;
+  width: 100%;
+  max-width: 360px;
+}
+h1 {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+}
+label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 0.25rem;
+}
+input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  margin-bottom: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+  color: #f8fafc;
+}
+button {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  background: #fff200;
+  color: #2e3092;
+  border: 1px solid rgba(46, 48, 146, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.err {
+  color: #fecaca;
+  font-size: 13px;
+  margin-bottom: 0.75rem;
+}

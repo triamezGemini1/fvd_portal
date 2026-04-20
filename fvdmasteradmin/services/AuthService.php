@@ -42,6 +42,20 @@ class AuthService
     /** Contexto opcional: delegado gestiona solo este torneo (panel evento). */
     private const SESSION_DELEGADO_TORNEO_CTX = 'fvd_delegado_torneo_context_id';
 
+    /**
+     * Prefijo web del proyecto (p. ej. /fvd_portal), alineado con {@see BASE_URL} en config/paths.php.
+     * No usar env('APP_BASE_PATH','') con default vacío: rompe instalaciones en subcarpeta (login → URL mal formada, página en blanco).
+     */
+    private static function appWebBase(): string
+    {
+        $root = dirname(__DIR__, 2);
+        if (!defined('BASE_URL')) {
+            require_once $root . '/config/paths.php';
+        }
+
+        return rtrim((string) BASE_URL, '/');
+    }
+
     /** Grupo de evento (campeonato vinculado: M/F/juvenil) para inscripciones y reportes del delegado. */
     private const SESSION_DELEGADO_CAMPEONATO_GRUPO = 'fvd_delegado_campeonato_grupo_id';
 
@@ -91,7 +105,7 @@ class AuthService
     public static function ensureSession(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
-            $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+            $base = self::appWebBase();
             $path = $base !== '' ? ($base . '/') : '/';
 
             /* Cookie Secure solo con HTTPS; en http://localhost WAMP la sesión no persiste si Secure queda activo (p. ej. php.ini / .htaccess). */
@@ -102,20 +116,22 @@ class AuthService
                     $secure = filter_var((string) $es, FILTER_VALIDATE_BOOLEAN);
                 }
             }
-            if (!$secure) {
-                ini_set('session.cookie_secure', '0');
-            }
+            if (!headers_sent()) {
+                if (!$secure) {
+                    ini_set('session.cookie_secure', '0');
+                }
 
-            if (PHP_VERSION_ID >= 70300) {
-                session_set_cookie_params([
-                    'lifetime' => 0,
-                    'path'     => $path,
-                    'secure'   => $secure,
-                    'httponly' => true,
-                    'samesite' => 'Lax',
-                ]);
-            } else {
-                session_set_cookie_params(0, $path, '', $secure, true);
+                if (PHP_VERSION_ID >= 70300) {
+                    session_set_cookie_params([
+                        'lifetime' => 0,
+                        'path'     => $path,
+                        'secure'   => $secure,
+                        'httponly' => true,
+                        'samesite' => 'Lax',
+                    ]);
+                } else {
+                    session_set_cookie_params(0, $path, '', $secure, true);
+                }
             }
             session_start();
         }
@@ -176,6 +192,22 @@ class AuthService
     public static function isAdministradorGeneral(): bool
     {
         return self::isSuperAdmin();
+    }
+
+    /** Alias breve de {@see isAdministradorGeneral()} (panel maestro / rutas). */
+    public static function isAdminGral(): bool
+    {
+        return self::isAdministradorGeneral();
+    }
+
+    /**
+     * Quita variables de sesión propias del flujo delegado (p. ej. tras login como admin general).
+     */
+    public static function clearDelegadoPanelSessionKeys(): void
+    {
+        self::ensureSession();
+        unset($_SESSION['fvd_master_delegado_notif_token'], $_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO]);
+        unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX]);
     }
 
     public static function isDelegadoAsociacion(): bool
@@ -627,7 +659,7 @@ class AuthService
      */
     public static function safeRedirectAfterLogin(?string $fromSession): string
     {
-        $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        $base = self::appWebBase();
         $master = $base . '/fvdmasteradmin/master_panel.php';
         if (self::role() === self::ROLE_FVD_ADMIN) {
             return $master;
@@ -646,9 +678,9 @@ class AuthService
 
     public static function homeUrl(): string
     {
-        $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        $base = self::appWebBase();
         if (self::isDelegadoAsociacion()) {
-            return $base . '/fvdmasteradmin/delegado_dashboard.php';
+            return $base . '/fvdmasteradmin/delegado_dashboard_new.php';
         }
         if (self::role() === self::ROLE_FVD_ADMIN) {
             return $base . '/fvdmasteradmin/master_panel.php';
@@ -659,7 +691,7 @@ class AuthService
 
     public static function logoutUrl(): string
     {
-        $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        $base = self::appWebBase();
 
         return $base . '/fvdmasteradmin/logout.php';
     }
@@ -669,7 +701,7 @@ class AuthService
      */
     public static function perfilUrl(): string
     {
-        $base = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        $base = self::appWebBase();
 
         return $base . '/fvdmasteradmin/perfil.php';
     }

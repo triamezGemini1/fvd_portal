@@ -1,34 +1,34 @@
 {
-  "_UserGroupIcon-BBNh24C2.css": {
-    "file": "assets/UserGroupIcon-BBNh24C2.css",
-    "src": "_UserGroupIcon-BBNh24C2.css"
+  "_UserGroupIcon-C6wjy3Iw.css": {
+    "file": "assets/UserGroupIcon-C6wjy3Iw.css",
+    "src": "_UserGroupIcon-C6wjy3Iw.css"
   },
-  "_UserGroupIcon-CZB-HOIa.js": {
-    "file": "assets/UserGroupIcon-CZB-HOIa.js",
+  "_UserGroupIcon-CYsAAGpY.js": {
+    "file": "assets/UserGroupIcon-CYsAAGpY.js",
     "name": "UserGroupIcon",
     "css": [
-      "assets/UserGroupIcon-BBNh24C2.css"
+      "assets/UserGroupIcon-C6wjy3Iw.css"
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-bNkTIsfh.js",
+    "file": "assets/app-POLMNP2k.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_UserGroupIcon-CZB-HOIa.js"
+      "_UserGroupIcon-CYsAAGpY.js"
     ],
     "css": [
-      "assets/app-By4UDWWH.css"
+      "assets/app-D0kyr_VJ.css"
     ]
   },
   "resources/js/delegado-app.js": {
-    "file": "assets/delegado-app-DOPAP8eq.js",
+    "file": "assets/delegado-app-BIRQJWP3.js",
     "name": "delegado-app",
     "src": "resources/js/delegado-app.js",
     "isEntry": true,
     "imports": [
-      "_UserGroupIcon-CZB-HOIa.js"
+      "_UserGroupIcon-CYsAAGpY.js"
     ]
   }
 }

@@ -33,3 +33,24 @@ if (!function_exists('str_contains')) {
         return strpos((string) $haystack, (string) $needle) !== false;
     }
 }
+
+if (!function_exists('str_ends_with')) {
+    /**
+     * @param string $haystack
+     * @param string $needle
+     */
+    function str_ends_with($haystack, $needle): bool
+    {
+        if ($needle === '') {
+            return true;
+        }
+        $haystack = (string) $haystack;
+        $needle = (string) $needle;
+        $len = strlen($needle);
+        if ($len > strlen($haystack)) {
+            return false;
+        }
+
+        return substr($haystack, -$len) === $needle;
+    }
+}

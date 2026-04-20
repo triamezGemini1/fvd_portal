@@ -2,26 +2,18 @@
 
 declare(strict_types=1);
 
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
 require_once __DIR__ . '/services/AuthService.php';
 AuthService::ensureSession();
 AuthService::requireLogin();
 
 $projRoot = dirname(__DIR__);
-if (!function_exists('url')) {
-    require_once $projRoot . '/config/paths.php';
-}
+require_once $projRoot . '/config/paths.php';
 
-$appBase = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
-if ($appBase !== '' && preg_match('#/fvdmasteradmin$#i', $appBase)) {
-    $appBase = rtrim((string) preg_replace('#/fvdmasteradmin$#i', '', $appBase), '/');
-}
-if ($appBase === '') {
-    $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
-    $pos = strpos($sn, '/fvdmasteradmin/');
-    if ($pos > 0) {
-        $appBase = rtrim(substr($sn, 0, $pos), '/');
-    }
-}
+/* Misma base que AuthService::appWebBase() / url(): env('APP_BASE_PATH','') vacío rompía URLs (p. ej. API inscripción). */
+$appBase = rtrim((string) BASE_URL, '/');
 
 if (AuthService::isAthletePortalUser()) {
     header('Location: ' . $appBase . '/fvdmasteradmin/atleta/mi_ficha.php');
@@ -42,6 +34,9 @@ require_once $projRoot . '/src/Services/DelegadoSolicitudService.php';
 require_once $projRoot . '/src/Services/FvdAdminService.php';
 require_once $projRoot . '/src/Services/FvdAccessManager.php';
 
+$fvd_delegado_boot_error = '';
+
+try {
 $pdo = fvd_db();
 $delegSnap = \FvdPortal\Services\StatsService::snapshotDelegadoPanel($pdo);
 $delegadoUid = (int) AuthService::userId();
@@ -241,8 +236,17 @@ try {
     $fvd_delegado_initial_json = '{}';
 }
 
-/* Mismo layout que el resto del panel (sidebar visible): evita la columna principal “vacía”. */
-$fvd_hide_sidebar = false;
+} catch (Throwable $e) {
+    error_log('[delegado_dashboard] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    $fvd_delegado_boot_error = 'Error al cargar datos del panel. Si APP_DEBUG está activo, el detalle queda en el log de PHP.';
+    if (function_exists('env') && in_array(strtolower((string) env('APP_DEBUG', '')), ['1', 'true', 'yes'], true)) {
+        $fvd_delegado_boot_error .= ' — ' . $e->getMessage();
+    }
+    $fvd_delegado_initial_json = '{}';
+}
+
+/* Sin menú lateral: layout_header aplica fvd-shell--no-sidebar para delegados (contenido a ancho completo). */
+$fvd_hide_sidebar = true;
 $fvdDdCssV = (string) (@filemtime($projRoot . '/assets/css/fvd-delegado-dashboard.css') ?: time());
 require_once __DIR__ . '/includes/vite_assets.php';
 $fvd_head_extra_html = '<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -252,7 +256,7 @@ $fvd_head_extra_html = '<link rel="preconnect" href="https://fonts.googleapis.co
     . '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">'
     . fvd_vite_tags('resources/js/delegado-app.js');
 
-$fvd_page_title = 'Panel de delegación';
+$fvd_page_title = 'Administración de la asociación';
 /* Menú lateral ancho al cargar (el modo “rail” deja el menú en una franja casi inútil). */
 $fvd_sidebar_start_expanded = true;
 require __DIR__ . '/includes/layout_header.php';

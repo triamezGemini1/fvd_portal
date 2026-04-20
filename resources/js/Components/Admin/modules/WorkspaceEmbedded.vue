@@ -62,7 +62,7 @@ function onTorneoChange(e) {
     <iframe
       :key="src"
       :src="src"
-      class="min-h-0 w-full flex-1 border-0 bg-white"
+      class="h-full min-h-[min(100%,72vh)] w-full flex-1 border-0 bg-white"
       title="Módulo embebido"
     />
   </div>

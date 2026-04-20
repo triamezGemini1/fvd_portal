@@ -89,6 +89,30 @@ body:has(#fvd-master-app) {
 }
 
 @layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg border border-transparent bg-[var(--fvd-azul-venezuela)] px-4 py-2 text-sm font-semibold text-white transition-all duration-150;
+  }
+
+  .btn-primary:hover {
+    @apply bg-[#001a5c] shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 transition-all duration-150;
+  }
+
+  .btn-secondary:hover {
+    @apply border-blue-200 bg-blue-50 text-blue-700;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center rounded-lg border bg-white px-4 py-2 text-sm font-semibold transition-all duration-150;
+  }
+
+  .card {
+    @apply flex flex-col min-h-[16rem];
+  }
+
   .fvd-header {
     background: linear-gradient(to right, var(--fvd-azul-venezuela), #0033a0);
     border-bottom: 4px solid var(--fvd-amarillo-oro);

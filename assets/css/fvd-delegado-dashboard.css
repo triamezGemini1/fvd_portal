@@ -2,6 +2,12 @@
  * Panel de delegado — mosaico (solo delegado_dashboard.php).
  * Layout sin depender de Bootstrap: evita “pantalla azul” si bootstrap-grid.css no carga.
  */
+.fvd-delegado-app-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
 .fvd-dd-root {
     box-sizing: border-box;
     width: 100%;

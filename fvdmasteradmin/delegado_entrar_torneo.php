@@ -10,9 +10,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/services/AuthService.php';
 require_once dirname(__DIR__) . '/config/paths.php';
-if (!function_exists('fvd_append_embed_to_url')) {
-    require_once dirname(__DIR__) . '/config/fvd_navigation_return.php';
-}
 require_once __DIR__ . '/config/db.php';
 require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
 
@@ -46,6 +43,9 @@ if ($tokenRaw !== '') {
             $row = DelegadoTorneoNotifService::notificacionPorIdParaDelegado($pdo, $nid, $did, $aid);
         }
     }
+    if ($row !== null) {
+        error_log('[delegado_entrar_torneo] Delegado detectado con token en URL: ' . $tokenRaw);
+    }
 } elseif ($notifId > 0) {
     $row = DelegadoTorneoNotifService::notificacionPorIdParaDelegado($pdo, $notifId, $did, $aid);
 } elseif (isset($_GET['ultima']) && (string) $_GET['ultima'] === '1') {
@@ -65,10 +65,27 @@ if ($tid <= 0) {
     exit;
 }
 
-AuthService::setDelegadoTorneoContext($tid);
-DelegadoTorneoNotifService::marcarVisto($pdo, (int) $row['id'], $did, $aid);
+$nid = (int) ($row['id'] ?? 0);
+$accessTok = DelegadoTorneoNotifService::asegurarAccessTokenParaNotificacion($pdo, $nid);
+if ($accessTok === null || $accessTok === '') {
+    $h = AuthService::homeUrl();
+    header('Location: ' . $h . (str_contains($h, '?') ? '&' : '?') . 'msg=notif_no');
+    exit;
+}
 
-$dest = url('fvdmasteradmin/delegado_dashboard.php');
-$dest = fvd_append_embed_to_url($dest);
+AuthService::setDelegadoTorneoContext($tid);
+DelegadoTorneoNotifService::marcarVisto($pdo, $nid, $did, $aid);
+
+$_SESSION['fvd_master_delegado_notif_token'] = $accessTok;
+error_log('[delegado_entrar_torneo] Sesión fvd_master_delegado_notif_token fijada; token=' . $accessTok);
+
+$mp = url('fvdmasteradmin/master_panel.php');
+$q = [
+    'token'            => $accessTok,
+    'embedded'         => '1',
+    'fvd_master_embed' => '1',
+    'ctx_torneo'       => $tid,
+];
+$dest = $mp . '?' . http_build_query($q);
 header('Location: ' . $dest);
 exit;

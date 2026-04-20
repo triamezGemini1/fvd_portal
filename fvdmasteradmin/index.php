@@ -31,7 +31,7 @@ if (!function_exists('url')) {
 $fvdEsDelegadoPanel = AuthService::isDelegadoAsociacion();
 
 if ($fvdEsDelegadoPanel) {
-    header('Location: ' . $appBase . '/fvdmasteradmin/delegado_dashboard.php');
+    header('Location: ' . $appBase . '/fvdmasteradmin/delegado_dashboard_new.php');
     exit;
 }
 

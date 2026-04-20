@@ -4,7 +4,7 @@
  * `fvdmasteradmin/includes/master_panel_state.php` (stubs bajo cruds/, operaciones/, reportes/).
  */
 import { computed, inject } from 'vue';
-import { RefreshCw } from 'lucide-vue-next';
+import { RefreshCw, DollarSign, BarChart3 } from 'lucide-vue-next';
 import {
   BuildingOffice2Icon,
   UserGroupIcon,
@@ -12,10 +12,8 @@ import {
   EnvelopeIcon,
   LinkIcon,
   GlobeAltIcon,
-  CurrencyDollarIcon,
   BuildingLibraryIcon,
   DocumentTextIcon,
-  ChartBarIcon,
 } from '@heroicons/vue/24/outline';
 import { ExclamationTriangleIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 
@@ -198,10 +196,11 @@ function navigate(key) {
         <button
           type="button"
           class="fvd-action-btn border-stone-300/90 bg-stone-100 text-stone-950 hover:border-stone-500 hover:bg-stone-200"
+          title="Consolidado de deudas por asociación (afiliación, inscripciones, traspasos)"
           @click="navigate('finanzas/general')"
         >
-          <span>General</span>
-          <CurrencyDollarIcon class="h-5 w-5 shrink-0 text-stone-700" aria-hidden="true" />
+          <span>Estado de cuentas</span>
+          <DollarSign class="h-5 w-5 shrink-0 text-stone-800" aria-hidden="true" stroke-width="2" />
         </button>
 
         <button
@@ -233,11 +232,12 @@ function navigate(key) {
 
         <button
           type="button"
-          class="fvd-action-btn mt-1 border-slate-700 bg-slate-800 text-white shadow-md hover:border-slate-900 hover:bg-slate-900 focus-visible:ring-offset-slate-900"
+          class="fvd-action-btn border-slate-600/90 bg-slate-700 text-white hover:border-slate-800 hover:bg-slate-800"
+          title="Mismo reporte consolidado (vista rápida)"
           @click="navigate('finanzas/consolidado')"
         >
-          <span>Consolidado</span>
-          <ChartBarIcon class="h-5 w-5 shrink-0 text-sky-300" aria-hidden="true" />
+          <span>Reporte consolidado</span>
+          <BarChart3 class="h-5 w-5 shrink-0 text-sky-200" aria-hidden="true" stroke-width="2" />
         </button>
       </div>
     </div>

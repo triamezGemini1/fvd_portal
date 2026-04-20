@@ -9,12 +9,20 @@
 
 declare(strict_types=1);
 
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
 $fvdRoot = dirname(__DIR__);
+require_once __DIR__ . '/../../config/php_polyfills.php';
 require_once $fvdRoot . '/services/AuthService.php';
 require_once $fvdRoot . '/config/ui_settings.php';
 
 AuthService::ensureSession();
 AuthService::requireLogin();
+
+if (!defined('BASE_URL')) {
+    require_once dirname(__DIR__, 2) . '/config/paths.php';
+}
 
 if (!function_exists('fvd_user_is_admin_gral')) {
     /**
@@ -23,6 +31,16 @@ if (!function_exists('fvd_user_is_admin_gral')) {
     function fvd_user_is_admin_gral(): bool
     {
         return AuthService::isAdministradorGeneral();
+    }
+}
+
+if (!function_exists('fvd_user_is_delegado')) {
+    /**
+     * Delegado de club (cuenta en tabla delegados).
+     */
+    function fvd_user_is_delegado(): bool
+    {
+        return AuthService::isDelegadoAsociacion();
     }
 }
 
@@ -51,19 +69,21 @@ if ($fvd_master_embed) {
     $fvd_hide_sidebar = true;
 }
 
-// Admin general: no usar el layout con menú lateral salvo vistas embebidas (?embedded=1 / fvd_master_embed).
-$fvd_script_early = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
-$fvd_legacy_layout_ok_admin = (!empty($fvd_allow_legacy_layout_admin) && $fvd_allow_legacy_layout_admin);
-if (!$fvd_legacy_layout_ok_admin) {
-    $fvd_legacy_layout_ok_admin = str_ends_with($fvd_script_early, '/fvdmasteradmin/perfil.php')
-        || str_ends_with($fvd_script_early, '/fvdmasteradmin/asociacion_reporte_financiero.php');
+// Delegado: sin menú lateral (clase fvd-shell--no-sidebar; .fvd-sidebar en el markup).
+if (function_exists('fvd_user_is_delegado') && fvd_user_is_delegado()) {
+    $fvd_hide_sidebar = true;
 }
-if (fvd_user_is_admin_gral() && !$fvd_master_embed && !$fvd_legacy_layout_ok_admin) {
-    $fvdNavBaseRedir = rtrim((string) env('APP_BASE_PATH', ''), '/') . '/fvdmasteradmin';
+
+// Admin general: no usar el layout con menú lateral salvo vistas embebidas (?embedded=1 / fvd_master_embed).
+// Versión compatible con PHP 7.4 (manual, sin str_ends_with).
+$current_script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+$is_master_panel = (substr($current_script, -16) === 'master_panel.php');
+if (fvd_user_is_admin_gral() && !$is_master_panel && !isset($_GET['embedded'])) {
+    $fvdNavBaseRedir = rtrim((string) BASE_URL, '/') . '/fvdmasteradmin';
     header('Location: ' . $fvdNavBaseRedir . '/master_panel.php');
     exit;
 }
-unset($fvd_script_early, $fvd_legacy_layout_ok_admin);
+unset($current_script);
 
 if (!isset($fvd_head_extra_html)) {
     $fvd_head_extra_html = '';
@@ -94,7 +114,7 @@ if (isset($fvd_page_return_url) && is_string($fvd_page_return_url) && $fvd_page_
 require_once $fvdRoot . '/includes/fvd_brand.php';
 $fvd_brand_logo_url = fvd_brand_logo_public_url();
 $fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
-$fvdNavBase = rtrim((string) env('APP_BASE_PATH', ''), '/') . '/fvdmasteradmin';
+$fvdNavBase = rtrim((string) BASE_URL, '/') . '/fvdmasteradmin';
 $fvdPanelUrl = $fvdNavBase . (AuthService::isDelegadoAsociacion()
     ? '/delegado_dashboard.php'
     : (AuthService::role() === AuthService::ROLE_FVD_ADMIN ? '/master_panel.php' : '/index.php'));
@@ -211,7 +231,7 @@ if ($aidTopbar !== null && $aidTopbar > 0) {
         if (is_array($rowTop)) {
             $fvd_topbar_asoc_nombre_raw = (string) ($rowTop['nombre'] ?? '');
             $fvd_topbar_asoc_nombre = fvd_asoc_nombre_sin_prefijo($fvd_topbar_asoc_nombre_raw);
-            $appTop = rtrim((string) env('APP_BASE_PATH', ''), '/');
+            $appTop = rtrim((string) BASE_URL, '/');
             $fvd_topbar_asoc_logo_url = fvd_asociacion_logo_public_url(
                 $appTop,
                 $fvdProjRoot,
@@ -809,6 +829,23 @@ header('Content-Type: text/html; charset=UTF-8');
             color: var(--fvd-amarillo);
             background: rgba(255, 242, 0, 0.1);
         }
+        .fvd-topbar__logout {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.28rem 0.65rem;
+            border-radius: 6px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--fvd-text);
+            text-decoration: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 2px solid var(--fvd-rojo);
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .fvd-topbar__logout:hover {
+            color: #fff;
+            background: rgba(190, 18, 60, 0.15);
+        }
         .fvd-topbar__perfil--active {
             color: var(--fvd-amarillo);
             background: rgba(255, 242, 0, 0.12);
@@ -934,9 +971,67 @@ header('Content-Type: text/html; charset=UTF-8');
             max-width: 100%;
             width: 100%;
         }
+        /* Workspace claro: panel del administrador de club (delegado) sin menú lateral */
+        body.fvd-body-delegado-workspace {
+            background: #f1f5f9 !important;
+            color: #0f172a;
+        }
+        .fvd-shell--delegado-workspace {
+            background: #f1f5f9;
+        }
+        .fvd-shell--delegado-workspace .fvd-main-column {
+            background: #f1f5f9;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__fvd-lockup {
+            color: #0f172a;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__page-title {
+            color: #0f172a;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__asoc-name {
+            color: #1e40af;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__perfil {
+            color: #1e293b;
+            border-color: #cbd5e1;
+            background: #f8fafc;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__perfil:hover {
+            color: #0f172a;
+            background: #e2e8f0;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__logout {
+            color: #1e293b;
+            border-color: #cbd5e1;
+            background: #f8fafc;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__logout:hover {
+            color: #fff;
+            background: #b91c1c;
+            border-color: #b91c1c;
+        }
+        .fvd-shell--delegado-workspace .fvd-topbar__notif-inv {
+            color: #1e3a8a;
+        }
     </style>
 </head>
-<body>
+<body<?php
+$fvdBodyClass = [];
+if (
+    function_exists('fvd_user_is_delegado')
+    && fvd_user_is_delegado()
+    && !empty($fvd_hide_sidebar)
+    && empty($fvd_master_embed)
+) {
+    $fvdBodyClass[] = 'fvd-body-delegado-workspace';
+}
+echo $fvdBodyClass !== [] ? ' class="' . htmlspecialchars(implode(' ', $fvdBodyClass), ENT_QUOTES, 'UTF-8') . '"' : '';
+?>>
 <script>
 (function () {
     if (window.self !== window.top || window.location.search.includes('embedded=1')) {
@@ -945,7 +1040,15 @@ header('Content-Type: text/html; charset=UTF-8');
     }
 })();
 </script>
-<div class="fvd-shell<?= empty($fvd_sidebar_start_expanded) ? ' fvd-shell--sidebar-rail' : '' ?><?= !empty($fvd_hide_sidebar) ? ' fvd-shell--no-sidebar' : '' ?><?= !empty($fvd_master_embed) ? ' fvd-shell--embedded' : '' ?>" id="fvd-shell"<?= !empty($fvd_sidebar_start_expanded) ? ' data-fvd-sidebar-start-expanded="1"' : '' ?>>
+<?php
+$fvdShellDelegadoWs = (
+    function_exists('fvd_user_is_delegado')
+    && fvd_user_is_delegado()
+    && !empty($fvd_hide_sidebar)
+    && empty($fvd_master_embed)
+);
+?>
+<div class="fvd-shell<?= empty($fvd_sidebar_start_expanded) ? ' fvd-shell--sidebar-rail' : '' ?><?= !empty($fvd_hide_sidebar) ? ' fvd-shell--no-sidebar' : '' ?><?= !empty($fvd_master_embed) ? ' fvd-shell--embedded' : '' ?><?= $fvdShellDelegadoWs ? ' fvd-shell--delegado-workspace' : '' ?>" id="fvd-shell"<?= !empty($fvd_sidebar_start_expanded) ? ' data-fvd-sidebar-start-expanded="1"' : '' ?>>
     <?php if (empty($fvd_master_embed)): ?>
     <button type="button" class="fvd-mnav-toggle" id="fvd-mnav-toggle" aria-controls="fvd-sidebar" aria-expanded="false" aria-label="Abrir menú">☰</button>
     <div class="fvd-sidebar-backdrop" id="fvd-sidebar-backdrop" aria-hidden="true"></div>
@@ -1126,6 +1229,7 @@ header('Content-Type: text/html; charset=UTF-8');
                 </a>
                 <?php endif; ?>
                 <a class="fvd-topbar__perfil<?= $fvd_sidebar_active === 'perfil' ? ' fvd-topbar__perfil--active' : '' ?>" href="<?= htmlspecialchars($fvd_perfil_url, ENT_QUOTES, 'UTF-8') ?>">Mi perfil</a>
+                <a class="fvd-topbar__logout" href="<?= htmlspecialchars(AuthService::logoutUrl(), ENT_QUOTES, 'UTF-8') ?>">Cerrar sesión</a>
             </div>
         </div>
     </header>

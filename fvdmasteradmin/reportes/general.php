@@ -7,5 +7,8 @@ AuthService::ensureSession();
 AuthService::requireLogin();
 AuthService::requireRoles([AuthService::ROLE_FVD_ADMIN]);
 
-require_once dirname(__DIR__) . '/includes/workspace_module_redirect.php';
-fvd_workspace_redirect_to_admin_module('deuda_asociacion/index.php');
+if (!function_exists('url')) {
+    require_once dirname(__DIR__, 2) . '/config/paths.php';
+}
+header('Location: ' . url('fvdmasteradmin/reportes/consolidado_finanzas.php'), true, 302);
+exit;

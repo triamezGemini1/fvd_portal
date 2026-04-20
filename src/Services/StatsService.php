@@ -1115,4 +1115,493 @@ final class StatsService
 
         return \is_array($rows) ? $rows : [];
     }
+
+    /**
+     * Reporte consolidado de deudas agrupado por asociación (suma de todas las filas `deuda_asociaciones`).
+     * Afiliación / inscripciones / traspasos corresponden a los montos generados por el sistema de deudas.
+     *
+     * @return array{
+     *   rows: list<array{
+     *     asociacion_id:int,
+     *     nombre:string,
+     *     monto_afiliacion:float,
+     *     monto_inscripciones:float,
+     *     monto_traspasos:float,
+     *     monto_carnets:float,
+     *     monto_anualidad:float,
+     *     deuda_total:float,
+     *     pagos_eur:float,
+     *     saldo:float|null
+     *   }>,
+     *   totales: array{
+     *     monto_afiliacion:float,
+     *     monto_inscripciones:float,
+     *     monto_traspasos:float,
+     *     monto_carnets:float,
+     *     monto_anualidad:float,
+     *     deuda_total:float,
+     *     pagos_eur:float,
+     *     saldo:float|null
+     *   },
+     *   usa_eur: bool
+     * }
+     */
+    public static function reporteConsolidadoDeudasPorAsociacion(PDO $pdo): array
+    {
+        $usaEur = false;
+        try {
+            $stc = $pdo->query("SHOW COLUMNS FROM deuda_asociaciones LIKE 'monto_total_eur'");
+            $usaEur = $stc !== false && $stc->fetch() !== false;
+        } catch (PDOException $e) {
+            $usaEur = false;
+        }
+        $exprDeudaAgg = $usaEur
+            ? 'COALESCE(SUM(COALESCE(d.monto_total_eur, d.monto_total, 0)), 0)'
+            : 'COALESCE(SUM(COALESCE(d.monto_total, 0)), 0)';
+
+        $sql = 'SELECT
+                s.id AS asociacion_id,
+                COALESCE(NULLIF(TRIM(s.nombre), \'\'), CONCAT(\'Asoc #\', s.id)) AS nombre,
+                COALESCE(SUM(COALESCE(d.monto_afiliados, 0)), 0) AS monto_afiliacion,
+                COALESCE(SUM(COALESCE(d.monto_inscritos, 0)), 0) AS monto_inscripciones,
+                COALESCE(SUM(COALESCE(d.monto_traspasos, 0)), 0) AS monto_traspasos,
+                COALESCE(SUM(COALESCE(d.monto_carnets, 0)), 0) AS monto_carnets,
+                COALESCE(SUM(COALESCE(d.monto_anualidad, 0)), 0) AS monto_anualidad,
+                ' . $exprDeudaAgg . ' AS deuda_total,
+                COALESCE(MAX(p.pagos_eur), 0) AS pagos_eur
+            FROM asociaciones s
+            LEFT JOIN deuda_asociaciones d ON d.asociacion_id = s.id
+            LEFT JOIN (
+                SELECT asociacion_id, SUM(COALESCE(monto_dolares, 0)) AS pagos_eur
+                FROM relacion_pagos
+                GROUP BY asociacion_id
+            ) p ON p.asociacion_id = s.id
+            GROUP BY s.id, s.nombre
+            ORDER BY nombre ASC';
+
+        $empty = [
+            'rows'    => [],
+            'totales' => [
+                'monto_afiliacion'     => 0.0,
+                'monto_inscripciones'  => 0.0,
+                'monto_traspasos'      => 0.0,
+                'monto_carnets'        => 0.0,
+                'monto_anualidad'      => 0.0,
+                'deuda_total'          => 0.0,
+                'pagos_eur'            => 0.0,
+                'saldo'                => null,
+            ],
+            'usa_eur' => $usaEur,
+        ];
+
+        try {
+            $st = $pdo->query($sql);
+            $raw = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+        } catch (PDOException $e) {
+            error_log('[StatsService::reporteConsolidadoDeudasPorAsociacion] ' . $e->getMessage());
+
+            return $empty;
+        }
+
+        $rows = [];
+        $tot = $empty['totales'];
+        foreach ($raw as $r) {
+            $deuda = (float) ($r['deuda_total'] ?? 0);
+            $pag = (float) ($r['pagos_eur'] ?? 0);
+            $saldo = null;
+            if ($usaEur && $deuda > 0) {
+                $saldo = round(max(0.0, $deuda - $pag), 2);
+            } elseif (!$usaEur && $deuda > 0) {
+                $saldo = round(max(0.0, $deuda - $pag), 2);
+            }
+
+            $rows[] = [
+                'asociacion_id'      => (int) ($r['asociacion_id'] ?? 0),
+                'nombre'             => (string) ($r['nombre'] ?? ''),
+                'monto_afiliacion'   => (float) ($r['monto_afiliacion'] ?? 0),
+                'monto_inscripciones'=> (float) ($r['monto_inscripciones'] ?? 0),
+                'monto_traspasos'    => (float) ($r['monto_traspasos'] ?? 0),
+                'monto_carnets'      => (float) ($r['monto_carnets'] ?? 0),
+                'monto_anualidad'    => (float) ($r['monto_anualidad'] ?? 0),
+                'deuda_total'        => $deuda,
+                'pagos_eur'          => $pag,
+                'saldo'              => $saldo,
+            ];
+
+            $tot['monto_afiliacion'] += (float) ($r['monto_afiliacion'] ?? 0);
+            $tot['monto_inscripciones'] += (float) ($r['monto_inscripciones'] ?? 0);
+            $tot['monto_traspasos'] += (float) ($r['monto_traspasos'] ?? 0);
+            $tot['monto_carnets'] += (float) ($r['monto_carnets'] ?? 0);
+            $tot['monto_anualidad'] += (float) ($r['monto_anualidad'] ?? 0);
+            $tot['deuda_total'] += $deuda;
+            $tot['pagos_eur'] += $pag;
+        }
+
+        $tot['monto_afiliacion'] = round($tot['monto_afiliacion'], 2);
+        $tot['monto_inscripciones'] = round($tot['monto_inscripciones'], 2);
+        $tot['monto_traspasos'] = round($tot['monto_traspasos'], 2);
+        $tot['monto_carnets'] = round($tot['monto_carnets'], 2);
+        $tot['monto_anualidad'] = round($tot['monto_anualidad'], 2);
+        $tot['deuda_total'] = round($tot['deuda_total'], 2);
+        $tot['pagos_eur'] = round($tot['pagos_eur'], 2);
+        if ($tot['deuda_total'] > 0) {
+            $tot['saldo'] = round(max(0.0, $tot['deuda_total'] - $tot['pagos_eur']), 2);
+        }
+
+        return [
+            'rows'    => $rows,
+            'totales' => $tot,
+            'usa_eur' => $usaEur,
+        ];
+    }
+
+    /**
+     * Indica si las deudas usan columna EUR en `deuda_asociaciones`.
+     */
+    public static function deudaAsociacionesUsaEur(PDO $pdo): bool
+    {
+        try {
+            $stc = $pdo->query("SHOW COLUMNS FROM deuda_asociaciones LIKE 'monto_total_eur'");
+
+            return $stc !== false && $stc->fetch() !== false;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Torneos con deuda registrada para una asociación (filas en `deuda_asociaciones`).
+     *
+     * @return list<array{
+     *   torneo_id:int,
+     *   torneo_nombre:string,
+     *   deuda:float,
+     *   pagos:float,
+     *   saldo:float|null,
+     *   estatus_pago:string,
+     *   usa_eur:bool
+     * }>
+     */
+    public static function torneosDeudaPorAsociacion(PDO $pdo, int $asociacionId): array
+    {
+        if ($asociacionId <= 0) {
+            return [];
+        }
+        $usaEur = self::deudaAsociacionesUsaEur($pdo);
+        $exprDeuda = $usaEur
+            ? 'COALESCE(d.monto_total_eur, d.monto_total, 0)'
+            : 'COALESCE(d.monto_total, 0)';
+
+        $sql = 'SELECT
+                d.torneo_id,
+                COALESCE(NULLIF(TRIM(t.nombre), \'\'), CONCAT(\'Torneo #\', d.torneo_id)) AS torneo_nombre,
+                ' . $exprDeuda . ' AS deuda_val,
+                COALESCE((
+                    SELECT SUM(COALESCE(r.monto_dolares, 0))
+                    FROM relacion_pagos r
+                    WHERE r.torneo_id = d.torneo_id AND r.asociacion_id = d.asociacion_id
+                ), 0) AS pagos_val
+            FROM deuda_asociaciones d
+            INNER JOIN torneosact t ON t.torneo = d.torneo_id
+            WHERE d.asociacion_id = :aid
+            ORDER BY t.fechator DESC, d.torneo_id DESC';
+
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([':aid' => $asociacionId]);
+            $raw = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('[StatsService::torneosDeudaPorAsociacion] ' . $e->getMessage());
+
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $r) {
+            $deuda = round((float) ($r['deuda_val'] ?? 0), 4);
+            $pag = round((float) ($r['pagos_val'] ?? 0), 4);
+            $saldo = null;
+            if ($deuda > 0.0001) {
+                $saldo = round(max(0.0, $deuda - $pag), 2);
+            }
+            $estatus = 'Sin cargo';
+            if ($deuda > 0.0001) {
+                if ($pag >= $deuda - 0.02) {
+                    $estatus = 'Liquidado';
+                } elseif ($pag > 0.01) {
+                    $estatus = 'Parcial';
+                } else {
+                    $estatus = 'Pendiente';
+                }
+            }
+
+            $out[] = [
+                'torneo_id'     => (int) ($r['torneo_id'] ?? 0),
+                'torneo_nombre' => (string) ($r['torneo_nombre'] ?? ''),
+                'deuda'         => round($deuda, 2),
+                'pagos'         => round($pag, 2),
+                'saldo'         => $saldo,
+                'estatus_pago'  => $estatus,
+                'usa_eur'       => $usaEur,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Conteos y montos por segmento (renglones) para un par torneo + asociación.
+     *
+     * @return array{
+     *   afiliados: array{count:int,monto:float},
+     *   inscritos: array{count:int,monto:float},
+     *   carnets: array{count:int,monto:float}
+     * }
+     */
+    public static function segmentosRenglonesTorneoAsociacion(PDO $pdo, int $torneoId, int $asociacionId): array
+    {
+        $emptySeg = static function (): array {
+            return ['count' => 0, 'monto' => 0.0];
+        };
+        $out = [
+            'afiliados' => $emptySeg(),
+            'inscritos' => $emptySeg(),
+            'carnets'   => $emptySeg(),
+        ];
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return $out;
+        }
+
+        try {
+            $st = $pdo->prepare(
+                'SELECT total_afiliados, monto_afiliados, total_inscritos, monto_inscritos, total_carnets, monto_carnets
+                FROM deuda_asociaciones WHERE torneo_id = :t AND asociacion_id = :a LIMIT 1'
+            );
+            $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log('[StatsService::segmentosRenglonesTorneoAsociacion] ' . $e->getMessage());
+
+            return $out;
+        }
+        if ($row === false) {
+            return $out;
+        }
+
+        $out['afiliados'] = [
+            'count' => (int) ($row['total_afiliados'] ?? 0),
+            'monto' => round((float) ($row['monto_afiliados'] ?? 0), 2),
+        ];
+        $out['inscritos'] = [
+            'count' => (int) ($row['total_inscritos'] ?? 0),
+            'monto' => round((float) ($row['monto_inscritos'] ?? 0), 2),
+        ];
+        $out['carnets'] = [
+            'count' => (int) ($row['total_carnets'] ?? 0),
+            'monto' => round((float) ($row['monto_carnets'] ?? 0), 2),
+        ];
+
+        return $out;
+    }
+
+    /**
+     * Listado nominal por segmento (afiliados / inscritos / carnets) para torneo + asociación.
+     *
+     * @param 'afiliados'|'inscritos'|'carnets' $segmento
+     *
+     * @return list<array{id:int|string, cedula:string, nombre:string, monto:float, fecha:string|null}>
+     */
+    public static function detalleNominalTorneoAsociacion(PDO $pdo, int $torneoId, int $asociacionId, string $segmento): array
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return [];
+        }
+        $allowed = ['afiliados' => true, 'inscritos' => true, 'carnets' => true];
+        $seg = isset($allowed[$segmento]) ? $segmento : '';
+        if ($seg === '') {
+            return [];
+        }
+
+        $costo = DeudaAsociacionGeneratorService::ultimoCosto($pdo);
+        if ($costo === null) {
+            return [];
+        }
+        $puAfi = (float) ($costo['afiliacion'] ?? 0);
+        $puIns = (float) ($costo['inscripciones'] ?? 0);
+        $puCar = (float) ($costo['carnets'] ?? 0);
+
+        $usaIt = DeudaAsociacionGeneratorService::conteosUsanTablaInscripcionTorneo($pdo);
+
+        try {
+            if ($usaIt) {
+                return self::detalleNominalDesdeInscripcionTorneo($pdo, $torneoId, $asociacionId, $seg, $puAfi, $puIns, $puCar);
+            }
+
+            return self::detalleNominalDesdeAtletas($pdo, $torneoId, $asociacionId, $seg, $puAfi, $puIns, $puCar);
+        } catch (PDOException $e) {
+            error_log('[StatsService::detalleNominalTorneoAsociacion] ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+
+
+    
+    /**
+     * @param 'afiliados'|'inscritos'|'carnets' $seg
+     *
+     * @return list<array{id:int|string, cedula:string, nombre:string, monto:float, fecha:string|null}>
+     */
+    private static function detalleNominalDesdeAtletas(
+        PDO $pdo,
+        int $torneoId,
+        int $asociacionId,
+        string $seg,
+        float $puAfi,
+        float $puIns,
+        float $puCar
+    ): array {
+        switch ($seg) {
+            case 'afiliados':
+                $whereExtra = 'COALESCE(a.afiliacion, 0) = 1';
+                $pu = $puAfi;
+                break;
+            case 'inscritos':
+                $whereExtra = 'COALESCE(a.inscripcion, 0) = 1 AND COALESCE(a.afiliacion, 0) = 0';
+                $pu = $puIns;
+                break;
+            case 'carnets':
+                $whereExtra = 'COALESCE(a.carnet, 0) = 1';
+                $pu = $puCar;
+                break;
+            default:
+                $whereExtra = '1=0';
+                $pu = 0.0;
+        }
+
+        $sql = 'SELECT a.id, a.cedula, a.nombre, a.fechact, a.fechfvd
+            FROM atletas a
+            WHERE a.torneo_id = :t AND a.asociacion = :a AND ' . $whereExtra . '
+            ORDER BY a.nombre ASC, a.id ASC';
+        $st = $pdo->prepare($sql);
+        $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id'     => (int) ($r['id'] ?? 0),
+                'cedula' => (string) ($r['cedula'] ?? ''),
+                'nombre' => (string) ($r['nombre'] ?? ''),
+                'monto'  => round($pu, 2),
+                'fecha'  => self::normalizarFechaAtleta($r['fechact'] ?? null, $r['fechfvd'] ?? null),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param 'afiliados'|'inscritos'|'carnets' $seg
+     *
+     * @return list<array{id:int|string, cedula:string, nombre:string, monto:float, fecha:string|null}>
+     */
+    private static function detalleNominalDesdeInscripcionTorneo(
+        PDO $pdo,
+        int $torneoId,
+        int $asociacionId,
+        string $seg,
+        float $puAfi,
+        float $puIns,
+        float $puCar
+    ): array {
+        switch ($seg) {
+            case 'afiliados':
+                $whereExtra = 'COALESCE(it.afiliacion, 0) = 1';
+                $pu = $puAfi;
+                break;
+            case 'inscritos':
+                $whereExtra = 'COALESCE(it.inscripcion, 0) IN (1, 2) AND COALESCE(it.afiliacion, 0) = 0';
+                $pu = $puIns;
+                break;
+            case 'carnets':
+                $whereExtra = 'COALESCE(it.carnet, 0) = 1';
+                $pu = $puCar;
+                break;
+            default:
+                $whereExtra = '1=0';
+                $pu = 0.0;
+        }
+
+        $sql = 'SELECT it.id, it.cedula, it.nombre, it.fecha_inscripcion, it.fecha_actualizacion
+            FROM inscripcion_torneo it
+            WHERE it.torneo_id = :t AND it.asociacion_id = :a AND ' . $whereExtra . '
+            ORDER BY it.nombre ASC, it.id ASC';
+        $st = $pdo->prepare($sql);
+        $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($rows as $r) {
+            $fd = $r['fecha_actualizacion'] ?? null;
+            $fi = $r['fecha_inscripcion'] ?? null;
+            $fecha = self::elegirFechaInscripcionTorneo($fd, $fi);
+            $out[] = [
+                'id'     => (int) ($r['id'] ?? 0),
+                'cedula' => (string) ($r['cedula'] ?? ''),
+                'nombre' => (string) ($r['nombre'] ?? ''),
+                'monto'  => round($pu, 2),
+                'fecha'  => $fecha,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param mixed $fechact
+     * @param mixed $fechfvd
+     */
+    private static function normalizarFechaAtleta($fechact, $fechfvd): ?string
+    {
+        $a = self::fechaSqlValida($fechact) ? (string) $fechact : null;
+        $b = self::fechaSqlValida($fechfvd) ? (string) $fechfvd : null;
+        if ($a === null && $b === null) {
+            return null;
+        }
+        if ($a === null) {
+            return $b;
+        }
+        if ($b === null) {
+            return $a;
+        }
+
+        return strtotime($a) >= strtotime($b) ? $a : $b;
+    }
+
+    private static function elegirFechaInscripcionTorneo($fd, $fi): ?string
+    {
+        $d1 = self::fechaSqlValida($fd) ? (string) $fd : null;
+        $d2 = self::fechaSqlValida($fi) ? (string) $fi : null;
+        if ($d1 === null) {
+            return $d2;
+        }
+        if ($d2 === null) {
+            return $d1;
+        }
+
+        return strtotime($d1) >= strtotime($d2) ? $d1 : $d2;
+    }
+
+    /**
+     * @param mixed $v
+     */
+    private static function fechaSqlValida($v): bool
+    {
+        if ($v === null || $v === '') {
+            return false;
+        }
+        $s = (string) $v;
+
+        return strpos($s, '0000-00-00') !== 0;
+    }
 }

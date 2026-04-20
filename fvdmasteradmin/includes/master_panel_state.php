@@ -11,6 +11,10 @@ use FvdPortal\Services\MasterPanelContextService;
  */
 function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): array
 {
+    if (!class_exists(AuthService::class, false)) {
+        require_once dirname(__DIR__) . '/services/AuthService.php';
+    }
+
     $projRoot = dirname(__DIR__, 2);
     if (!function_exists('admin_module_url') || !function_exists('url')) {
         require_once $projRoot . '/config/paths.php';
@@ -50,9 +54,10 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
         'operaciones/invitaciones' => url('fvdmasteradmin/operaciones/invitaciones.php'),
         'operaciones/portal_assoc' => url('fvdmasteradmin/operaciones/portal_mirror.php'),
 
-        'finanzas/general' => url('fvdmasteradmin/reportes/general.php'),
+        'finanzas/general' => url('fvdmasteradmin/reportes/consolidado_finanzas.php'),
         'finanzas/por_torneo' => url('fvdmasteradmin/reportes/torneo_spec.php'),
-        'finanzas/consolidado' => url('fvdmasteradmin/reportes/consolidado.php'),
+        'finanzas/consolidado' => url('fvdmasteradmin/reportes/consolidado_finanzas.php'),
+        'finanzas/estado_cuentas' => url('fvdmasteradmin/reportes/consolidado_finanzas.php'),
         'finanzas/deudas_pagos' => url('fvdmasteradmin/reportes/cartera.php'),
 
         // Compatibilidad con claves anteriores
@@ -190,6 +195,32 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
         $userLabel = '';
     }
 
+    $delegadoPanel = false;
+    $delegadoDashboardEmbeddedUrl = '';
+    $isAdminGralState = AuthService::isAdminGral();
+    /** Misma cadena que en master_panel.php / seed SQL (vista embebida delegado en pruebas). */
+    $fvdMasterTestDelegadoToken = 'TOKEN_PRUEBA_MIRANDA_2026';
+    $sessTok = trim((string) ($_SESSION['fvd_master_delegado_notif_token'] ?? ''));
+
+    if (
+        $isAdminGralState
+        && $sessTok === $fvdMasterTestDelegadoToken
+    ) {
+        $delegadoPanel = true;
+        $delegadoDashboardEmbeddedUrl = function_exists('fvd_append_embed_to_url')
+            ? fvd_append_embed_to_url(url('fvdmasteradmin/delegado_dashboard.php'))
+            : url('fvdmasteradmin/delegado_dashboard.php');
+    } elseif (
+        !$isAdminGralState
+        && AuthService::isDelegadoAsociacion()
+        && $sessTok !== ''
+    ) {
+        $delegadoPanel = true;
+        $delegadoDashboardEmbeddedUrl = function_exists('fvd_append_embed_to_url')
+            ? fvd_append_embed_to_url(url('fvdmasteradmin/delegado_dashboard.php'))
+            : url('fvdmasteradmin/delegado_dashboard.php');
+    }
+
     return [
         'pendingApprovals' => $totalPend,
         'pendingAffiliations' => $nAltas,
@@ -222,5 +253,8 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
             ['src' => url('assets/img/partners/mindeporte.svg'), 'alt' => 'Ministerio del Poder Popular para el Deporte'],
         ],
         'invitacionesMonitor' => fvd_invitaciones_monitor_line($pdo),
+        'delegadoPanel' => $delegadoPanel,
+        'delegadoDashboardEmbeddedUrl' => $delegadoDashboardEmbeddedUrl,
+        'isAdminGral' => $isAdminGralState,
     ];
 }

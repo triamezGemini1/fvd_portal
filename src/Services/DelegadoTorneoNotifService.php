@@ -685,4 +685,37 @@ final class DelegadoTorneoNotifService
             return false;
         }
     }
+
+    /**
+     * Asegura `access_token` no vacío (≥32 hex) para la fila `fvd_delegado_notif_torneo.id`.
+     */
+    public static function asegurarAccessTokenParaNotificacion(PDO $pdo, int $notifId): ?string
+    {
+        if ($notifId <= 0) {
+            return null;
+        }
+        self::ensureTable($pdo);
+        self::ensureTokenColumns($pdo);
+        try {
+            $st = $pdo->prepare('SELECT id, access_token FROM fvd_delegado_notif_torneo WHERE id = :id LIMIT 1');
+            $st->execute([':id' => $notifId]);
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+            if ($r === false) {
+                return null;
+            }
+            $tok = trim((string) ($r['access_token'] ?? ''));
+            if ($tok !== '' && strlen($tok) >= 32) {
+                return $tok;
+            }
+            $new = bin2hex(random_bytes(32));
+            $up = $pdo->prepare('UPDATE fvd_delegado_notif_torneo SET access_token = :t WHERE id = :id');
+            $up->execute([':t' => $new, ':id' => $notifId]);
+
+            return $new;
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] asegurarAccessTokenParaNotificacion: ' . $e->getMessage());
+
+            return null;
+        }
+    }
 }

@@ -81,12 +81,14 @@ function fvd_vite_tags(string $entry = 'resources/js/app.js'): string
 
     $manifestPath = $projRoot . '/public/build/.vite/manifest.json';
     if (!is_readable($manifestPath)) {
-        return '<!-- Vite: ejecute npm run build en la raíz del proyecto -->';
+        return '<p class="fvd-mod-msg" role="alert" style="margin:0.75rem 0;padding:0.75rem;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:0.875rem;">'
+            . 'No se encontró el build de Vite (<code>public/build/.vite/manifest.json</code>). En la raíz del proyecto ejecute <code>npm install</code> y <code>npm run build</code>, o active el modo desarrollo (<code>FVD_VITE_DEV=true</code> y servidor Vite en el puerto configurado).</p>';
     }
     /** @var mixed $decoded */
     $decoded = json_decode((string) file_get_contents($manifestPath), true);
     if (!is_array($decoded) || !isset($decoded[$entry]) || !is_array($decoded[$entry])) {
-        return '<!-- Vite: entrada no encontrada en manifest: ' . htmlspecialchars($entry, ENT_QUOTES, 'UTF-8') . ' -->';
+        return '<p class="fvd-mod-msg" role="alert" style="margin:0.75rem 0;padding:0.75rem;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:0.875rem;">'
+            . 'Entrada Vite no encontrada en el manifest: <code>' . htmlspecialchars($entry, ENT_QUOTES, 'UTF-8') . '</code>. Ejecute <code>npm run build</code> tras añadir el entry en Vite.</p>';
     }
     /** @var array<string, mixed> $chunk */
     $chunk = $decoded[$entry];

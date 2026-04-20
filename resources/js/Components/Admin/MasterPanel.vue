@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, provide } from 'vue';
+import { ref, computed, onMounted, onUnmounted, provide, watchEffect } from 'vue';
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/vue/24/solid';
 import WorkspaceHome from './modules/WorkspaceHome.vue';
 import WorkspaceEmbedded from './modules/WorkspaceEmbedded.vue';
@@ -36,6 +36,9 @@ const dashboardState = ref({
   userLabel: '',
   fvdLogoUrl: '',
   partnerLogos: [],
+  delegadoPanel: false,
+  delegadoDashboardEmbeddedUrl: '',
+  isAdminGral: false,
   ...props.initialState,
 });
 
@@ -54,7 +57,8 @@ const WORKSPACE_LABELS = {
   'operaciones/inscripciones': 'Inscripciones',
   'operaciones/asociar/torneo': 'Asociar torneo',
   'operaciones/fichaje/social': 'Fichaje / social',
-  'finanzas/general': 'Finanzas generales',
+  'finanzas/general': 'Estado de cuentas (consolidado)',
+  'finanzas/estado_cuentas': 'Estado de cuentas (consolidado)',
   'finanzas/por_torneo': 'Finanzas por torneo',
   'finanzas/por-torneo': 'Finanzas por torneo',
   'finanzas/deudas_pagos': 'Cartera (deudas y pagos)',
@@ -68,7 +72,8 @@ const WORKSPACE_LABELS = {
   'operaciones/portal-asociacion': 'Portal asociación',
   'finanzas/deudas': 'Deudas',
   'finanzas/pagos': 'Pagos',
-  'finanzas/consolidado': 'Consolidado financiero',
+  'finanzas/consolidado': 'Reporte consolidado de deudas',
+  'delegado/panel': 'Panel del delegado',
 };
 
 const showGrid = ref(true);
@@ -212,6 +217,22 @@ function navigateToModule(key) {
 }
 
 function goHome() {
+  if (dashboardState.value.isAdminGral === true) {
+    showGrid.value = true;
+    embeddedSrc.value = '';
+    embeddedTitle.value = '';
+    currentView.value = '';
+    document.title = 'FVD - Panel Maestro';
+    return;
+  }
+  const dUrl = dashboardState.value.delegadoDashboardEmbeddedUrl;
+  if (dashboardState.value.delegadoPanel && typeof dUrl === 'string' && dUrl !== '') {
+    showGrid.value = false;
+    embeddedSrc.value = applyContextToModuleUrl(dUrl);
+    embeddedTitle.value = WORKSPACE_LABELS['delegado/panel'] || 'Panel del delegado';
+    currentView.value = 'delegado/panel';
+    return;
+  }
   showGrid.value = true;
   embeddedSrc.value = '';
   embeddedTitle.value = '';
@@ -258,6 +279,18 @@ provide('fvdWorkspace', {
 
 const searchRef = ref(null);
 
+watchEffect(() => {
+  if (dashboardState.value.isAdminGral === true) {
+    document.title = 'FVD - Panel Maestro';
+    return;
+  }
+  if (currentView.value === 'delegado/panel' && embeddedSrc.value) {
+    document.title = 'FVD - Panel del delegado';
+    return;
+  }
+  document.title = 'FVD - Panel Maestro';
+});
+
 function onGlobalKeydown(e) {
   if (e.key === 'Escape') {
     closeAccountMenu();
@@ -271,6 +304,21 @@ function onGlobalKeydown(e) {
 
 onMounted(() => {
   selectedContextTorneoId.value = Number(dashboardState.value.selectedContextTorneoId ?? 0);
+  if (dashboardState.value.isAdminGral === true) {
+    showGrid.value = true;
+    embeddedSrc.value = '';
+    embeddedTitle.value = '';
+    currentView.value = '';
+    document.title = 'FVD - Panel Maestro';
+  } else {
+    const dUrl = dashboardState.value.delegadoDashboardEmbeddedUrl;
+    if (dashboardState.value.delegadoPanel && typeof dUrl === 'string' && dUrl !== '') {
+      showGrid.value = false;
+      embeddedSrc.value = dUrl;
+      embeddedTitle.value = WORKSPACE_LABELS['delegado/panel'] || 'Panel del delegado';
+      currentView.value = 'delegado/panel';
+    }
+  }
   window.addEventListener('keydown', onGlobalKeydown);
   document.addEventListener('pointerdown', onDocumentPointerDown, true);
 });
