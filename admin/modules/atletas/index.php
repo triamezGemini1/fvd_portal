@@ -56,7 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
         if ($sid !== null) {
             header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=form&id=' . $sid));
         } else {
-            header('Location: ' . fvd_return_preserve_query_params($selfUrl));
+            $redir = $selfUrl;
+            if (AuthService::isDelegadoAsociacion()) {
+                $mineAsoc = (int) (AuthService::idAsociacion() ?? 0);
+                $redir = $selfUrl . '?action=list&alcance=asociacion&asociacion_id=' . $mineAsoc;
+            }
+            header('Location: ' . fvd_return_preserve_query_params($redir));
         }
         exit;
     } catch (Throwable $e) {
@@ -85,28 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'tras
         header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=traspaso&id=' . $taid));
         exit;
     }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'reset_marcador_atletas') {
-    $rolSesion = trim((string) (AuthService::role() ?? ''));
-    if (!in_array($rolSesion, [
-        AuthService::ROLE_FVD_ADMIN,
-        AuthService::ROLE_DELEGADO_ASOC,
-    ], true)) {
-        http_response_code(403);
-        header('Content-Type: text/plain; charset=UTF-8');
-        echo 'Sin permiso para reiniciar marcadores.';
-        exit;
-    }
-    $campo = trim((string) ($_POST['marcador'] ?? ''));
-    try {
-        $n = $svc->atletasResetMarcadorMasivo($campo);
-        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list&msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo)));
-    } catch (Throwable $e) {
-        error_log('[admin/atletas reset] ' . $e->getMessage());
-        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list&msg=reset_err'));
-    }
-    exit;
 }
 
 $fvd_page_title = 'Atletas';
@@ -272,6 +255,15 @@ if ($action === 'form') {
     <link rel="stylesheet" href="<?= htmlspecialchars($embedCss, ENT_QUOTES, 'UTF-8') ?>">
     <style>
         body.fvd-embed-atleta { margin: 0; padding: 0.65rem; background: var(--fvd-bg, #0f172a); min-height: 100vh; box-sizing: border-box; }
+        body.fvd-embed-atleta,
+        body.fvd-embed-atleta .fvd-atleta-form,
+        body.fvd-embed-atleta .fvd-atleta-form * {
+            color: #000 !important;
+            font-weight: 700 !important;
+        }
+        body.fvd-embed-atleta .fvd-atleta-form.fvd-atleta-form--framed {
+            background: #003366 !important;
+        }
         body.fvd-embed-atleta .fvd-atleta-form { max-width: none; }
     </style>
 </head>
@@ -374,14 +366,6 @@ $fvd_atletas_pager_html = PaginationView::navHtml(
     $paginationQueryParams,
     'fvd-atletas-pager'
 );
-
-$fvd_atletas_reset_msg = isset($_GET['msg']) ? trim((string) $_GET['msg']) : '';
-$fvd_atletas_reset_n = isset($_GET['n']) ? (int) $_GET['n'] : 0;
-$fvd_atletas_reset_campo = isset($_GET['campo']) ? trim((string) $_GET['campo']) : '';
-$fvd_atletas_puede_reset_marcadores = in_array(trim((string) (AuthService::role() ?? '')), [
-    AuthService::ROLE_FVD_ADMIN,
-    AuthService::ROLE_DELEGADO_ASOC,
-], true);
 
 require_once FVD_PROJECT_ROOT . '/src/Services/StatsService.php';
 $fvd_atletas_widget = \FvdPortal\Services\StatsService::atletasModuloWidgetResumen(

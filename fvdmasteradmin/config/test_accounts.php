@@ -39,7 +39,7 @@ function fvd_test_accounts_catalogue(): array
             'login' => 'delegado.prueba@fvd.local',
             'rol' => 'delegado_asoc',
             'notas' => 'Cuenta en tabla delegados (no en fvd_usuarios).',
-            'destino_tras_login' => $base . '/fvdmasteradmin/delegado_dashboard.php',
+            'destino_tras_login' => $base . '/fvdmasteradmin/delegado_dashboard_new.php',
         ],
         [
             'key' => 'usuario',

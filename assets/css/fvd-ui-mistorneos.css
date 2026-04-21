@@ -1277,7 +1277,7 @@ table.fvd-mod-table {
 }
 
 .fvd-mis-card__head--ops {
-  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  background: linear-gradient(90deg, #2e3092, #3a3eb5 55%, #4c52d4);
 }
 
 .fvd-mis-card__head--res {
@@ -1351,7 +1351,7 @@ table.fvd-mod-table {
 }
 
 .fvd-mis-btn--blue {
-  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  background: linear-gradient(180deg, #2e3092, #252f7a);
 }
 
 .fvd-mis-btn--amber {
@@ -2161,8 +2161,9 @@ select optgroup {
 }
 
 select:focus-visible {
-  outline: 2px solid rgba(46, 48, 146, 0.45);
-  outline-offset: 1px;
+  outline: 2px solid var(--fvd-amarillo, #fff200);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgba(46, 48, 146, 0.35);
 }
 
 select:disabled {
@@ -2944,6 +2945,125 @@ body.is-embedded main {
   width: 100% !important;
   max-width: 100% !important;
   padding: 0 !important;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Formularios: legibilidad + cromática FVD (según shell claro u oscuro)      */
+/* ------------------------------------------------------------------------- */
+.fvd-shell--delegado-workspace .fvd-mod-form label,
+.fvd-shell--delegado-workspace .fvd-atleta-form label,
+.fvd-shell--delegado-workspace .fvd-mod-toolbar label,
+.fvd-shell--delegado-workspace #fvd-atletas-root label,
+.fvd-shell--delegado-workspace .report-container label {
+  color: var(--fvd-azul, #2e3092) !important;
+  font-weight: 700 !important;
+}
+
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-mod-form label,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-atleta-form label,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-mod-toolbar label,
+.fvd-shell:not(.fvd-shell--delegado-workspace) #fvd-atletas-root label,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .report-container label {
+  color: var(--fvd-text, #f8fafc) !important;
+  font-weight: 600 !important;
+}
+
+.fvd-shell--delegado-workspace .fvd-input,
+.fvd-shell--delegado-workspace input.fvd-input,
+.fvd-shell--delegado-workspace select.fvd-input,
+.fvd-shell--delegado-workspace textarea.fvd-input,
+.fvd-shell--delegado-workspace .fvd-mod-form .fvd-input,
+.fvd-shell--delegado-workspace .fvd-atleta-form .fvd-input,
+.fvd-shell--delegado-workspace .fvd-mod-toolbar .fvd-input,
+.fvd-shell--delegado-workspace #fvd-atletas-root .fvd-input,
+.fvd-shell--delegado-workspace .report-container .fvd-input {
+  color: var(--fvd-dorado-ink, #2e2a00) !important;
+  font-weight: 600 !important;
+  background: #ffffff !important;
+  border-color: rgba(46, 48, 146, 0.32) !important;
+  caret-color: var(--fvd-azul, #2e3092) !important;
+}
+
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) input.fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) textarea.fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-mod-form .fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-atleta-form .fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-mod-toolbar .fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) #fvd-atletas-root .fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .report-container .fvd-input {
+  color: var(--fvd-text, #f8fafc) !important;
+  font-weight: 500 !important;
+  background: rgba(0, 0, 0, 0.22) !important;
+  border-color: var(--fvd-border, rgba(255, 255, 255, 0.18)) !important;
+  caret-color: var(--fvd-amarillo, #fff200) !important;
+}
+
+.fvd-shell:not(.fvd-shell--delegado-workspace) select.fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-mod-form select.fvd-input,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-atleta-form select.fvd-input {
+  background: var(--fvd-select-bg, #ffffff) !important;
+  color: var(--fvd-select-fg, #111827) !important;
+  border-color: var(--fvd-select-border, rgba(15, 23, 42, 0.28)) !important;
+  caret-color: var(--fvd-select-fg, #111827) !important;
+}
+
+.fvd-input:focus,
+input.fvd-input:focus,
+select.fvd-input:focus,
+textarea.fvd-input:focus {
+  outline: 2px solid var(--fvd-amarillo, #fff200) !important;
+  outline-offset: 2px;
+  border-color: var(--fvd-amarillo, #fff200) !important;
+}
+
+.fvd-shell--delegado-workspace .fvd-mod-table td,
+.fvd-shell--delegado-workspace .tabla-atletas td,
+.fvd-shell--delegado-workspace #fvd-atletas-root .fvd-mod-table td,
+.fvd-shell--delegado-workspace .report-container .fvd-mod-table td {
+  color: var(--fvd-dorado-ink, #1e1b4b) !important;
+  font-weight: 600 !important;
+}
+
+.fvd-shell:not(.fvd-shell--delegado-workspace) .fvd-mod-table td,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .tabla-atletas td,
+.fvd-shell:not(.fvd-shell--delegado-workspace) #fvd-atletas-root .fvd-mod-table td,
+.fvd-shell:not(.fvd-shell--delegado-workspace) .report-container .fvd-mod-table td {
+  color: var(--fvd-text, #f8fafc) !important;
+  font-weight: 500 !important;
+}
+
+/* Bootstrap legacy (.form-control) dentro del shell FVD */
+.fvd-shell--delegado-workspace input.form-control,
+.fvd-shell--delegado-workspace textarea.form-control,
+.fvd-shell--delegado-workspace select.form-control {
+  font-family: var(--fvd-main-font, 'Inter', system-ui, sans-serif);
+  border-radius: 6px;
+  border: 1px solid rgba(46, 48, 146, 0.28);
+  background: #fff;
+  color: #0f172a;
+}
+.fvd-shell:not(.fvd-shell--delegado-workspace) input.form-control,
+.fvd-shell:not(.fvd-shell--delegado-workspace) textarea.form-control {
+  font-family: var(--fvd-main-font, 'Inter', system-ui, sans-serif);
+  border-radius: 6px;
+  border: 1px solid var(--fvd-border, rgba(255, 255, 255, 0.18));
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--fvd-text, #f8fafc);
+}
+.fvd-shell:not(.fvd-shell--delegado-workspace) select.form-control {
+  font-family: var(--fvd-main-font, 'Inter', system-ui, sans-serif);
+  border-radius: 6px;
+  background: var(--fvd-select-bg, #fff);
+  color: var(--fvd-select-fg, #111827);
+  border: 1px solid var(--fvd-select-border, rgba(15, 23, 42, 0.28));
+  color-scheme: light;
+}
+.fvd-shell input.form-control:focus-visible,
+.fvd-shell textarea.form-control:focus-visible,
+.fvd-shell select.form-control:focus-visible {
+  outline: 2px solid var(--fvd-amarillo, #fff200);
+  outline-offset: 2px;
 }
 
 html.is-embedded-view body.is-embedded {

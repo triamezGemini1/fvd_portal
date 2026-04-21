@@ -65,6 +65,8 @@ if ($tid <= 0) {
     exit;
 }
 
+$gidTorneo = (int) ($row['grupo_evento_id'] ?? 0);
+
 $nid = (int) ($row['id'] ?? 0);
 $accessTok = DelegadoTorneoNotifService::asegurarAccessTokenParaNotificacion($pdo, $nid);
 if ($accessTok === null || $accessTok === '') {
@@ -74,7 +76,12 @@ if ($accessTok === null || $accessTok === '') {
 }
 
 AuthService::setDelegadoTorneoContext($tid);
-DelegadoTorneoNotifService::marcarVisto($pdo, $nid, $did, $aid);
+if ($gidTorneo > 0) {
+    AuthService::setDelegadoCampeonatoGrupo($gidTorneo);
+    DelegadoTorneoNotifService::marcarVistoTodasMismoGrupo($pdo, $did, $aid, $gidTorneo);
+} else {
+    DelegadoTorneoNotifService::marcarVisto($pdo, $nid, $did, $aid);
+}
 
 $_SESSION['fvd_master_delegado_notif_token'] = $accessTok;
 error_log('[delegado_entrar_torneo] Sesión fvd_master_delegado_notif_token fijada; token=' . $accessTok);

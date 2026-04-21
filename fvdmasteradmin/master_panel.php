@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 ini_set('display_errors', 1);
@@ -80,6 +79,16 @@ if (AuthService::isAdminGral()) {
         $tidCtx = (int) ($notifMp['torneo_id'] ?? 0);
         if ($tidCtx > 0) {
             AuthService::setDelegadoTorneoContext($tidCtx);
+            try {
+                $stG = $pdo->prepare('SELECT COALESCE(grupo_evento_id, 0) FROM torneosact WHERE torneo = :t LIMIT 1');
+                $stG->execute([':t' => $tidCtx]);
+                $gTok = (int) $stG->fetchColumn();
+                if ($gTok > 0) {
+                    AuthService::setDelegadoCampeonatoGrupo($gTok);
+                }
+            } catch (Throwable $e) {
+                /* sin grupo_evento_id o error puntual */
+            }
         }
     }
 } else {

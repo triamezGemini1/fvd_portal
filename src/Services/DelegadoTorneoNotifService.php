@@ -403,7 +403,7 @@ final class DelegadoTorneoNotifService
         }
         self::ensureTable($pdo);
         self::ensureCampeonatoGrupoTable($pdo);
-        $selTorneo = 'COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre, t.nombre AS torneo_rama_nombre';
+        $selTorneo = 'COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre, t.nombre AS torneo_rama_nombre, COALESCE(t.grupo_evento_id, 0) AS grupo_evento_id';
         try {
             if ($asociacionId !== null && $asociacionId > 0) {
                 $st = $pdo->prepare(
@@ -455,7 +455,8 @@ final class DelegadoTorneoNotifService
                 $st = $pdo->prepare(
                     'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en, n.invitacion_aceptada_en,
                         COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
-                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar,
+                        COALESCE(t.grupo_evento_id, 0) AS grupo_evento_id
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
                      LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
@@ -469,7 +470,8 @@ final class DelegadoTorneoNotifService
                 $st = $pdo->prepare(
                     'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en, n.invitacion_aceptada_en,
                         COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
-                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar,
+                        COALESCE(t.grupo_evento_id, 0) AS grupo_evento_id
                      FROM fvd_delegado_notif_torneo n
                      INNER JOIN torneosact t ON t.torneo = n.torneo_id
                      LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
@@ -485,6 +487,295 @@ final class DelegadoTorneoNotifService
             error_log('[DelegadoTorneoNotifService] listar: ' . $e->getMessage());
 
             return [];
+        }
+    }
+
+    /**
+     * Invitaciones sin abrir (JOIN torneosact para grupo), orden reciente.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function filasNotificacionesSinVista(PDO $pdo, int $delegadoId, ?int $asociacionId, int $limite = 200): array
+    {
+        if ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0)) {
+            return [];
+        }
+        self::ensureTable($pdo);
+        self::ensureCampeonatoGrupoTable($pdo);
+        $limite = max(1, min(500, $limite));
+        try {
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar,
+                        COALESCE(t.grupo_evento_id, 0) AS grupo_evento_id
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     WHERE del.asociacion_id = :a AND del.activo = 1 AND n.visto_en IS NULL
+                     ORDER BY n.creado_en DESC
+                     LIMIT ' . (int) $limite
+                );
+                $st->execute([':a' => $asociacionId]);
+            } else {
+                $st = $pdo->prepare(
+                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
+                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
+                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar,
+                        COALESCE(t.grupo_evento_id, 0) AS grupo_evento_id
+                     FROM fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
+                     WHERE n.delegado_id = :d AND n.visto_en IS NULL
+                     ORDER BY n.creado_en DESC
+                     LIMIT ' . (int) $limite
+                );
+                $st->execute([':d' => $delegadoId]);
+            }
+
+            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] filasNotificacionesSinVista: ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return array<string, mixed>
+     */
+    private static function fusionarFilasGrupoMismoEvento(array $rows): array
+    {
+        $ids = [];
+        $torneoIds = [];
+        $ramas = [];
+        $maxCreado = '';
+        $invFile = '';
+        $tidRep = 0;
+        $nidRep = 0;
+        $g = 0;
+        foreach ($rows as $r) {
+            $ids[] = (int) ($r['id'] ?? 0);
+            $tid = (int) ($r['torneo_id'] ?? 0);
+            if ($tid > 0) {
+                $torneoIds[] = $tid;
+            }
+            $rama = trim((string) ($r['torneo_rama_nombre'] ?? ''));
+            if ($rama !== '' && !in_array($rama, $ramas, true)) {
+                $ramas[] = $rama;
+            }
+            $ce = (string) ($r['creado_en'] ?? '');
+            if ($ce !== '' && ($maxCreado === '' || $ce > $maxCreado)) {
+                $maxCreado = $ce;
+            }
+            $inv = trim((string) ($r['invitacion_archivo'] ?? ''));
+            if ($inv !== '' && $invFile === '') {
+                $invFile = $inv;
+            }
+            $g = (int) ($r['grupo_evento_id'] ?? 0);
+        }
+        sort($ids);
+        $tidRep = $torneoIds !== [] ? (int) min($torneoIds) : 0;
+        foreach ($rows as $r) {
+            if ((int) ($r['torneo_id'] ?? 0) === $tidRep) {
+                $nidRep = (int) ($r['id'] ?? 0);
+
+                break;
+            }
+        }
+        if ($nidRep <= 0 && $ids !== []) {
+            $nidRep = (int) min($ids);
+        }
+        $base = $rows[0];
+
+        return array_merge($base, [
+            'id' => $nidRep,
+            'torneo_id' => $tidRep,
+            'invitacion_archivo' => $invFile !== '' ? $invFile : ($base['invitacion_archivo'] ?? null),
+            'creado_en' => $maxCreado !== '' ? $maxCreado : ($base['creado_en'] ?? ''),
+            'visto_en' => null,
+            'es_grupo_agrupado' => true,
+            'grupo_evento_id' => $g,
+            'n_en_grupo' => count($rows),
+            'rama_subtitulo' => $ramas !== [] ? implode(' · ', $ramas) : '',
+        ]);
+    }
+
+    /**
+     * Listado para UI: torneos no vinculados → una fila cada uno; mismo grupo_evento_id → una sola fila.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function listarParaDelegadoVistaAgrupada(PDO $pdo, int $delegadoId, int $limite = 40, ?int $asociacionId = null): array
+    {
+        $raw = self::listarParaDelegado($pdo, $delegadoId, max(60, $limite * 3), $asociacionId);
+        if ($raw === []) {
+            return [];
+        }
+        $porGrupo = [];
+        $solos = [];
+        foreach ($raw as $r) {
+            $g = (int) ($r['grupo_evento_id'] ?? 0);
+            if ($g <= 0) {
+                $solos[] = array_merge($r, ['es_grupo_agrupado' => false]);
+
+                continue;
+            }
+            if (!isset($porGrupo[$g])) {
+                $porGrupo[$g] = [];
+            }
+            $porGrupo[$g][] = $r;
+        }
+        $out = [];
+        foreach ($porGrupo as $g => $pack) {
+            if (count($pack) === 1) {
+                $out[] = array_merge($pack[0], ['es_grupo_agrupado' => false]);
+
+                continue;
+            }
+            $out[] = self::fusionarFilasGrupoMismoEvento($pack);
+        }
+        foreach ($solos as $s) {
+            $out[] = $s;
+        }
+        usort(
+            $out,
+            static function (array $a, array $b): int {
+                $ca = (string) ($a['creado_en'] ?? '');
+                $cb = (string) ($b['creado_en'] ?? '');
+
+                return strcmp($cb, $ca);
+            }
+        );
+
+        return array_slice($out, 0, max(1, $limite));
+    }
+
+    /**
+     * Pendientes para badge: sin grupo cuenta 1 por fila; con grupo cuenta 1 por código de grupo.
+     */
+    public static function contarPendientesVistaAgrupada(PDO $pdo, int $delegadoId, ?int $asociacionId = null): int
+    {
+        $filas = self::filasNotificacionesSinVista($pdo, $delegadoId, $asociacionId, 400);
+        if ($filas === []) {
+            return 0;
+        }
+        $vistosGrupo = [];
+        $n = 0;
+        foreach ($filas as $r) {
+            $g = (int) ($r['grupo_evento_id'] ?? 0);
+            if ($g > 0) {
+                if (!isset($vistosGrupo[$g])) {
+                    $vistosGrupo[$g] = true;
+                    ++$n;
+                }
+            } else {
+                ++$n;
+            }
+        }
+
+        return $n;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $filasSinVista
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function representantesVisualesDesdeFilasSinVista(array $filasSinVista): array
+    {
+        if ($filasSinVista === []) {
+            return [];
+        }
+        $porGrupo = [];
+        $solos = [];
+        foreach ($filasSinVista as $r) {
+            $g = (int) ($r['grupo_evento_id'] ?? 0);
+            if ($g <= 0) {
+                $solos[] = $r;
+            } else {
+                if (!isset($porGrupo[$g])) {
+                    $porGrupo[$g] = [];
+                }
+                $porGrupo[$g][] = $r;
+            }
+        }
+        $candidatos = [];
+        foreach ($porGrupo as $pack) {
+            $candidatos[] = count($pack) > 1
+                ? self::fusionarFilasGrupoMismoEvento($pack)
+                : array_merge($pack[0], ['es_grupo_agrupado' => false]);
+        }
+        foreach ($solos as $s) {
+            $candidatos[] = array_merge($s, ['es_grupo_agrupado' => false]);
+        }
+        usort(
+            $candidatos,
+            static function (array $a, array $b): int {
+                return strcmp((string) ($b['creado_en'] ?? ''), (string) ($a['creado_en'] ?? ''));
+            }
+        );
+
+        return $candidatos;
+    }
+
+    /**
+     * Torneo + grupo sugeridos desde invitaciones aún no vistas (p. ej. fijar sesión al abrir el panel).
+     *
+     * @return array{torneo_id:int, grupo_evento_id:int}
+     */
+    public static function sugerirContextoDesdeInvitacionesPendientes(PDO $pdo, int $delegadoId, ?int $asociacionId): array
+    {
+        $filas = self::filasNotificacionesSinVista($pdo, $delegadoId, $asociacionId, 100);
+        $candidatos = self::representantesVisualesDesdeFilasSinVista($filas);
+        if ($candidatos === []) {
+            return ['torneo_id' => 0, 'grupo_evento_id' => 0];
+        }
+        $top = $candidatos[0];
+        $tid = (int) ($top['torneo_id'] ?? 0);
+        $gid = (int) ($top['grupo_evento_id'] ?? 0);
+
+        return [
+            'torneo_id' => $tid > 0 ? $tid : 0,
+            'grupo_evento_id' => $gid > 0 ? $gid : 0,
+        ];
+    }
+
+    /**
+     * Marca vistas todas las notificaciones del delegado cuyo torneo comparte el mismo grupo_evento_id.
+     */
+    public static function marcarVistoTodasMismoGrupo(PDO $pdo, int $delegadoId, ?int $asociacionId, int $grupoEventoId): void
+    {
+        if ($grupoEventoId <= 0 || ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0))) {
+            return;
+        }
+        self::ensureTable($pdo);
+        try {
+            if ($asociacionId !== null && $asociacionId > 0) {
+                $st = $pdo->prepare(
+                    'UPDATE fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     INNER JOIN delegados del ON del.id = n.delegado_id
+                     SET n.visto_en = COALESCE(n.visto_en, NOW())
+                     WHERE del.asociacion_id = :a AND del.activo = 1
+                       AND COALESCE(t.grupo_evento_id, 0) = :g'
+                );
+                $st->execute([':a' => $asociacionId, ':g' => $grupoEventoId]);
+            } else {
+                $st = $pdo->prepare(
+                    'UPDATE fvd_delegado_notif_torneo n
+                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
+                     SET n.visto_en = COALESCE(n.visto_en, NOW())
+                     WHERE n.delegado_id = :d AND COALESCE(t.grupo_evento_id, 0) = :g'
+                );
+                $st->execute([':d' => $delegadoId, ':g' => $grupoEventoId]);
+            }
+        } catch (PDOException $e) {
+            error_log('[DelegadoTorneoNotifService] marcarVistoTodasMismoGrupo: ' . $e->getMessage());
         }
     }
 
@@ -516,52 +807,17 @@ final class DelegadoTorneoNotifService
     }
 
     /**
-     * @return array<string, mixed>|null Última notificación no vista
+     * @return array<string, mixed>|null Invitación pendiente más reciente (una sola entrada si los torneos comparten grupo).
      */
     public static function ultimaNoVista(PDO $pdo, int $delegadoId, ?int $asociacionId = null): ?array
     {
         if ($delegadoId <= 0 && ($asociacionId === null || $asociacionId <= 0)) {
             return null;
         }
-        self::ensureTable($pdo);
-        self::ensureCampeonatoGrupoTable($pdo);
-        try {
-            if ($asociacionId !== null && $asociacionId > 0) {
-                $st = $pdo->prepare(
-                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
-                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
-                     FROM fvd_delegado_notif_torneo n
-                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
-                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
-                     INNER JOIN delegados del ON del.id = n.delegado_id
-                     WHERE del.asociacion_id = :a AND del.activo = 1 AND n.visto_en IS NULL
-                     ORDER BY n.creado_en DESC
-                     LIMIT 1'
-                );
-                $st->execute([':a' => $asociacionId]);
-            } else {
-                $st = $pdo->prepare(
-                    'SELECT n.id, n.torneo_id, n.invitacion_archivo, n.creado_en, n.visto_en,
-                        COALESCE(NULLIF(TRIM(cg.nombre_nominal), \'\'), t.nombre) AS torneo_nombre,
-                        t.nombre AS torneo_rama_nombre, t.fechator, t.lugar
-                     FROM fvd_delegado_notif_torneo n
-                     INNER JOIN torneosact t ON t.torneo = n.torneo_id
-                     LEFT JOIN fvd_campeonato_grupo cg ON cg.grupo_evento_id = t.grupo_evento_id
-                     WHERE n.delegado_id = :d AND n.visto_en IS NULL
-                     ORDER BY n.creado_en DESC
-                     LIMIT 1'
-                );
-                $st->execute([':d' => $delegadoId]);
-            }
-            $r = $st->fetch(PDO::FETCH_ASSOC);
+        $filas = self::filasNotificacionesSinVista($pdo, $delegadoId, $asociacionId, 100);
+        $candidatos = self::representantesVisualesDesdeFilasSinVista($filas);
 
-            return $r !== false ? $r : null;
-        } catch (PDOException $e) {
-            error_log('[DelegadoTorneoNotifService] ultimaNoVista: ' . $e->getMessage());
-
-            return null;
-        }
+        return $candidatos[0] ?? null;
     }
 
     public static function marcarVisto(PDO $pdo, int $notifId, int $delegadoId, ?int $asociacionId = null): void

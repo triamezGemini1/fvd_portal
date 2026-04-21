@@ -9,6 +9,8 @@
 /** @var string $fvdUrlRelacionPago */
 /** @var array<string,string> $fvdTiposPagoOpciones */
 $r = $row ?? [];
+$fvdDeudaTid = (int) ($r['torneo_id'] ?? ($_GET['tid'] ?? 0));
+$fvdDeudaAid = (int) ($r['asociacion_id'] ?? ($_GET['aid'] ?? 0));
 $c = $fvdCostoTarifa ?? [];
 $fvdPuedeActualizarDeuda = isset($fvdPuedeActualizarDeuda) ? (bool) $fvdPuedeActualizarDeuda : false;
 $fvdPagosRecibos = $fvdPagosRecibos ?? [];
@@ -23,7 +25,7 @@ $fvdFmtMonto = static function ($v, int $dec = 2): string {
 
     return number_format((float) $v, $dec, ',', '.');
 };
-$reporteConceptosUrl = fvd_return_append_to_url($selfUrl . '?action=reporte_conceptos&tid=' . (int) ($r['torneo_id'] ?? 0) . '&aid=' . (int) ($r['asociacion_id'] ?? 0));
+$reporteConceptosUrl = fvd_return_append_to_url($selfUrl . '?action=reporte_conceptos&tid=' . $fvdDeudaTid . '&aid=' . $fvdDeudaAid);
 
 /**
  * @param array<string, mixed> $costo
@@ -218,7 +220,7 @@ $renglones = [
 
 <div class="fvd-deuda-detalle-titulo">
     <h1>Reporte detallado de costos</h1>
-    <p>Torneo #<?= (int) ($r['torneo_id'] ?? 0) ?> · Asociación #<?= (int) ($r['asociacion_id'] ?? 0) ?></p>
+    <p>Torneo #<?= $fvdDeudaTid ?> · Asociación #<?= $fvdDeudaAid ?></p>
     <p style="margin:0.25rem 0 0;font-size:0.86rem">Vista de solo lectura. <strong>Actualizar deuda</strong> vuelve a leer <code>atletas</code> (inscripción, afiliación, carnet, traspaso, anualidad) para este torneo y asociación, aplica tarifas de <code>costos</code> y actualiza el estado de cuenta.</p>
     <?php if (isset($_GET['msg']) && $_GET['msg'] === 'deuda_actualizada'): ?>
         <p class="fvd-mod-msg">Deuda actualizada correctamente desde atletas.</p>
@@ -336,11 +338,15 @@ $renglones = [
         <?php endif; ?>
 
         <div class="fvd-deuda-detalle-actions fvd-mod-actions">
-            <?php if ($fvdPuedeActualizarDeuda): ?>
-                <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=form&tid=' . (int) $r['torneo_id'] . '&aid=' . (int) $r['asociacion_id']), ENT_QUOTES, 'UTF-8') ?>" style="display:inline-flex">
+            <?php if (!$fvdPuedeActualizarDeuda): ?>
+                <button type="button" disabled style="opacity:0.6;cursor:not-allowed">Actualizar deuda (torneo finalizado)</button>
+            <?php elseif ($r === []): ?>
+                <button type="button" disabled style="opacity:0.6;cursor:not-allowed">Actualizar deuda (sin registro de deuda)</button>
+            <?php else: ?>
+                <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=form&tid=' . $fvdDeudaTid . '&aid=' . $fvdDeudaAid), ENT_QUOTES, 'UTF-8') ?>" style="display:inline-flex">
                     <input type="hidden" name="_action" value="actualizar_deuda">
-                    <input type="hidden" name="torneo_id" value="<?= (int) ($r['torneo_id'] ?? 0) ?>">
-                    <input type="hidden" name="asociacion_id" value="<?= (int) ($r['asociacion_id'] ?? 0) ?>">
+                    <input type="hidden" name="torneo_id" value="<?= $fvdDeudaTid ?>">
+                    <input type="hidden" name="asociacion_id" value="<?= $fvdDeudaAid ?>">
                     <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
                     <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
                     <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
@@ -348,11 +354,9 @@ $renglones = [
                     <?php endif; ?>
                     <button type="submit">Actualizar deuda</button>
                 </form>
-            <?php else: ?>
-                <button type="button" disabled style="opacity:0.6;cursor:not-allowed">Actualizar deuda (torneo finalizado)</button>
             <?php endif; ?>
             <a class="fvd-deuda-btn fvd-deuda-btn--conceptos" href="<?= htmlspecialchars($reporteConceptosUrl, ENT_QUOTES, 'UTF-8') ?>">Todos los conceptos</a>
-            <a class="fvd-deuda-btn fvd-deuda-btn--volver" href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver</a>
+            <a class="fvd-deuda-btn fvd-deuda-btn--volver" href="<?= htmlspecialchars(fvd_return_to_module_index($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver</a>
         </div>
     </div>
 </div>

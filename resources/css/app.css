@@ -137,4 +137,50 @@ body:has(#fvd-master-app) {
     @apply flex w-full min-h-[2.75rem] items-center justify-between gap-2 rounded-lg border bg-white p-3.5 text-left text-base font-bold text-slate-800 shadow-sm transition duration-150;
     @apply hover:-translate-y-px hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1;
   }
+
+  /* Alto contraste para flujo Afiliaciones (panel delegado) */
+  .fvd-atleta-form label,
+  #fvd-atletas-root label,
+  .fvd-rep-indicadores label,
+  .report-container label {
+    @apply font-bold text-black;
+  }
+
+  .fvd-atleta-form .fvd-input,
+  .fvd-atleta-form select.fvd-input,
+  .fvd-atleta-form input.fvd-input,
+  #fvd-atletas-root .fvd-input,
+  #fvd-atletas-root select.fvd-input,
+  #fvd-atletas-root input.fvd-input,
+  .fvd-rep-indicadores .fvd-input,
+  .fvd-rep-indicadores select.fvd-input,
+  .fvd-rep-indicadores input.fvd-input,
+  .report-container .fvd-input,
+  .report-container select.fvd-input,
+  .report-container input.fvd-input {
+    @apply font-bold text-black bg-white border-slate-500;
+    caret-color: #000;
+  }
+
+  .tabla-atletas td,
+  #fvd-atletas-root .fvd-mod-table td,
+  .fvd-rep-indicadores .fvd-mod-table td,
+  .report-container .fvd-mod-table td {
+    @apply font-bold text-black;
+  }
+
+  /* Forzado final para evitar overrides del tema legacy */
+  .fvd-atleta-form label,
+  #fvd-atletas-root label,
+  .fvd-rep-indicadores label,
+  .report-container label,
+  .fvd-atleta-form .fvd-input,
+  #fvd-atletas-root .fvd-input,
+  .fvd-rep-indicadores .fvd-input,
+  .report-container .fvd-input,
+  .tabla-atletas td,
+  .report-container .fvd-mod-table td {
+    color: #000 !important;
+    font-weight: 700 !important;
+  }
 }

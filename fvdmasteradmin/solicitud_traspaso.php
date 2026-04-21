@@ -41,6 +41,7 @@ AuthService::ensureSession();
 $solMsg = isset($_GET['msg']) && $_GET['msg'] === 'sol_ok';
 $solErr = (string) ($_SESSION['fvd_delegado_sol_err'] ?? '');
 unset($_SESSION['fvd_delegado_sol_err']);
+$prefillAtletaId = isset($_GET['atleta_id']) ? max(0, (int) $_GET['atleta_id']) : 0;
 
 $fvd_sidebar_active = 'sol_traspaso';
 $fvd_page_title = 'Solicitar traspaso';
@@ -57,7 +58,7 @@ require __DIR__ . '/includes/layout_header.php';
             <input type="hidden" name="_action" value="delegado_solicitud">
             <input type="hidden" name="tipo" value="traspaso">
             <label style="font-size:0.75rem;color:var(--fvd-muted);display:block">Atleta (ID)</label>
-            <input class="fvd-input" name="atleta_id" type="number" required style="width:100%;max-width:22rem;margin-bottom:8px">
+            <input class="fvd-input" name="atleta_id" type="number" required value="<?= $prefillAtletaId > 0 ? (string) $prefillAtletaId : '' ?>" style="width:100%;max-width:22rem;margin-bottom:8px">
             <label style="font-size:0.75rem;color:var(--fvd-muted);display:block">Asociación destino</label>
             <select class="fvd-input" name="asociacion_destino_id"<?= $asocDestino === [] ? ' disabled' : ' required' ?> style="width:100%;max-width:22rem;margin-bottom:8px">
                 <?php if ($asocDestino === []): ?>

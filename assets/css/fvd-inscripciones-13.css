@@ -174,12 +174,13 @@
     background: rgba(234, 179, 8, 0.35);
 }
 .fvd-insc-btn--comprobante {
-    background: rgba(37, 99, 235, 0.35);
-    color: #bfdbfe;
-    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(46, 48, 146, 0.35);
+    color: #e8e9f4;
+    border-color: rgba(255, 242, 0, 0.45);
 }
 .fvd-insc-btn--comprobante:hover {
-    background: rgba(37, 99, 235, 0.5);
+    background: rgba(46, 48, 146, 0.52);
+    border-color: rgba(255, 242, 0, 0.65);
 }
 .fvd-insc-btn:disabled {
     opacity: 0.45;

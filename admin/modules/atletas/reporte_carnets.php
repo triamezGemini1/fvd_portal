@@ -63,6 +63,13 @@ if ($aidHdr !== null && $aidHdr > 0) {
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
 <div class="report-container" style="max-width:56rem">
+    <p class="no-print" style="margin:0 0 .85rem">
+        <a href="/fvd_portal/fvdmasteradmin/delegado_dashboard_new.php"
+           class="inline-flex items-center text-black font-bold border-2 border-black px-4 py-2 rounded hover:bg-black hover:text-white transition-colors"
+           style="display:inline-flex;align-items:center;gap:.45rem;color:#000;font-weight:800;border:2px solid #000;padding:.5rem .9rem;border-radius:.45rem;text-decoration:none;transition:all .15s ease">
+            <i class="fas fa-arrow-left mr-2"></i> VOLVER AL PANEL
+        </a>
+    </p>
     <?php if ($repAsocNombreCorto !== '' || $repAsocLogoUrl !== null): ?>
     <div class="fvd-rep-carnets-head" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding-bottom:12px;border-bottom:2px solid var(--fvd-amarillo)">
         <?php if ($repAsocLogoUrl !== null): ?>

@@ -20,7 +20,15 @@ body {
 }
 h1 {
   font-size: 1.1rem;
+  margin: 0 0 0.35rem;
+}
+.fvd-login-tagline {
+  font-size: 0.72rem;
   margin: 0 0 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 242, 0, 0.92);
+  font-weight: 600;
 }
 label {
   display: block;
@@ -36,6 +44,11 @@ input {
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(0, 0, 0, 0.2);
   color: #f8fafc;
+}
+input:focus-visible {
+  outline: 2px solid #fff200;
+  outline-offset: 2px;
+  border-color: #fff200;
 }
 button {
   width: 100%;

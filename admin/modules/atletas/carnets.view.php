@@ -128,6 +128,7 @@ header('Content-Type: text/html; charset=UTF-8');
         <p class="fvd-carnet-indicador">
             <strong>Solicitar (impresión)</strong> marca <code style="font-size:15px">atletas.carnet = 1</code> y abre la impresión para el prestador del servicio.
             <strong>Registrar carnet solicitado</strong> solo guarda el marcador sin imprimir. Las estadísticas y el reporte «solicitados» solo consideran <code>carnet = 1</code> (otros valores no cuentan).
+            <strong>Delegado de club:</strong> debe tener el <strong>torneo activo en el panel</strong> (entrada por invitación al evento); el movimiento queda ligado a ese torneo y, si aplica, se registra en el historial del torneo.
             El traspaso de asociación usa <code style="font-size:15px">atletas.traspaso = 1</code> y <code style="font-size:15px">log_traspasos</code>.
         </p>
         <a class="fvd-carnet-btn--ghost" href="<?= htmlspecialchars($atletasListUrl, ENT_QUOTES, 'UTF-8') ?>">← Volver al listado</a>

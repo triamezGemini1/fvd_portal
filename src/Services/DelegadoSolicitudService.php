@@ -12,12 +12,31 @@ use RuntimeException;
 require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
 require_once __DIR__ . '/TraspasoService.php';
 require_once __DIR__ . '/CarnetService.php';
+require_once __DIR__ . '/NotificacionService.php';
 
 /**
  * Cola de solicitudes de delegados (traspaso / carnet / afiliación) para aprobación FVD.
  */
 final class DelegadoSolicitudService
 {
+    private static function atletaHasColumn(PDO $pdo, string $column): bool
+    {
+        try {
+            $st = $pdo->prepare(
+                'SELECT 1 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = :t
+                   AND COLUMN_NAME = :c
+                 LIMIT 1'
+            );
+            $st->execute([':t' => 'atletas', ':c' => $column]);
+
+            return $st->fetchColumn() !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private const DDL = <<<'SQL'
 CREATE TABLE IF NOT EXISTS `fvd_solicitudes_delegado` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -75,7 +94,7 @@ SQL;
             $asociacionDestinoId = null;
         }
 
-        $st = $pdo->prepare('SELECT id, asociacion FROM atletas WHERE id = :id LIMIT 1');
+        $st = $pdo->prepare('SELECT id, nombre, asociacion FROM atletas WHERE id = :id LIMIT 1');
         $st->execute([':id' => $atletaId]);
         $a = $st->fetch(PDO::FETCH_ASSOC);
         if ($a === false || (int) ($a['asociacion'] ?? 0) !== (int) $asoc) {
@@ -96,6 +115,66 @@ SQL;
             ':dest' => $asociacionDestinoId,
             ':nota'=> $nota !== null && trim($nota) !== '' ? trim($nota) : null,
         ]);
+
+        if ($tipo === 'afiliacion') {
+            if (self::atletaHasColumn($pdo, 'afiliacion_fecha')) {
+                $pdo->prepare('UPDATE atletas SET afiliacion_fecha = NOW() WHERE id = :id')->execute([':id' => $atletaId]);
+            }
+            if (self::atletaHasColumn($pdo, 'verificado')) {
+                $pdo->prepare('UPDATE atletas SET verificado = 0 WHERE id = :id')->execute([':id' => $atletaId]);
+            }
+        }
+
+        if ($tipo === 'carnet') {
+            if (self::atletaHasColumn($pdo, 'carnet_solicitud_fecha')) {
+                $pdo->prepare('UPDATE atletas SET carnet_solicitud_fecha = NOW() WHERE id = :id')->execute([':id' => $atletaId]);
+            }
+            if (self::atletaHasColumn($pdo, 'carnet_status')) {
+                $pdo->prepare("UPDATE atletas SET carnet_status = 'SOLICITADO' WHERE id = :id")->execute([':id' => $atletaId]);
+            }
+        }
+
+        if ($tipo === 'traspaso') {
+            if (self::atletaHasColumn($pdo, 'traspaso_asoc_destino')) {
+                $pdo->prepare('UPDATE atletas SET traspaso_asoc_destino = :dest WHERE id = :id')
+                    ->execute([':dest' => $asociacionDestinoId, ':id' => $atletaId]);
+            }
+            if (self::atletaHasColumn($pdo, 'estatus_traspaso')) {
+                $pdo->prepare("UPDATE atletas SET estatus_traspaso = 'PROCESANDO' WHERE id = :id")
+                    ->execute([':id' => $atletaId]);
+            }
+
+            $asocOrigenNombre = '';
+            $asocDestinoNombre = '';
+            try {
+                $stAs = $pdo->prepare('SELECT nombre FROM asociaciones WHERE id = :id LIMIT 1');
+                $stAs->execute([':id' => $asoc]);
+                $asocOrigenNombre = trim((string) ($stAs->fetchColumn() ?: ''));
+                if ($asociacionDestinoId !== null && $asociacionDestinoId > 0) {
+                    $stAs->execute([':id' => $asociacionDestinoId]);
+                    $asocDestinoNombre = trim((string) ($stAs->fetchColumn() ?: ''));
+                }
+            } catch (\Throwable $e) {
+                // fallback
+            }
+            if ($asocOrigenNombre === '') {
+                $asocOrigenNombre = 'Asociación origen';
+            }
+            if ($asocDestinoNombre === '') {
+                $asocDestinoNombre = 'Asociación destino';
+            }
+            $adminId = NotificacionService::resolverAdminGeneralId($pdo);
+            $nombreAtleta = trim((string) ($a['nombre'] ?? ''));
+            if ($nombreAtleta === '') {
+                $nombreAtleta = 'Atleta #' . $atletaId;
+            }
+            NotificacionService::crear(
+                $pdo,
+                $adminId,
+                'SOLICITUD_TRASPASO',
+                'Solicitud de traspaso: Atleta ' . $nombreAtleta . ' de ' . $asocOrigenNombre . ' hacia ' . $asocDestinoNombre
+            );
+        }
     }
 
     /**

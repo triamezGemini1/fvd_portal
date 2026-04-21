@@ -7,7 +7,7 @@ require_once dirname(__DIR__, 2) . '/_init.php';
 fvd_admin_require_roles();
 
 $svc = new FvdAdminService();
-$selfUrl = fvd_master_module_url('torneo_inscripcion/index.php');
+$selfUrl = fvd_torneo_inscripcion_self_url();
 $fvd_page_title = AuthService::isDelegadoAsociacion() ? 'Inscripciones al torneo' : 'Inscripción';
 $fvd_error = '';
 $fvd_ok = '';
@@ -184,12 +184,16 @@ $fvd_campeonato_q = ($esDelegadoBandera && $fvd_campeonato_grupo > 0) ? ('&campe
 
 $fvd_balance_invitacion = null;
 if ($esDelegadoBandera && $fvd_campeonato_grupo > 0 && $asocId > 0 && $fvd_error_campeonato === '') {
-    require_once dirname(__DIR__, 3) . '/src/Services/StatsService.php';
-    $fvd_balance_invitacion = \FvdPortal\Services\StatsService::obtenerBalanceCampeonato(
-        fvd_db(),
-        $fvd_campeonato_grupo,
-        (int) $asocId
-    );
+    try {
+        require_once dirname(__DIR__, 3) . '/src/Services/StatsService.php';
+        $fvd_balance_invitacion = \FvdPortal\Services\StatsService::obtenerBalanceCampeonato(
+            fvd_db(),
+            $fvd_campeonato_grupo,
+            (int) $asocId
+        );
+    } catch (Throwable $e) {
+        error_log('[torneo_inscripcion] balance invitación: ' . $e->getMessage());
+    }
 }
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';

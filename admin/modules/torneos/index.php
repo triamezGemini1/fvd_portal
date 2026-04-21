@@ -20,6 +20,9 @@ if (AuthService::isDelegadoAsociacion() && $_SERVER['REQUEST_METHOD'] === 'POST'
 
 $svc = new FvdAdminService();
 $selfUrl = fvd_crud_self_url('torneos');
+if (!function_exists('fvd_return_preserve_query_params')) {
+    require_once FVD_PROJECT_ROOT . '/config/fvd_navigation_return.php';
+}
 $fvd_error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'notificar_delegados') {
@@ -35,13 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'noti
             (int) ($out['web_notif_delegados'] ?? 0)
         );
         $_SESSION['fvd_torneo_wa_url'] = $out['wa_url'];
-        header('Location: ' . $selfUrl . '?action=evento&id=' . $tidN . '&msg=notif_delegados');
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $tidN . '&msg=notif_delegados'));
         exit;
     } catch (Throwable $e) {
         AuthService::ensureSession();
         $_SESSION['fvd_torneo_evento_flash'] = $e->getMessage();
         $tidN = (int) ($_POST['torneo_id'] ?? 0);
-        header('Location: ' . $selfUrl . '?action=evento&id=' . max(1, $tidN));
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . max(1, $tidN)));
         exit;
     }
 }
@@ -62,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'lanz
         $_SESSION['fvd_torneo_list_flash'] = 'No se pudo enviar el lote: ' . $e->getMessage();
         error_log('[admin/torneos lanzar_convocatoria_nacional] ' . $e->getMessage());
     }
-    header('Location: ' . $selfUrl . '?action=list');
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list'));
     exit;
 }
 
@@ -82,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'lanz
         $_SESSION['fvd_torneo_list_flash'] = 'No se pudo re-enviar a pendientes: ' . $e->getMessage();
         error_log('[admin/torneos lanzar_convocatoria_pendientes] ' . $e->getMessage());
     }
-    header('Location: ' . $selfUrl . '?action=list');
+    header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=list'));
     exit;
 }
 
@@ -122,14 +125,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 throw new InvalidArgumentException('Acci?n no reconocida.');
             }
-            header('Location: ' . $selfUrl . '?action=evento&id=' . $tid . '&msg=ok');
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $tid . '&msg=ok'));
             exit;
         } catch (Throwable $e) {
             AuthService::ensureSession();
             $_SESSION['fvd_torneo_evento_flash'] = $e->getMessage();
             error_log('[admin/torneos convocatoria] ' . $e->getMessage());
             $redirT = (int) ($_POST['torneo_id'] ?? 0);
-            header('Location: ' . $selfUrl . '?action=evento&id=' . max(1, $redirT));
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . max(1, $redirT)));
             exit;
         }
     }
@@ -148,13 +151,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'torn
             $out['participantes_bandera'],
             $out['filas_tabla']
         );
-        header('Location: ' . $selfUrl . '?action=evento&id=' . $tidF . '&msg=ok');
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $tidF . '&msg=ok'));
         exit;
     } catch (Throwable $e) {
         AuthService::ensureSession();
         $_SESSION['fvd_torneo_evento_flash'] = $e->getMessage();
         $tidF = (int) ($_POST['torneo_id'] ?? 0);
-        header('Location: ' . $selfUrl . '?action=evento&id=' . max(1, $tidF));
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . max(1, $tidF)));
         exit;
     }
 }
@@ -189,24 +192,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rela
         if (!is_array($ids)) {
             $ids = [];
         }
-        $fechaRel = trim((string) ($_POST['fecha_relacion'] ?? ''));
-        if ($fechaRel === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRel)) {
-            $fechaRel = date('Y-m-d');
-        }
         $nombreNominal = trim((string) ($_POST['nombre_nominal_campeonato'] ?? ''));
         $gid = $svc->torneosRelacionGrupoAplicar($ids, $nombreNominal);
-        $_SESSION['fvd_torneo_relacion_flash'] = 'Relación aplicada: grupo #' . $gid . ' — nombre nominal guardado. Las invitaciones a delegados se han actualizado cuando correspondía.';
-        header('Location: ' . $selfUrl . '?action=relacion_grupo&fecha=' . rawurlencode($fechaRel) . '&msg=ok');
+        $_SESSION['fvd_torneo_relacion_flash']
+            = 'Relación aplicada: código de grupo #' . $gid
+            . '. Las invitaciones a delegados se han actualizado cuando correspondía; en inscripción (sitio y panel) podrá cambiar de categoría entre torneos del mismo grupo.';
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=relacion_grupo&msg=ok'));
         exit;
     } catch (Throwable $e) {
         AuthService::ensureSession();
         $_SESSION['fvd_torneo_relacion_err'] = $e->getMessage();
-        $fechaRel = trim((string) ($_POST['fecha_relacion'] ?? ''));
-        if ($fechaRel === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRel)) {
-            $fechaRel = date('Y-m-d');
-        }
         error_log('[admin/torneos relacion_grupo] ' . $e->getMessage());
-        header('Location: ' . $selfUrl . '?action=relacion_grupo&fecha=' . rawurlencode($fechaRel));
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=relacion_grupo'));
         exit;
     }
 }
@@ -220,16 +217,16 @@ if (AuthService::isDelegadoAsociacion() && ($_SERVER['REQUEST_METHOD'] ?? '') !=
     $asocDel = (int) (AuthService::idAsociacion() ?? 0);
     if ($ctx !== null && $ctx > 0) {
         if ($action !== 'evento' || $id === null || $id <= 0) {
-            header('Location: ' . $selfUrl . '?action=evento&id=' . $ctx);
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $ctx));
             exit;
         }
         if ($asocDel > 0 && !$svc->delegadoPuedeAbrirPantallaEvento($asocDel, (int) $id)) {
-            header('Location: ' . $selfUrl . '?action=evento&id=' . $ctx);
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $ctx));
             exit;
         }
     } elseif ($action !== 'evento' || $id === null || $id <= 0) {
         $base = rtrim((string) env('APP_BASE_PATH', ''), '/');
-        header('Location: ' . $base . '/fvdmasteradmin/delegado_dashboard.php');
+        header('Location: ' . $base . '/fvdmasteradmin/delegado_dashboard_new.php');
         exit;
     }
 }
@@ -488,10 +485,6 @@ if ($action === 'evento' && $id !== null && $id > 0) {
 if ($action === 'relacion_grupo') {
     AuthService::ensureSession();
     $svc->torneosRequireFvdAdminForGestion();
-    $fechaRel = isset($_GET['fecha']) ? trim((string) $_GET['fecha']) : '';
-    if ($fechaRel === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRel)) {
-        $fechaRel = date('Y-m-d');
-    }
     $fvd_torneo_relacion_flash = '';
     if (!empty($_SESSION['fvd_torneo_relacion_flash'])) {
         $fvd_torneo_relacion_flash = (string) $_SESSION['fvd_torneo_relacion_flash'];
@@ -502,10 +495,10 @@ if ($action === 'relacion_grupo') {
         $fvd_torneo_relacion_err = (string) $_SESSION['fvd_torneo_relacion_err'];
         unset($_SESSION['fvd_torneo_relacion_err']);
     }
-    $relacionGrupoFilas = $svc->torneosRelacionGrupoCandidatosPorFecha($fechaRel);
+    $relacionGrupoFilas = $svc->torneosRelacionGrupoCandidatosFuturos();
     $relacionGrupoColumnaOk = $svc->torneosactGrupoEventoColumnExists();
     $fvd_relacion_max_dias_fechas = FvdAdminService::RELACION_GRUPO_MAX_DIAS_ENTRE_FECHAS;
-    $fvd_page_title = 'Relacionar campeonatos (mismo día)';
+    $fvd_page_title = 'Relacionar campeonatos (próximos)';
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/relacion_grupo.view.php';
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';

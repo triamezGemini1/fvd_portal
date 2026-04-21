@@ -9,7 +9,6 @@ import {
   BuildingOffice2Icon,
   UserGroupIcon,
   TrophyIcon,
-  EnvelopeIcon,
   LinkIcon,
   GlobeAltIcon,
   BuildingLibraryIcon,
@@ -150,28 +149,20 @@ function navigate(key) {
         <button
           type="button"
           class="fvd-action-btn border-sky-300/90 bg-sky-50 text-sky-950 hover:border-sky-500 hover:bg-sky-100"
-          title="Asocia dos o más campeonatos el mismo día para compartir grupo y cambiar de entorno sin salir del sistema"
+          title="Abre la pantalla de asociar campeonatos (próximos, código de grupo compartido)"
           @click="navigate('operaciones/assoc_torneo')"
         >
-          <span>Relación torneos (mismo día)</span>
+          <span>Asociar torneos</span>
           <LinkIcon class="h-5 w-5 shrink-0 text-sky-600" aria-hidden="true" />
         </button>
 
         <button
           type="button"
-          class="fvd-action-btn border-indigo-300/90 bg-indigo-50 text-indigo-950 hover:border-indigo-500 hover:bg-indigo-100"
-          @click="navigate('operaciones/invitaciones')"
-        >
-          <span>Invitaciones</span>
-          <EnvelopeIcon class="h-5 w-5 shrink-0 text-indigo-600" aria-hidden="true" />
-        </button>
-
-        <button
-          type="button"
           class="fvd-action-btn border-teal-300/90 bg-teal-50 text-teal-950 hover:border-teal-500 hover:bg-teal-100"
+          title="Elegir asociación y abrir el panel de delegado (misma vista que los delegados)"
           @click="navigate('operaciones/portal_assoc')"
         >
-          <span>Portal asociación</span>
+          <span>Panel delegado (asociaciones)</span>
           <GlobeAltIcon class="h-5 w-5 shrink-0 text-teal-600" aria-hidden="true" />
         </button>
       </div>

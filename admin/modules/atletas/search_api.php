@@ -60,13 +60,14 @@ try {
     $fvd_atletas_show_asociacion_col = !($alcance === 'asociacion' && $asociacionFiltroId > 0);
     $appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
     $fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
+    $fvd_url_solicitud_traspaso_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_traspaso.php' : '/fvdmasteradmin/solicitud_traspaso.php';
 
     ob_start();
     foreach ($paged['registros'] as $r) {
         require $atletaRowTpl;
     }
     if ($paged['registros'] === []) {
-        $cs = $fvd_atletas_show_asociacion_col ? '13' : '12';
+        $cs = $fvd_atletas_show_asociacion_col ? '11' : '10';
         echo '<tr><td colspan="' . $cs . '" style="padding:12px">Sin registros con los filtros actuales.</td></tr>';
     }
     $tbodyHtml = ob_get_clean();

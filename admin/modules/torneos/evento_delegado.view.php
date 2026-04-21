@@ -21,7 +21,7 @@ $urlPublicTorneo = url('torneo_publico.php?id=' . $tidTorneo);
 
 <?php if ($t === null): ?>
     <h1 class="fvd-torneo-evento__title">Torneo no encontrado</h1>
-    <p><a class="fvd-torneo-evento__link" href="<?= htmlspecialchars($appBase . '/fvdmasteradmin/delegado_dashboard.php', ENT_QUOTES, 'UTF-8') ?>">Volver al panel</a></p>
+    <p><a class="fvd-torneo-evento__link" href="<?= htmlspecialchars($appBase . '/fvdmasteradmin/delegado_dashboard_new.php', ENT_QUOTES, 'UTF-8') ?>">Volver al panel</a></p>
 <?php else: ?>
     <div class="fvd-mis-panel">
         <nav class="fvd-mis-panel__crumb" aria-label="Ruta">

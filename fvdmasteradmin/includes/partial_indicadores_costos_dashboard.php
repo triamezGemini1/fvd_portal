@@ -45,8 +45,8 @@ if (is_array($tarifa) && isset($tarifa['fecha'])) {
 $wrapStyle = $variant === 'delegado'
     ? 'margin:0 0 1rem;padding:12px 14px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,0.06);max-width:72rem;color:#0f172a'
     : 'margin:0 0 1.25rem;padding:12px 14px;border-radius:10px;border:1px solid var(--fvd-border, rgba(255,255,255,0.12));background:rgba(255,255,255,0.04);max-width:72rem';
-$mutedColor = $variant === 'delegado' ? '#64748b' : 'var(--fvd-muted,#94a3b8)';
-$linkColor = $variant === 'delegado' ? '#2563eb' : 'var(--fvd-amarillo,#facc15)';
+$mutedColor = $variant === 'delegado' ? '#5c6199' : 'var(--fvd-muted,#94a3b8)';
+$linkColor = $variant === 'delegado' ? 'var(--fvd-azul,#2e3092)' : 'var(--fvd-amarillo,#facc15)';
 
 ?>
 <section class="fvd-ic-dash" aria-label="Indicadores de servicio y costos estimados" style="<?= htmlspecialchars($wrapStyle, ENT_QUOTES, 'UTF-8') ?>">

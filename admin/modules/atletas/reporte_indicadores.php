@@ -13,10 +13,7 @@ fvd_admin_require_roles();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'reset_marcador_atletas') {
     $rolSesion = trim((string) (AuthService::role() ?? ''));
-    if (!in_array($rolSesion, [
-        AuthService::ROLE_FVD_ADMIN,
-        AuthService::ROLE_DELEGADO_ASOC,
-    ], true)) {
+    if ($rolSesion !== AuthService::ROLE_FVD_ADMIN) {
         http_response_code(403);
         header('Content-Type: text/plain; charset=UTF-8');
         echo 'Sin permiso para reiniciar marcadores.';
@@ -150,10 +147,8 @@ $resetEtiquetas = [
     'inscripcion' => 'inscripción (+ torneo_id)',
 ];
 $rolSesionUi = trim((string) (AuthService::role() ?? ''));
-$fvdPuedeResetMarcadores = in_array($rolSesionUi, [
-    AuthService::ROLE_FVD_ADMIN,
-    AuthService::ROLE_DELEGADO_ASOC,
-], true);
+$fvdEsDelegadoAsoc = $rolSesionUi === AuthService::ROLE_DELEGADO_ASOC;
+$fvdPuedeResetMarcadores = $rolSesionUi === AuthService::ROLE_FVD_ADMIN;
 $fvdEsAdminAsociacion = $rolSesionUi === AuthService::ROLE_ASO_ADMIN;
 
 $columnas = $rows !== [] ? array_keys($rows[0]) : [];
@@ -166,20 +161,27 @@ $totalesVals = $totalesAlcance !== []
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
 <div class="report-container fvd-rep-indicadores" style="max-width:100%">
+    <p class="no-print" style="margin:0 0 .85rem">
+        <a href="/fvd_portal/fvdmasteradmin/delegado_dashboard_new.php"
+           class="inline-flex items-center text-black font-bold border-2 border-black px-4 py-2 rounded hover:bg-black hover:text-white transition-colors"
+           style="display:inline-flex;align-items:center;gap:.45rem;color:#000;font-weight:800;border:2px solid #000;padding:.5rem .9rem;border-radius:.45rem;text-decoration:none;transition:all .15s ease">
+            <i class="fas fa-arrow-left mr-2"></i> VOLVER AL PANEL
+        </a>
+    </p>
     <!-- fvd indicadores: bloque reinicio masivo v2026-04 -->
     <h1 class="fvd-atletas-title"><?= htmlspecialchars($h1Reporte, ENT_QUOTES, 'UTF-8') ?></h1>
     <?php if ($fvdPuedeResetMarcadores): ?>
     <p class="no-print" style="margin:0 0 .75rem;padding:10px 12px;border:2px solid #b91c1c;border-radius:8px;background:rgba(254,226,226,.35);font-size:.875rem;line-height:1.45">
-        <strong>Reinicio masivo de marcadores:</strong> el bloque <strong>«Reiniciar marcadores (poner en 0)»</strong> está justo debajo (botones rojos: carnet, traspaso, anualidad, afiliación, inscripciones).
-        Alcance según su sesión (FVD: todos los atletas; club: solo su asociación).
+        <strong>Reinicio masivo de marcadores:</strong> use los botones rojos más abajo (carnet, traspaso, anualidad, afiliación, inscripciones).
+        Alcance según su sesión (FVD: todos los atletas; asociación/delegado: solo su club).
     </p>
     <?php endif; ?>
-    <?php if ($marcadorFijo !== null): ?>
+    <?php if ($marcadorFijo !== null && !$fvdEsDelegadoAsoc): ?>
     <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 .75rem;line-height:1.45">
         Listado de <code>atletas</code> con el marcador indicado en <strong>1</strong> (y su alcance regional).
         Cada fila de la tabla coincide con la condición del título.
     </p>
-    <?php else: ?>
+    <?php elseif (!$fvdEsDelegadoAsoc): ?>
     <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 .75rem;line-height:1.45">
         Se listan filas de <code>atletas</code> con los campos <strong>afiliación, anualidad, carnet, traspaso e inscripción</strong> según el modo elegido.
         <strong>Cualquiera</strong>: al menos un indicador en 1. <strong>Todos</strong>: los cinco en 1.
@@ -296,7 +298,9 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         <?php if ($marcadorFijo !== null): ?>
         <input type="hidden" name="marcador" value="<?= htmlspecialchars($marcadorFijo, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="modo" value="cualquiera">
+        <?php if (!$fvdEsDelegadoAsoc): ?>
         <p style="margin:0;font-size:.75rem;color:var(--fvd-muted);max-width:28rem">Filtro fijo por marcador; no aplica el modo «cualquiera / todos».</p>
+        <?php endif; ?>
         <?php else: ?>
         <div>
             <label style="font-size:.75rem;color:var(--fvd-muted);display:block">Modo</label>

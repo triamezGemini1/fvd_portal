@@ -393,7 +393,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
                 <span style="opacity:0.55;cursor:not-allowed" title="Alta de atletas solo en fase 1 del calendario">Registrar atleta</span>
                 <?php endif; ?>
 
-                · <a href="<?= htmlspecialchars($appBase . '/modules/atletas/index.php?action=list', ENT_QUOTES, 'UTF-8') ?>">Fichas / carnets</a>
+                · <a href="<?= htmlspecialchars($appBase . '/modules/atletas/index.php?action=list&alcance=asociacion&asociacion_id=' . (int) ($myAid ?? 0), ENT_QUOTES, 'UTF-8') ?>">Fichas / carnets</a>
 
             </p>
 
@@ -690,7 +690,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
     --dt-text: #0f172a;
 
-    --dt-muted: #64748b;
+    --dt-muted: #5c6199;
 
     --dt-border: #e2e8f0;
 
@@ -1014,7 +1014,8 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 }
 
-.fvd-delegado-torneos__card-foot a { color: #2563eb; font-weight: 600; }
+.fvd-delegado-torneos__card-foot a { color: var(--fvd-azul, #2e3092); font-weight: 600; }
+.fvd-delegado-torneos__card-foot a:hover { color: #1e1b6e; }
 
 </style>
 

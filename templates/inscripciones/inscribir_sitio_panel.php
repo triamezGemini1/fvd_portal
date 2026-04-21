@@ -33,7 +33,7 @@ $fvdDelegadoVentanaMsg = is_array($vdDeleg) ? (string) ($vdDeleg['etiqueta_fase'
 </style>
 <?php endif; ?>
 
-<section class="fvd-insc-sitio<?= $fvdSitioSoloLectura ? ' fvd-insc-sitio--solo-lectura' : '' ?>" aria-label="<?= $tnom ?>">
+<section id="fvd-insc-sitio-panel" class="fvd-insc-sitio<?= $fvdSitioSoloLectura ? ' fvd-insc-sitio--solo-lectura' : '' ?>" aria-label="<?= $tnom ?>">
     <div class="fvd-insc-sitio__body">
         <?php if ($fvdNominaSoloLectura): ?>
             <p class="fvd-mod-msg" style="margin:0 0 0.75rem;font-size:0.875rem;border-left:4px solid #94a3b8;padding-left:10px;background:rgba(241,245,249,0.95);color:#334155">

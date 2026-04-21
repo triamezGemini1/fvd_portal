@@ -10,6 +10,13 @@ declare(strict_types=1);
 if (!function_exists('url')) {
     require_once dirname(__DIR__) . '/config/paths.php';
 }
+require_once __DIR__ . '/services/AuthService.php';
+AuthService::ensureSession();
+AuthService::requireLogin();
+if (!AuthService::isDelegadoAsociacion()) {
+    header('Location: ' . AuthService::loginUrl());
+    exit;
+}
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/services/MediaService.php';
 
@@ -69,6 +76,21 @@ if ($row === false) {
     http_response_code(404);
     echo 'Delegado no encontrado.';
     exit;
+}
+
+$fvdDelegadoDashboardUrl = url('fvdmasteradmin/delegado_dashboard_new.php');
+$notifActivas = 0;
+try {
+    $chkNf = $pdo->query("SHOW TABLES LIKE 'fvd_notificaciones'");
+    if ($chkNf !== false && $chkNf->fetchColumn() !== false) {
+        $stNf = $pdo->prepare(
+            'SELECT COUNT(*) FROM fvd_notificaciones WHERE delegado_id = :d AND visto_en IS NULL'
+        );
+        $stNf->execute([':d' => $uid]);
+        $notifActivas = (int) $stNf->fetchColumn();
+    }
+} catch (Throwable $e) {
+    $notifActivas = 0;
 }
 
 $msg = '';
@@ -171,8 +193,28 @@ $fotoCedulaUrl = ($hasFotoCedula && !empty($row['foto_cedula']))
 
 require __DIR__ . '/includes/layout_header.php';
 ?>
+<div class="fvd-delegado-perfil-resumen" style="max-width:42rem;margin:0 auto 1rem;color:#000;font-weight:700;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;">
+    <h1 style="margin:0 0 .75rem;font-size:1.35rem;font-weight:700;color:#000;">Tu perfil</h1>
+    <p style="margin:.35rem 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
+        Nombre: <?= htmlspecialchars(trim((string) ($row['nombre_contacto'] ?? '')) !== '' ? (string) $row['nombre_contacto'] : '—', ENT_QUOTES, 'UTF-8') ?>
+    </p>
+    <p style="margin:.35rem 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
+        Correo: <?= htmlspecialchars((string) ($row['email_acceso'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+    </p>
+    <p style="margin:.35rem 0 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
+        Asociación: <?= htmlspecialchars((string) ($row['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+    </p>
+</div>
+<?php if ($notifActivas > 0): ?>
+<a href="<?= htmlspecialchars($fvdDelegadoDashboardUrl, ENT_QUOTES, 'UTF-8') ?>"
+   class="fvd-delegado-notif-banner"
+   style="display:block;max-width:42rem;margin:0 auto 1.25rem;box-sizing:border-box;padding:1rem 1.25rem;background:#FFEB3E;color:#000;font-weight:700;font-size:1.2rem;text-align:center;text-decoration:none;border:3px solid #000;border-radius:10px;line-height:1.35;cursor:pointer;box-shadow:0 4px 0 #000;">
+    TIENES <?= $notifActivas ?> NOTIFICACIONES ACTIVAS
+</a>
+<?php endif; ?>
+
 <div class="fvd-card" style="max-width:36rem">
-    <h1>Mi perfil (delegado)</h1>
+    <h1 style="color:#000;font-weight:700;">Mi perfil (delegado)</h1>
     <p style="font-size:0.8125rem;color:var(--fvd-muted)">Asociación: <strong><?= htmlspecialchars((string) ($row['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong></p>
     <?php if ($msg !== ''): ?><p class="fvd-mod-msg" style="color:#86efac"><?= htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
     <?php if ($err !== ''): ?><p class="fvd-mod-msg"><?= htmlspecialchars($err, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>

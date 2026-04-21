@@ -7,11 +7,25 @@ require_once dirname(__DIR__) . '/config/paths.php';
 require_once __DIR__ . '/includes/vite_assets.php';
 require_once __DIR__ . '/includes/fvd_brand.php';
 require_once dirname(__DIR__) . '/src/Views/Delegado/Dashboard.php';
+require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
 
 AuthService::ensureSession();
 AuthService::requireLogin();
 
-if (!AuthService::isDelegadoAsociacion()) {
+$adminPortalDelegado = false;
+if (AuthService::isDelegadoAsociacion()) {
+    // flujo delegado estándar
+} elseif (AuthService::isSuperAdmin()) {
+    $portalAid = AuthService::adminPortalDelegadoAsociacionId();
+    if ($portalAid === null || $portalAid <= 0) {
+        if (!function_exists('fvd_append_embed_to_url')) {
+            require_once dirname(__DIR__) . '/config/fvd_navigation_return.php';
+        }
+        header('Location: ' . fvd_append_embed_to_url(url('fvdmasteradmin/operaciones/portal_mirror.php')), true, 302);
+        exit;
+    }
+    $adminPortalDelegado = true;
+} else {
     header('Location: ' . url('login.php'), true, 302);
     exit;
 }
@@ -34,7 +48,44 @@ $stats = [
     'inscritos' => 0,
 ];
 $torneoStats = [];
-$asociacionId = (int) (AuthService::idAsociacion() ?? 0);
+$asociacionId = $adminPortalDelegado
+    ? (int) (AuthService::adminPortalDelegadoAsociacionId() ?? 0)
+    : (int) (AuthService::idAsociacion() ?? 0);
+
+$delegadoUidInt = (int) (AuthService::userId() ?? 0);
+$delegInvitacionesAgrupadas = [];
+$delegInvitacionesPendientes = 0;
+if (!$adminPortalDelegado && $delegadoUidInt > 0 && $asociacionId > 0) {
+    try {
+        $ctxPrev = AuthService::delegadoTorneoContextId();
+        if (($ctxPrev === null || (int) $ctxPrev <= 0)) {
+            $sug = \FvdPortal\Services\DelegadoTorneoNotifService::sugerirContextoDesdeInvitacionesPendientes(
+                $pdo,
+                $delegadoUidInt,
+                $asociacionId
+            );
+            if ((int) ($sug['torneo_id'] ?? 0) > 0) {
+                AuthService::setDelegadoTorneoContext((int) $sug['torneo_id']);
+            }
+            if ((int) ($sug['grupo_evento_id'] ?? 0) > 0) {
+                AuthService::setDelegadoCampeonatoGrupo((int) $sug['grupo_evento_id']);
+            }
+        }
+        $delegInvitacionesAgrupadas = \FvdPortal\Services\DelegadoTorneoNotifService::listarParaDelegadoVistaAgrupada(
+            $pdo,
+            $delegadoUidInt,
+            24,
+            $asociacionId
+        );
+        $delegInvitacionesPendientes = \FvdPortal\Services\DelegadoTorneoNotifService::contarPendientesVistaAgrupada(
+            $pdo,
+            $delegadoUidInt,
+            $asociacionId
+        );
+    } catch (Throwable $e) {
+        error_log('[delegado_dashboard_new invitaciones] ' . $e->getMessage());
+    }
+}
 
 if ($asociacionId > 0) {
     try {
@@ -144,23 +195,119 @@ $logoutUrl = AuthService::logoutUrl();
 $panelUrl = AuthService::homeUrl();
 $torneoCtx = (int) (AuthService::delegadoTorneoContextId() ?? 0);
 $campeonatoCtx = (int) (AuthService::delegadoCampeonatoGrupoId() ?? 0);
-$qTorneo = [];
-if ($torneoCtx > 0) {
-    $qTorneo['torneo_id'] = $torneoCtx;
-} elseif (isset($torneoStats[0]['torneo_id']) && (int) $torneoStats[0]['torneo_id'] > 0) {
-    $qTorneo['torneo_id'] = (int) $torneoStats[0]['torneo_id'];
+
+$torneoActualId = $torneoCtx > 0
+    ? $torneoCtx
+    : (isset($torneoStats[0]['torneo_id']) && (int) $torneoStats[0]['torneo_id'] > 0 ? (int) $torneoStats[0]['torneo_id'] : 0);
+
+$grupoDesdeTorneo = 0;
+$nomTorneoDb = '';
+if ($torneoActualId > 0) {
+    try {
+        $stCur = $pdo->prepare('SELECT nombre, grupo_evento_id FROM torneosact WHERE torneo = :t LIMIT 1');
+        $stCur->execute([':t' => $torneoActualId]);
+        $tcur = $stCur->fetch(PDO::FETCH_ASSOC);
+        if (is_array($tcur)) {
+            $nomTorneoDb = trim((string) ($tcur['nombre'] ?? ''));
+            $rawGid = $tcur['grupo_evento_id'] ?? null;
+            if ($rawGid !== null && $rawGid !== '' && (int) $rawGid > 0) {
+                $grupoDesdeTorneo = (int) $rawGid;
+            }
+        }
+    } catch (Throwable $e) {
+        /* Esquema sin grupo_evento_id o error puntual. */
+    }
 }
-if ($campeonatoCtx > 0) {
-    $qTorneo['campeonato_id'] = $campeonatoCtx;
+
+$campeonatoParaUrl = $campeonatoCtx > 0 ? $campeonatoCtx : ($grupoDesdeTorneo > 0 ? $grupoDesdeTorneo : 0);
+if ($grupoDesdeTorneo > 0 && $campeonatoCtx <= 0) {
+    AuthService::setDelegadoCampeonatoGrupo($grupoDesdeTorneo);
+}
+
+$qTorneo = [];
+if ($torneoActualId > 0) {
+    $qTorneo['torneo_id'] = $torneoActualId;
+}
+if ($campeonatoParaUrl > 0) {
+    $qTorneo['campeonato_id'] = $campeonatoParaUrl;
+}
+if ($adminPortalDelegado && $asociacionId > 0) {
+    $qTorneo['asociacion_id'] = $asociacionId;
 }
 $qTorneoStr = $qTorneo !== [] ? ('?' . http_build_query($qTorneo)) : '';
+
+$msgCampeonatoObl = 'Debe indicar el campeonato (parámetro obligatorio campeonato_id en la URL). Use el ID de grupo de evento o el ID de uno de los torneos del campeonato.';
+$inscripcionesCtx = [
+    'torneo_id'              => $torneoActualId,
+    'torneo_nombre'          => $nomTorneoDb,
+    'torneos_en_grupo'       => 0,
+    'grupo_evento_id'        => $grupoDesdeTorneo > 0 ? $grupoDesdeTorneo : null,
+    'url_destino'            => '',
+    'campeonato_en_url'      => $campeonatoParaUrl,
+    'msg_campeonato_obligatorio' => $msgCampeonatoObl,
+];
+if ($grupoDesdeTorneo > 0) {
+    try {
+        $stCnt = $pdo->prepare('SELECT COUNT(*) FROM torneosact WHERE grupo_evento_id = :g');
+        $stCnt->execute([':g' => $grupoDesdeTorneo]);
+        $inscripcionesCtx['torneos_en_grupo'] = (int) $stCnt->fetchColumn();
+    } catch (Throwable $e) {
+        $inscripcionesCtx['torneos_en_grupo'] = 0;
+    }
+}
+if ($inscripcionesCtx['torneo_nombre'] === '' && isset($torneoStats[0]['torneo_nombre'])) {
+    $inscripcionesCtx['torneo_nombre'] = (string) $torneoStats[0]['torneo_nombre'];
+}
+
+$qAfiliaciones = [
+    'action' => 'list',
+    'alcance' => 'asociacion',
+    'asociacion_id' => $asociacionId > 0 ? $asociacionId : 0,
+];
+$finDeudaUrl = fvd_master_module_url('deuda_asociacion/index.php');
+if ($asociacionId > 0 && $torneoActualId > 0) {
+    $finDeudaUrl .= '?action=form&tid=' . $torneoActualId . '&aid=' . $asociacionId;
+} elseif ($asociacionId > 0) {
+    $finDeudaUrl .= '?action=list';
+}
+
+$finPagosUrl = fvd_master_module_url('relacion_pago/index.php');
+if ($asociacionId > 0) {
+    $finPagosUrl .= '?' . http_build_query(['aid' => $asociacionId]);
+}
+
 $actionUrls = [
-    'afiliaciones' => url('fvdmasteradmin/solicitud_afiliacion.php'),
+    'afiliaciones' => fvd_master_module_url('atletas/index.php?' . http_build_query($qAfiliaciones)),
     'carnets' => url('fvdmasteradmin/solicitud_carnet.php'),
     'transferencias' => url('fvdmasteradmin/solicitud_traspaso.php'),
-    'inscribir_torneo' => fvd_master_module_url('torneo_inscripcion/index.php' . $qTorneoStr),
+    'inscribir_torneo' => admin_module_url('torneo_inscripcion/index.php' . $qTorneoStr),
     'administrar_inscripciones' => fvd_master_module_url('inscripcion_torneo/index.php' . $qTorneoStr),
+    'finanzas_situacion' => $finDeudaUrl,
+    'finanzas_pagos' => $finPagosUrl,
+    'detalle_atletas_afiliados' => url('atleta/index.php'),
+    'detalle_afiliaciones' => url('atleta/index.php'),
+    'detalle_carnets' => url('atleta/index.php?filter=carnets'),
+    'detalle_anualidades' => '',
+    'detalle_traspasos' => url('atleta/index.php?filter=traspasos'),
+    'detalle_inscritos' => url('torneos/inscripciones.php'),
 ];
+$inscripcionesCtx['url_destino'] = (string) ($actionUrls['inscribir_torneo'] ?? '');
+
+$avisoTorneoPanel = '';
+if ($torneoActualId <= 0) {
+    $avisoTorneoPanel = 'No hay torneo disponible ni activo: no tiene un torneo fijado en la sesión y no hay datos que permitan determinar un evento (por ejemplo, atletas vinculados a un torneo o convocatoria abierta). Revise invitaciones en la barra superior o espere a que la federación asigne el contexto del evento.';
+} elseif ($campeonatoParaUrl <= 0) {
+    $avisoTorneoPanel = 'No se puede determinar el campeonato (grupo de evento) del torneo en contexto. Las inscripciones y enlaces por evento quedan deshabilitados hasta que el torneo esté vinculado correctamente en la base de datos.';
+}
+$inscripcionesCtx['aviso_torneo_panel'] = $avisoTorneoPanel;
+
+$adminPortalCambiarAsocUrl = '';
+if ($adminPortalDelegado) {
+    if (!function_exists('fvd_append_embed_to_url')) {
+        require_once dirname(__DIR__) . '/config/fvd_navigation_return.php';
+    }
+    $adminPortalCambiarAsocUrl = fvd_append_embed_to_url(url('fvdmasteradmin/operaciones/portal_mirror.php'));
+}
 
 \FvdPortal\Views\Delegado\Dashboard::render(
     $stats,
@@ -172,5 +319,11 @@ $actionUrls = [
     $panelUrl,
     $brandLogoUrl,
     $actionUrls,
-    $viteTags
+    $viteTags,
+    $inscripcionesCtx,
+    $adminPortalDelegado,
+    $adminPortalCambiarAsocUrl,
+    $delegInvitacionesAgrupadas,
+    $delegInvitacionesPendientes,
+    rtrim((string) (defined('BASE_URL') ? BASE_URL : ''), '/')
 );

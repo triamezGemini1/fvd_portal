@@ -40,6 +40,13 @@ $fvd_page_title = 'Reporte traspasos';
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
 <div class="report-container" style="max-width:64rem">
+    <p class="no-print" style="margin:0 0 .85rem">
+        <a href="/fvd_portal/fvdmasteradmin/delegado_dashboard_new.php"
+           class="inline-flex items-center text-black font-bold border-2 border-black px-4 py-2 rounded hover:bg-black hover:text-white transition-colors"
+           style="display:inline-flex;align-items:center;gap:.45rem;color:#000;font-weight:800;border:2px solid #000;padding:.5rem .9rem;border-radius:.45rem;text-decoration:none;transition:all .15s ease">
+            <i class="fas fa-arrow-left mr-2"></i> VOLVER AL PANEL
+        </a>
+    </p>
     <h1 class="fvd-atletas-title">Historial de traspasos</h1>
     <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 1rem">
         Movimientos registrados en <code>log_traspasos</code>; el atleta queda con <code>atletas.traspaso = 1</code>. Registros: <strong><?= count($rows) ?></strong> (máx. 500).

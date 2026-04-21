@@ -21,7 +21,8 @@ if ($fvd_form_repost !== null && $fvd_form_repost !== []) {
         $r['monto_dolares'] = $fvd_form_repost['monto_eur'];
     }
 }
-$isEdit = $rowDb !== null;
+/* Alta nueva puede traer solo asociacion_id (sin id); solo consulta si ya existe recibo en BD */
+$isEdit = $rowDb !== null && isset($rowDb['id']) && (int) $rowDb['id'] > 0;
 $fvdSoloConsulta = $isEdit;
 
 $legacyTipo = ['efectivo' => 'efectivo_bs', 'transferencia' => 'transferencia_bs', 'pago_movil' => 'pago_movil_bs'];
@@ -305,7 +306,7 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
             <a href="<?= htmlspecialchars($fvdBcvTasasUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Abrir tipo de cambio oficial del BCV (euro y otras monedas)</a>
         </p>
 
-        <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : '')), ENT_QUOTES, 'UTF-8') ?>" id="fvd-form-relacion-pago"<?= $fvdSoloConsulta ? ' onsubmit="return false"' : '' ?>>
+        <form method="post" action="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) ($r['id'] ?? 0) : '')), ENT_QUOTES, 'UTF-8') ?>" id="fvd-form-relacion-pago"<?= $fvdSoloConsulta ? ' onsubmit="return false"' : '' ?>>
             <?php if (!$fvdSoloConsulta): ?>
                 <input type="hidden" name="_action" value="save">
             <?php endif; ?>

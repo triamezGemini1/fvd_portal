@@ -104,6 +104,20 @@ if (!function_exists('fvd_return_append_to_url')) {
     }
 }
 
+if (!function_exists('fvd_return_to_module_index')) {
+    /**
+     * URL al índice/listado de un módulo sin usar la página actual como ret:
+     * solo conserva ret/return si ya venían en la petición (evita anidar el detalle
+     * sobre el listado y romper la cadena hacia el panel u otras pantallas).
+     */
+    function fvd_return_to_module_index(string $moduleIndexUrl): string
+    {
+        $prev = fvd_return_from_request();
+
+        return fvd_return_append_to_url($moduleIndexUrl, $prev !== null ? $prev : '');
+    }
+}
+
 if (!function_exists('fvd_return_merge_get_params')) {
     /**
      * Copia ret o return válidos del GET actual para conservarlos en paginación / filtros.

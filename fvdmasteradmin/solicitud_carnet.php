@@ -40,6 +40,7 @@ require __DIR__ . '/includes/layout_header.php';
     <h1>Solicitar carnet (revisión FVD)</h1>
     <p style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 1rem">
         En <strong>Gestión fichas / carnets</strong> puede marcar <strong>Registrar carnet solicitado</strong> (<code>carnet=1</code>).
+        Ese marcador y las solicitudes de aquí quedan asociadas al <strong>torneo activo del panel</strong> (seleccione el torneo entrando por invitación al evento, según el calendario).
         Este formulario envía la solicitud al administrador general para revisión.
     </p>
     <?php if ($solMsg): ?><p class="fvd-mod-msg" style="color:#86efac">Solicitud registrada. El administrador general la revisará.</p><?php endif; ?>

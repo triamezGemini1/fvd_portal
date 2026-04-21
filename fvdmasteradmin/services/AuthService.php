@@ -59,6 +59,9 @@ class AuthService
     /** Grupo de evento (campeonato vinculado: M/F/juvenil) para inscripciones y reportes del delegado. */
     private const SESSION_DELEGADO_CAMPEONATO_GRUPO = 'fvd_delegado_campeonato_grupo_id';
 
+    /** Asociación elegida en el portal asociación (admin FVD en vista delegado). */
+    private const SESSION_ADMIN_PORTAL_DELEGADO_ASOC = 'fvd_admin_portal_delegado_asoc_id';
+
     /** @var string Código interno del último fallo (solo para depuración con APP_DEBUG). */
     private static $lastLoginFailure = '';
 
@@ -248,6 +251,38 @@ class AuthService
     }
 
     /**
+     * Asociación en la que el administrador FVD está «actuando como delegado» (portal asociación).
+     */
+    public static function adminPortalDelegadoAsociacionId(): ?int
+    {
+        self::ensureSession();
+        if (!self::isSuperAdmin()) {
+            return null;
+        }
+        if (!isset($_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC])) {
+            return null;
+        }
+        $v = (int) $_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC];
+
+        return $v > 0 ? $v : null;
+    }
+
+    public static function setAdminPortalDelegadoAsociacionId(int $asociacionId): void
+    {
+        self::ensureSession();
+        if (!self::isSuperAdmin() || $asociacionId <= 0) {
+            return;
+        }
+        $_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC] = $asociacionId;
+    }
+
+    public static function clearAdminPortalDelegadoAsociacionId(): void
+    {
+        self::ensureSession();
+        unset($_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC]);
+    }
+
+    /**
      * Torneo activo en modo administración restringida (solo rol delegado).
      */
     public static function delegadoTorneoContextId(): ?int
@@ -409,7 +444,7 @@ class AuthService
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
         }
-        unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX]);
+        unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX], $_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC]);
         $_SESSION[self::SESSION_KEY] = [
             'auth_source'    => 'fvd_usuario',
             'id'             => (int) $row['id'],
@@ -434,7 +469,7 @@ class AuthService
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
         }
-        unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX]);
+        unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX], $_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC]);
         $_SESSION[self::SESSION_KEY] = [
             'auth_source'    => 'delegado',
             'id'             => (int) $row['id'],
@@ -449,7 +484,7 @@ class AuthService
     public static function logout(): void
     {
         self::ensureSession();
-        unset($_SESSION[self::SESSION_KEY]);
+        unset($_SESSION[self::SESSION_KEY], $_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC]);
     }
 
     /**
@@ -680,7 +715,7 @@ class AuthService
     {
         $base = self::appWebBase();
         if (self::isDelegadoAsociacion()) {
-            return $base . '/fvdmasteradmin/delegado_dashboard_new.php';
+            return $base . '/fvdmasteradmin/perfil_delegado.php';
         }
         if (self::role() === self::ROLE_FVD_ADMIN) {
             return $base . '/fvdmasteradmin/master_panel.php';

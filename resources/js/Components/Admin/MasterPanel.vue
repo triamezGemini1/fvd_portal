@@ -50,9 +50,8 @@ const WORKSPACE_LABELS = {
   'servicios/torneos': 'Torneos',
   'servicios/atletas_reset': 'Reiniciar atletas',
   'operaciones/torneos': 'Gestión de torneos',
-  'operaciones/assoc_torneo': 'Relación entre torneos (mismo día)',
-  'operaciones/invitaciones': 'Invitaciones',
-  'operaciones/portal_assoc': 'Portal asociación',
+  'operaciones/assoc_torneo': 'Asociar torneos',
+  'operaciones/portal_assoc': 'Panel delegado (asociaciones)',
   'operaciones/torneos/editar': 'Editar torneos',
   'operaciones/inscripciones': 'Inscripciones',
   'operaciones/asociar/torneo': 'Asociar torneo',
@@ -67,9 +66,8 @@ const WORKSPACE_LABELS = {
   carnets: 'Carnets',
   'torneos/crear': 'Crear torneo',
   'torneos/asociar': 'Inscripciones al torneo',
-  'torneos/invitar': 'Invitaciones',
   'operaciones/enlace-simultaneo': 'Asociar torneos (simultáneos)',
-  'operaciones/portal-asociacion': 'Portal asociación',
+  'operaciones/portal-asociacion': 'Asociaciones (CRUD)',
   'finanzas/deudas': 'Deudas',
   'finanzas/pagos': 'Pagos',
   'finanzas/consolidado': 'Reporte consolidado de deudas',
@@ -116,6 +114,8 @@ const partnerLogos = computed(() => {
   const list = dashboardState.value.partnerLogos;
   return Array.isArray(list) ? list : [];
 });
+
+const adminNotificationsUnread = computed(() => Number(dashboardState.value.adminNotificationsUnread ?? 0));
 
 const hasAssociatedTournaments = computed(
   () =>
@@ -375,6 +375,21 @@ defineExpose({ dashboardState, navigateToModule, goHome });
         </div>
 
         <div class="flex shrink-0 items-center gap-2 sm:gap-4">
+          <div
+            class="relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm"
+            :aria-label="adminNotificationsUnread > 0 ? adminNotificationsUnread + ' notificaciones sin leer' : 'Sin notificaciones nuevas'"
+            role="status"
+            title="Notificaciones del panel"
+          >
+            <span aria-hidden="true">🔔</span>
+            <span
+              v-if="adminNotificationsUnread > 0"
+              class="absolute -right-1 -top-1 inline-flex min-w-[1.05rem] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold leading-4 text-white"
+            >
+              {{ adminNotificationsUnread > 99 ? '99+' : adminNotificationsUnread }}
+            </span>
+          </div>
+
           <div
             v-if="hasAssociatedTournaments"
             class="rounded border border-white/20 bg-white/10 px-2 py-1"

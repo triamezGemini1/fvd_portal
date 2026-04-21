@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/FvdModuleController.php';
+require_once dirname(__DIR__, 3) . '/src/Services/NotificacionService.php';
 
 class AtletasController extends FvdModuleController
 {
@@ -121,6 +122,11 @@ class AtletasController extends FvdModuleController
             $data['asociacion'] = $mine;
         }
 
+        if ($id === null && AuthService::isDelegadoAsociacion()) {
+            $data['numfvd'] = 0;
+            $data['estatus'] = \FvdAdminService::ATLETA_ESTATUS_PENDIENTE_ADMIN;
+        }
+
         $uploadDir = $this->projectRoot() . DIRECTORY_SEPARATOR . 'crud_atletas' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR;
         if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
             throw new RuntimeException('No se pudo crear uploads de atletas.');
@@ -142,6 +148,44 @@ class AtletasController extends FvdModuleController
 
         if ($id === null) {
             self::insert($this->pdo, self::TABLE, $data, self::ALLOW_PERSIST);
+            $newAtletaId = (int) $this->pdo->lastInsertId();
+            if (AuthService::isDelegadoAsociacion()) {
+                $adminId = \FvdPortal\Services\NotificacionService::resolverAdminGeneralId($this->pdo);
+                $asocNombre = 'Una asociación';
+                try {
+                    $mineAsoc = (int) (AuthService::idAsociacion() ?? 0);
+                    if ($mineAsoc > 0) {
+                        $stA = $this->pdo->prepare('SELECT nombre FROM asociaciones WHERE id = :id LIMIT 1');
+                        $stA->execute([':id' => $mineAsoc]);
+                        $nm = trim((string) ($stA->fetchColumn() ?: ''));
+                        if ($nm !== '') {
+                            $asocNombre = $nm;
+                        }
+                    }
+                } catch (Throwable $e) {
+                    // fallback
+                }
+                $nombreAtleta = trim((string) ($data['nombre'] ?? ''));
+                if ($nombreAtleta === '') {
+                    $nombreAtleta = 'Atleta #' . $newAtletaId;
+                }
+                \FvdPortal\Services\NotificacionService::crear(
+                    $this->pdo,
+                    $adminId,
+                    'NUEVO_AFILIADO',
+                    $asocNombre . ' ha ingresado un nuevo atleta: ' . $nombreAtleta
+                );
+
+                try {
+                    $stCol = $this->pdo->query("SHOW COLUMNS FROM atletas LIKE 'estatus_verificacion'");
+                    if ($stCol !== false && $stCol->fetchColumn() !== false && $newAtletaId > 0) {
+                        $stUp = $this->pdo->prepare("UPDATE atletas SET estatus_verificacion = 'PENDIENTE' WHERE id = :id");
+                        $stUp->execute([':id' => $newAtletaId]);
+                    }
+                } catch (Throwable $e) {
+                    // compatibilidad
+                }
+            }
         } else {
             if ($prevRow === null) {
                 throw new InvalidArgumentException('Atleta no encontrado.');

@@ -11,8 +11,10 @@ $fvd_toggle_atleta = \AuthService::isSuperAdmin();
 $fotoFn = isset($r['foto']) ? trim((string) $r['foto']) : '';
 $cel = isset($r['celular']) ? trim((string) $r['celular']) : '';
 $aid = (int) $r['id'];
-$mostrarSolCarnet = isset($fvd_url_solicitud_carnet_base) && is_string($fvd_url_solicitud_carnet_base) && $fvd_url_solicitud_carnet_base !== ''
+$mostrarSolDelegado = isset($fvd_url_solicitud_carnet_base) && is_string($fvd_url_solicitud_carnet_base) && $fvd_url_solicitud_carnet_base !== ''
     && \AuthService::checkAccess([\AuthService::ROLE_ASO_ADMIN, \AuthService::ROLE_DELEGADO_ASOC]);
+$mostrarTraspasoDelegado = $mostrarSolDelegado
+    && isset($fvd_url_solicitud_traspaso_base) && is_string($fvd_url_solicitud_traspaso_base) && $fvd_url_solicitud_traspaso_base !== '';
 $dash = "\xE2\x80\x94";
 $estAt = (int) ($r['estatus'] ?? 0);
 $esBaja = $estAt === \FvdAdminService::ATLETA_ESTATUS_BAJA;
@@ -41,13 +43,6 @@ $fvdRetRowKey = isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_san
     <td class="fvd-col-asoc"><?php $an = isset($r['asociacion_nombre']) ? trim((string) $r['asociacion_nombre']) : ''; echo $an !== '' ? htmlspecialchars($an, ENT_QUOTES, 'UTF-8') : $dash; ?></td>
     <?php endif; ?>
     <td class="fvd-col-contact fvd-col-cel"><?= $cel !== '' ? htmlspecialchars($cel, ENT_QUOTES, 'UTF-8') : $dash ?></td>
-    <td class="fvd-col-sol-carnet">
-        <?php if ($mostrarSolCarnet): ?>
-            <a class="fvd-atleta-sol-carnet" href="<?= htmlspecialchars(fvd_return_append_to_url($fvd_url_solicitud_carnet_base . '?atleta_id=' . $aid), ENT_QUOTES, 'UTF-8') ?>">Solicitar carnet</a>
-        <?php else: ?>
-            <?= $dash ?>
-        <?php endif; ?>
-    </td>
     <td class="fvd-col-tech fvd-col-sexo"><?= (int) ($r['sexo'] ?? 0) ?></td>
     <td class="fvd-col-tech fvd-col-numfvd"><?php $nf = (int) ($r['numfvd'] ?? 0); echo $nf > 0 ? (string) $nf : $dash; ?></td>
     <td class="fvd-col-tech fvd-col-categ"><?= htmlspecialchars(FvdAdminService::atletasCategoriaEtiquetaPorCodigo((int) ($r['categ'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></td>
@@ -82,9 +77,16 @@ $fvdRetRowKey = isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_san
                     </button>
                 </form>
             <?php endif; ?>
-            <a class="fvd-icon-btn fvd-action-ficha-only" href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=carnets&ids=' . $aid), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="Solicitud de carnet">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
-            </a>
+            <?php if ($mostrarSolDelegado && !$esBaja): ?>
+                <a class="fvd-atleta-ficha-txt" href="<?= htmlspecialchars(fvd_return_append_to_url($fvd_url_solicitud_carnet_base . '?atleta_id=' . $aid), ENT_QUOTES, 'UTF-8') ?>">Carnet</a>
+            <?php else: ?>
+                <a class="fvd-icon-btn fvd-action-ficha-only" href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=carnets&ids=' . $aid), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="Vista carnet / ficha">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
+                </a>
+            <?php endif; ?>
+            <?php if ($mostrarTraspasoDelegado && !$esBaja): ?>
+                <a class="fvd-atleta-ficha-txt" href="<?= htmlspecialchars(fvd_return_append_to_url($fvd_url_solicitud_traspaso_base . '?atleta_id=' . $aid), ENT_QUOTES, 'UTF-8') ?>">Transferencia</a>
+            <?php endif; ?>
             <?php if ($fvd_puede_traspaso): ?>
                 <a class="fvd-icon-btn fvd-action-ficha-only" href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=traspaso&id=' . $aid), ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" title="Solicitar traspaso de asociación">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>

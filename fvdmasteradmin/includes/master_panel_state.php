@@ -24,6 +24,7 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
     require_once $projRoot . '/src/Services/FvdAdminRevisionPendienteService.php';
     require_once $projRoot . '/src/Services/DelegadoSolicitudService.php';
     require_once $projRoot . '/src/Services/MasterPanelContextService.php';
+    require_once $projRoot . '/src/Services/NotificacionService.php';
 
     $stats = FvdDashboardStats::counts();
     $rev = \FvdPortal\Services\FvdAdminRevisionPendienteService::conteos($pdo);
@@ -51,7 +52,7 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
         'operaciones/torneos' => url('fvdmasteradmin/operaciones/gestion.php'),
         // Mismo día / grupo compartido (relacion_grupo), no inscripción asociación–torneo
         'operaciones/assoc_torneo' => url('fvdmasteradmin/operaciones/vinculacion.php'),
-        'operaciones/invitaciones' => url('fvdmasteradmin/operaciones/invitaciones.php'),
+        // Selector de asociación → panel delegado (vista como delegado)
         'operaciones/portal_assoc' => url('fvdmasteradmin/operaciones/portal_mirror.php'),
 
         'finanzas/general' => url('fvdmasteradmin/reportes/consolidado_finanzas.php'),
@@ -71,7 +72,6 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
         'carnets' => admin_module_url('solicitudes_delegado/index.php?tipo=carnet_afiliacion'),
         'torneos/crear' => admin_module_url('torneos/index.php?action=form'),
         'torneos/asociar' => admin_module_url('torneo_inscripcion/index.php'),
-        'torneos/invitar' => admin_module_url('invitaciones/index.php'),
         'operaciones/enlace-simultaneo' => admin_module_url('torneos/index.php?action=relacion_grupo'),
         'operaciones/portal-asociacion' => $urlAsociaciones,
         'finanzas/deudas' => admin_module_url('deuda_asociacion/index.php'),
@@ -87,6 +87,7 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
     $urlSolicitudesEmb = fvd_append_embed_to_url($urlSolicitudes);
 
     $pendingPagosVerificar = 0;
+    $alerts = [];
 
     $recentEvents = [];
     $tsRows = [];
@@ -150,6 +151,27 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
         $recentEvents[] = $ev;
     }
 
+    $adminNotifUnread = [];
+    try {
+        $adminNotifUnread = \FvdPortal\Services\NotificacionService::listarNoLeidas(
+            $pdo,
+            AuthService::userId(),
+            8
+        );
+        foreach ($adminNotifUnread as $n) {
+            $msg = trim((string) ($n['mensaje'] ?? ''));
+            if ($msg === '') {
+                continue;
+            }
+            $alerts[] = [
+                'id' => 'admin-notif-' . (int) ($n['id'] ?? 0),
+                'msg' => $msg,
+            ];
+        }
+    } catch (Throwable $e) {
+        error_log('[master_panel notificaciones] ' . $e->getMessage());
+    }
+
     $contextTorneos = MasterPanelContextService::listTorneosConGrupo($pdo);
     $showContextSelector = count($contextTorneos) >= 2;
 
@@ -208,8 +230,8 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
     ) {
         $delegadoPanel = true;
         $delegadoDashboardEmbeddedUrl = function_exists('fvd_append_embed_to_url')
-            ? fvd_append_embed_to_url(url('fvdmasteradmin/delegado_dashboard.php'))
-            : url('fvdmasteradmin/delegado_dashboard.php');
+            ? fvd_append_embed_to_url(url('fvdmasteradmin/delegado_dashboard_new.php'))
+            : url('fvdmasteradmin/delegado_dashboard_new.php');
     } elseif (
         !$isAdminGralState
         && AuthService::isDelegadoAsociacion()
@@ -217,8 +239,8 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
     ) {
         $delegadoPanel = true;
         $delegadoDashboardEmbeddedUrl = function_exists('fvd_append_embed_to_url')
-            ? fvd_append_embed_to_url(url('fvdmasteradmin/delegado_dashboard.php'))
-            : url('fvdmasteradmin/delegado_dashboard.php');
+            ? fvd_append_embed_to_url(url('fvdmasteradmin/delegado_dashboard_new.php'))
+            : url('fvdmasteradmin/delegado_dashboard_new.php');
     }
 
     return [
@@ -228,7 +250,8 @@ function fvd_master_panel_build_initial_state(PDO $pdo, ?int $contextTorneoId): 
         'pendingPayments' => $pendingPagosVerificar,
         'pendingAthletesLabel' => $nAltas . ' atleta' . ($nAltas === 1 ? '' : 's'),
         'activeTournaments' => (int) ($stats['torneos'] ?? 0),
-        'alerts' => [],
+        'alerts' => $alerts,
+        'adminNotificationsUnread' => count($adminNotifUnread),
         'recentEvents' => $recentEvents,
         'workspaceRoutes' => $workspaceRoutes,
         'actionUrls' => [

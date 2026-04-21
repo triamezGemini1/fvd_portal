@@ -44,7 +44,7 @@ $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
         </select>
     </label>
     <button type="submit" class="fvd-btn fvd-btn--primary" style="padding:8px 16px">Ver estadísticas</button>
-    <a class="fvd-btn fvd-btn--ghost" style="padding:8px 16px;text-decoration:none;display:inline-block" href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver a deudas</a>
+    <a class="fvd-btn fvd-btn--ghost" style="padding:8px 16px;text-decoration:none;display:inline-block" href="<?= htmlspecialchars(fvd_return_to_module_index($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver a deudas</a>
 </form>
 
 <?php if ($tidStats > 0): ?>

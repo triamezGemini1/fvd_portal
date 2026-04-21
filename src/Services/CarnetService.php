@@ -9,6 +9,8 @@ use PDOException;
 use RuntimeException;
 
 require_once dirname(__DIR__, 2) . '/config/paths.php';
+require_once dirname(__DIR__, 2) . '/fvdmasteradmin/services/AuthService.php';
+require_once __DIR__ . '/DelegadoTorneoVentanasService.php';
 
 /**
  * Carnet: la columna `atletas.carnet` en BD es el marcador para informes y estadísticas.
@@ -109,8 +111,21 @@ final class CarnetService
         return $safe;
     }
 
+    private static function torneoMovimientoHistoricoTableExists(PDO $pdo): bool
+    {
+        try {
+            $pdo->query('SELECT 1 FROM torneo_movimiento_historico LIMIT 0');
+
+            return true;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
     /**
      * Marca `atletas.carnet` = 1 (carnet solicitado) para informes y paneles.
+     * Delegado: exige torneo en contexto (panel / invitación), ventana de fase 1, alinea `torneo_id` si faltaba
+     * y registra movimiento en `torneo_movimiento_historico` cuando la tabla existe.
      *
      * @param list<int> $ids
      */
@@ -126,19 +141,113 @@ final class CarnetService
             require_once $legacy;
         }
 
+        $esDelegado = \AuthService::isDelegadoAsociacion();
+        $ctxTorneo = null;
+        if ($esDelegado) {
+            $ctxTorneo = \AuthService::delegadoTorneoContextId();
+            if ($ctxTorneo === null || $ctxTorneo <= 0) {
+                throw new RuntimeException(
+                    'Debe seleccionar el torneo desde el panel (entrada por invitación) para enviar solicitudes según el calendario del evento.'
+                );
+            }
+            DelegadoTorneoVentanasService::assertPuedeFase1Administrativa($pdo, $ctxTorneo);
+        }
+
         $params = [];
         $scope = \QueryHelper::asociacionScopeSql('a.asociacion', $params);
         $in = implode(',', $ids);
+        $sqlPre = 'SELECT a.id, a.carnet, a.torneo_id, a.numfvd FROM atletas a WHERE a.id IN (' . $in . ') ' . $scope;
+        try {
+            $stPre = $pdo->prepare($sqlPre);
+            $stPre->execute($params);
+            $antes = $stPre->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('[CarnetService] emitirCarnet preselect: ' . $e->getMessage());
+            throw new RuntimeException('No se pudo validar los atletas.');
+        }
+
+        $porId = [];
+        foreach ($antes as $r) {
+            $iid = (int) ($r['id'] ?? 0);
+            if ($iid > 0) {
+                $porId[$iid] = $r;
+            }
+        }
+        foreach ($ids as $iid) {
+            if (!isset($porId[$iid])) {
+                throw new RuntimeException('Algún identificador no corresponde a un atleta de su alcance.');
+            }
+        }
+
+        if ($esDelegado && $ctxTorneo !== null && $ctxTorneo > 0) {
+            foreach ($porId as $r) {
+                $tidRow = (int) ($r['torneo_id'] ?? 0);
+                $tidCheck = $tidRow > 0 ? $tidRow : $ctxTorneo;
+                DelegadoTorneoVentanasService::assertPuedeFase1Administrativa($pdo, $tidCheck);
+            }
+        }
+
         $sql = 'UPDATE atletas a SET a.carnet = 1 WHERE a.id IN (' . $in . ') ' . $scope;
 
         try {
             $st = $pdo->prepare($sql);
             $st->execute($params);
-
-            return $st->rowCount();
+            $n = $st->rowCount();
         } catch (PDOException $e) {
             error_log('[CarnetService] emitirCarnet: ' . $e->getMessage());
             throw new RuntimeException('No se pudo actualizar el indicador de carnet en atletas.');
         }
+
+        if ($esDelegado && $ctxTorneo !== null && $ctxTorneo > 0 && $n > 0) {
+            try {
+                $pFill = $params;
+                $pFill[':ctx'] = $ctxTorneo;
+                $sqlFill = 'UPDATE atletas a SET a.torneo_id = :ctx WHERE a.id IN (' . $in . ') '
+                    . $scope
+                    . ' AND (a.torneo_id IS NULL OR a.torneo_id = 0)';
+                $stFill = $pdo->prepare($sqlFill);
+                $stFill->execute($pFill);
+            } catch (PDOException $e) {
+                error_log('[CarnetService] emitirCarnet torneo_id: ' . $e->getMessage());
+            }
+        }
+
+        if ($n > 0 && self::torneoMovimientoHistoricoTableExists($pdo)) {
+            $insH = $pdo->prepare(
+                'INSERT INTO torneo_movimiento_historico (torneo_id, atleta_id, numfvd, tipo, valor_anterior, valor_nuevo, notas)
+                 VALUES (:tor, :aid, :nf, :tipo, :va, :vn, :no)'
+            );
+            foreach ($ids as $iid) {
+                if (!isset($porId[$iid])) {
+                    continue;
+                }
+                $r = $porId[$iid];
+                if ((int) ($r['carnet'] ?? 0) === 1) {
+                    continue;
+                }
+                $tidMov = (int) ($r['torneo_id'] ?? 0);
+                if ($esDelegado && $ctxTorneo !== null && $ctxTorneo > 0) {
+                    $tidMov = $tidMov > 0 ? $tidMov : $ctxTorneo;
+                }
+                if ($tidMov <= 0) {
+                    continue;
+                }
+                try {
+                    $insH->execute([
+                        ':tor' => $tidMov,
+                        ':aid' => $iid,
+                        ':nf'  => (int) ($r['numfvd'] ?? 0),
+                        ':tipo'=> 'carnet',
+                        ':va'  => (string) (int) ($r['carnet'] ?? 0),
+                        ':vn'  => '1',
+                        ':no'  => 'Solicitud carnet (gestión fichas / carnets)',
+                    ]);
+                } catch (PDOException $e) {
+                    error_log('[CarnetService] emitirCarnet historico: ' . $e->getMessage());
+                }
+            }
+        }
+
+        return $n;
     }
 }

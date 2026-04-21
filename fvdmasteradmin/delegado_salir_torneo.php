@@ -14,7 +14,7 @@ if (AuthService::isDelegadoAsociacion()) {
 }
 
 $dest = AuthService::isDelegadoAsociacion()
-    ? ($base . '/fvdmasteradmin/delegado_dashboard.php')
+    ? ($base . '/fvdmasteradmin/delegado_dashboard_new.php')
     : AuthService::homeUrl();
 header('Location: ' . $dest);
 exit;

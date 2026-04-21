@@ -78,7 +78,10 @@ if (function_exists('fvd_user_is_delegado') && fvd_user_is_delegado()) {
 // Versión compatible con PHP 7.4 (manual, sin str_ends_with).
 $current_script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 $is_master_panel = (substr($current_script, -16) === 'master_panel.php');
-if (fvd_user_is_admin_gral() && !$is_master_panel && !isset($_GET['embedded'])) {
+$fvdEmbedRequestActivo = function_exists('fvd_master_embed_active')
+    ? fvd_master_embed_active()
+    : (isset($_GET['embedded']) && (string) $_GET['embedded'] === '1');
+if (fvd_user_is_admin_gral() && !$is_master_panel && !$fvdEmbedRequestActivo) {
     $fvdNavBaseRedir = rtrim((string) BASE_URL, '/') . '/fvdmasteradmin';
     header('Location: ' . $fvdNavBaseRedir . '/master_panel.php');
     exit;
@@ -88,7 +91,7 @@ unset($current_script);
 if (!isset($fvd_head_extra_html)) {
     $fvd_head_extra_html = '';
 }
-/** Si true, el menú lateral arranca ancho (sin modo “rail” estrecho). Opcional por página, p. ej. delegado_dashboard.php */
+/** Si true, el menú lateral arranca ancho (sin modo “rail” estrecho). Opcional por página, p. ej. delegado_dashboard_new.php */
 if (!isset($fvd_sidebar_start_expanded)) {
     $fvd_sidebar_start_expanded = false;
 }
@@ -116,7 +119,7 @@ $fvd_brand_logo_url = fvd_brand_logo_public_url();
 $fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
 $fvdNavBase = rtrim((string) BASE_URL, '/') . '/fvdmasteradmin';
 $fvdPanelUrl = $fvdNavBase . (AuthService::isDelegadoAsociacion()
-    ? '/delegado_dashboard.php'
+    ? '/delegado_dashboard_new.php'
     : (AuthService::role() === AuthService::ROLE_FVD_ADMIN ? '/master_panel.php' : '/index.php'));
 
 $fvdScript = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
@@ -253,7 +256,7 @@ if (AuthService::isDelegadoAsociacion()) {
         $pdoDelegNotif = fvd_db();
         $delegTopAid = AuthService::idAsociacion();
         $delegTopAidInt = ($delegTopAid !== null && (int) $delegTopAid > 0) ? (int) $delegTopAid : null;
-        $fvd_topbar_deleg_notif_no_vistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas(
+        $fvd_topbar_deleg_notif_no_vistas = \FvdPortal\Services\DelegadoTorneoNotifService::contarPendientesVistaAgrupada(
             $pdoDelegNotif,
             (int) AuthService::userId(),
             $delegTopAidInt
@@ -994,7 +997,7 @@ header('Content-Type: text/html; charset=UTF-8');
             color: #0f172a;
         }
         .fvd-shell--delegado-workspace .fvd-topbar__asoc-name {
-            color: #1e40af;
+            color: var(--fvd-azul, #2e3092);
         }
         .fvd-shell--delegado-workspace .fvd-topbar__perfil {
             color: #1e293b;
@@ -1012,11 +1015,11 @@ header('Content-Type: text/html; charset=UTF-8');
         }
         .fvd-shell--delegado-workspace .fvd-topbar__logout:hover {
             color: #fff;
-            background: #b91c1c;
-            border-color: #b91c1c;
+            background: var(--fvd-rojo, #be123c);
+            border-color: var(--fvd-rojo, #be123c);
         }
         .fvd-shell--delegado-workspace .fvd-topbar__notif-inv {
-            color: #1e3a8a;
+            color: var(--fvd-azul, #2e3092);
         }
     </style>
 </head>
@@ -1034,12 +1037,40 @@ echo $fvdBodyClass !== [] ? ' class="' . htmlspecialchars(implode(' ', $fvdBodyC
 ?>>
 <script>
 (function () {
-    if (window.self !== window.top || window.location.search.includes('embedded=1')) {
+    var q = window.location.search || '';
+    if (window.self !== window.top || q.indexOf('embedded=1') >= 0 || q.indexOf('fvd_master_embed=1') >= 0) {
         document.documentElement.classList.add('is-embedded-view');
         document.body.classList.add('is-embedded');
     }
 })();
 </script>
+<?php if (!empty($fvd_master_embed)): ?>
+<script>
+(function () {
+    document.addEventListener('submit', function (ev) {
+        var f = ev.target;
+        if (!(f instanceof HTMLFormElement)) {
+            return;
+        }
+        if ((f.getAttribute('method') || 'get').toLowerCase() !== 'post') {
+            return;
+        }
+        function appendHidden(name, value) {
+            if (f.querySelector('input[type="hidden"][name="' + name + '"][value="' + value + '"]')) {
+                return;
+            }
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = name;
+            inp.value = value;
+            f.appendChild(inp);
+        }
+        appendHidden('embedded', '1');
+        appendHidden('fvd_master_embed', '1');
+    }, true);
+})();
+</script>
+<?php endif; ?>
 <?php
 $fvdShellDelegadoWs = (
     function_exists('fvd_user_is_delegado')
@@ -1143,7 +1174,7 @@ $fvdShellDelegadoWs = (
                     </div>
                 </details>
                 <?php if (AuthService::isDelegadoAsociacion()): ?>
-                <details class="fvd-sn-acc"<?= (str_contains($fvdScript, 'delegado_bandeja_traspasos') || str_contains($fvdScript, 'delegado_estado_carnetizacion')) ? ' open' : '' ?>>
+                <details class="fvd-sn-acc"<?= (str_contains($fvdScript, 'delegado_bandeja_traspasos') || str_contains($fvdScript, 'delegado_estado_carnetizacion') || str_contains($fvdScript, 'relacion_torneos_master.php')) ? ' open' : '' ?>>
                     <summary class="fvd-sn-acc__summary" title="Delegación de asociación">Mi delegación <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
                         <?php
@@ -1155,8 +1186,9 @@ $fvdShellDelegadoWs = (
                         $fvd_url_afiliados_deleg = fvd_module_url('atletas/index.php?' . http_build_query($fvd_q_afiliados_deleg));
                         ?>
                         <a class="fvd-sn" href="<?= htmlspecialchars($fvd_url_afiliados_deleg, ENT_QUOTES, 'UTF-8') ?>" title="Alta de nuevos atletas (su asociación)">Gestión de afiliados</a>
-                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_bandeja_traspasos') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_bandeja_traspasos.php' . $fvd_deleg_asoc_q, ENT_QUOTES, 'UTF-8') ?>" title="Solicitudes de traspaso pendientes">Bandeja de traspasos</a>
-                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_estado_carnetizacion') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars(fvdNavBase . '/delegado_estado_carnetizacion.php' . $fvd_deleg_asoc_q, ENT_QUOTES, 'UTF-8') ?>" title="Atletas activos sin carnet">Estado de carnetización</a>
+                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_bandeja_traspasos') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars($fvdNavBase . '/delegado_bandeja_traspasos.php' . $fvd_deleg_asoc_q, ENT_QUOTES, 'UTF-8') ?>" title="Solicitudes de traspaso pendientes">Bandeja de traspasos</a>
+                        <a class="fvd-sn<?= str_contains($fvdScript, 'delegado_estado_carnetizacion') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars($fvdNavBase . '/delegado_estado_carnetizacion.php' . $fvd_deleg_asoc_q, ENT_QUOTES, 'UTF-8') ?>" title="Atletas activos sin carnet">Estado de carnetización</a>
+                        <a class="fvd-sn<?= str_contains($fvdScript, 'relacion_torneos_master.php') ? ' fvd-sn--active' : '' ?>" href="<?= htmlspecialchars($fvdNavBase . '/relacion_torneos_master.php', ENT_QUOTES, 'UTF-8') ?>" title="Unificar campeonatos del club en un mismo grupo">Relacionar campeonatos</a>
                     </div>
                 </details>
                 <?php endif; ?>
@@ -1223,7 +1255,7 @@ $fvdShellDelegadoWs = (
             </div>
             <div class="fvd-topbar__actions">
                 <?php if ($fvd_topbar_deleg_notif_no_vistas > 0): ?>
-                <a class="fvd-topbar__notif-inv" href="<?= htmlspecialchars($fvdPanelUrl . '#fvd-deleg-guia-inscripcion', ENT_QUOTES, 'UTF-8') ?>" title="Notificaciones web — invitaciones a torneos sin abrir">
+                <a class="fvd-topbar__notif-inv" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Notificaciones web — invitaciones a torneos sin abrir">
                     Invitaciones
                     <span class="fvd-topbar__notif-badge"><?= (int) $fvd_topbar_deleg_notif_no_vistas ?></span>
                 </a>

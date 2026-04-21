@@ -103,7 +103,7 @@ $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== nu
                     placeholder="Ej. 1"
                     value="<?= isset($r['grupo_evento_id']) && (int) ($r['grupo_evento_id'] ?? 0) > 0 ? (int) $r['grupo_evento_id'] : '' ?>">
                 <small style="display:block;font-size:0.7rem;color:var(--fvd-muted,#94a3b8);margin-top:4px">
-                    También puede usar <a href="<?= htmlspecialchars($selfUrl . '?action=relacion_grupo', ENT_QUOTES, 'UTF-8') ?>">Relacionar campeonatos</a> para elegir varios el mismo día y asignar el grupo automáticamente. Aquí puede corregir el número a mano si hace falta.
+                    También puede usar <a href="<?= htmlspecialchars($selfUrl . '?action=relacion_grupo', ENT_QUOTES, 'UTF-8') ?>">Relacionar campeonatos</a> (próximos, mismo código de grupo). Aquí puede corregir el número a mano si hace falta.
                 </small>
             </div>
             <?php endif; ?>

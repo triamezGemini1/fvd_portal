@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
             case 'DELEGADO_ASO':
             case 'DELEGADO_ASOC':
-                header('Location: /fvd_portal/fvdmasteradmin/delegado_dashboard_new.php', true, 302);
+                header('Location: ' . url('fvdmasteradmin/perfil_delegado.php'), true, 302);
                 break;
             default:
                 header('Location: /fvd_portal/public/index.php', true, 302);
@@ -79,6 +79,7 @@ header('Content-Type: text/html; charset=UTF-8');
 <body>
 <div class="box">
     <h1>FVD Master Admin</h1>
+    <p class="fvd-login-tagline">Federación Venezolana de Dominó</p>
     <?php if ($error !== '') : ?>
         <p class="err"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></p>
     <?php endif; ?>

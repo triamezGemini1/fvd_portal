@@ -36,7 +36,7 @@ $isEdit = $row !== null;
 
         <div class="fvd-mod-actions fvd-costos-form__actions">
             <button type="submit">Guardar</button>
-            <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver</a>
+            <a href="<?= htmlspecialchars(fvd_return_to_module_index($selfUrl), ENT_QUOTES, 'UTF-8') ?>">Volver</a>
         </div>
 
         <p class="fvd-costos-form-footnote" role="note">Estos montos serán calculados en base al cambio oficial del euro en el BCV.</p>

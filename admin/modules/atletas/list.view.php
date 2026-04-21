@@ -15,29 +15,15 @@
 /** @var array<string,mixed>|null $fvd_asociacion_header */
 /** @var list<array<string,mixed>> $fvd_asociaciones_list_filter */
 /** @var bool $fvd_atletas_puede_elegir_alcance true = admin FVD: selector federación / asociación con listado completo */
-/** @var bool $fvd_atletas_puede_reset_marcadores */
-/** @var string $fvd_atletas_reset_msg */
-/** @var int $fvd_atletas_reset_n */
-/** @var string $fvd_atletas_reset_campo */
 /** @var array<string, int|string> $fvd_atletas_widget */
 $atletasFormNuevoUrl = fvd_return_append_to_url($selfUrl . '?action=form');
 $fvd_atletas_widget = isset($fvd_atletas_widget) && is_array($fvd_atletas_widget) ? $fvd_atletas_widget : [
     'etiqueta' => '', 'total_atletas' => 0, 'total_afiliados' => 0,
     'sexo_m' => 0, 'sexo_f' => 0, 'sexo_sin' => 0, 'torneos' => 0, 'participacion' => 0,
 ];
-$fvd_atletas_puede_reset_marcadores = $fvd_atletas_puede_reset_marcadores ?? false;
-$fvd_atletas_reset_msg = $fvd_atletas_reset_msg ?? '';
-$fvd_atletas_reset_n = isset($fvd_atletas_reset_n) ? (int) $fvd_atletas_reset_n : 0;
-$fvd_atletas_reset_campo = $fvd_atletas_reset_campo ?? '';
-$fvd_atletas_reset_etiquetas = [
-    'carnet' => 'carnet',
-    'traspaso' => 'traspaso',
-    'anualidad' => 'anualidad',
-    'afiliacion' => 'afiliación',
-    'inscripcion' => 'inscripción (+ torneo_id)',
-];
 $appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
 $fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
+$fvd_url_solicitud_traspaso_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_traspaso.php' : '/fvdmasteradmin/solicitud_traspaso.php';
 $fvd_atletas_show_asociacion_col = $fvd_atletas_show_asociacion_col ?? true;
 $fvd_atletas_alcance = $fvd_atletas_alcance ?? 'todos';
 $fvd_atletas_tipo = $fvd_atletas_tipo ?? 'normal';
@@ -47,73 +33,260 @@ $fvd_atletas_puede_elegir_alcance = $fvd_atletas_puede_elegir_alcance ?? false;
 $nOpcionesAsoc = count($fvd_asociaciones_list_filter);
 require_once FVD_PROJECT_ROOT . '/fvdmasteradmin/includes/fvd_asociacion_helpers.php';
 $rolAtletasUi = trim((string) (\AuthService::role() ?? ''));
+$fvdEsDelegadoAsocUi = $rolAtletasUi === \AuthService::ROLE_DELEGADO_ASOC;
+$fvdRetornoUrl = '';
+if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+    $fvdRetornoUrl = (string) $_GET['ret'];
+} elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+    $fvdRetornoUrl = (string) $_GET['return'];
+} elseif ($fvdEsDelegadoAsocUi) {
+    $fvdRetornoUrl = \AuthService::homeUrl();
+}
 $widgetStatsTitulo = $rolAtletasUi === \AuthService::ROLE_ASO_ADMIN
     ? 'Estadísticas'
     : ('Estadísticas — ' . htmlspecialchars((string) ($fvd_atletas_widget['etiqueta'] ?? ''), ENT_QUOTES, 'UTF-8'));
 ?>
+<style>
+#fvd-atletas-root .report-container.fvd-atletas-list-page {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+}
+#fvd-atletas-root .fvd-mod-toolbar {
+    position: sticky;
+    top: 72px;
+    z-index: 40;
+    margin-bottom: 0 !important;
+    border-radius: 12px 12px 0 0 !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+}
+#fvd-atletas-root .fvd-atletas-list-scroll {
+    max-height: min(72vh, calc(100vh - 200px));
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid rgba(46, 48, 146, 0.32);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    background: #fff;
+}
+#fvd-atletas-root .fvd-atletas-list-scroll .fvd-mod-table-wrap {
+    margin-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+}
+#fvd-atletas-root .fvd-atletas-view-seg--in-toolbar {
+    margin: 0 !important;
+    width: 100%;
+    flex-basis: 100%;
+    padding-top: 6px;
+    border-top: 1px solid rgba(46, 48, 146, 0.22);
+}
+#fvd-atletas-root .fvd-atletas-view-seg--in-toolbar .fvd-atletas-seg__btn {
+    border-color: rgba(46, 48, 146, 0.38) !important;
+    background: #fff !important;
+    color: #0f172a !important;
+}
+#fvd-atletas-root .fvd-atletas-view-seg--in-toolbar .fvd-atletas-seg__btn--on {
+    border-color: #2e3092 !important;
+    background: rgba(255, 242, 0, 0.22) !important;
+    color: #1e1b4b !important;
+}
+#fvd-atletas-root .fvd-atletas-live-hint--in-toolbar {
+    width: 100%;
+    flex-basis: 100%;
+    margin: 2px 0 0 !important;
+    min-height: 0;
+    font-size: 0.72rem;
+    line-height: 1.25;
+}
+#fvd-atletas-root #fvd-tabla-atletas thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #e2e8f0 !important;
+    color: #000 !important;
+    font-weight: 800 !important;
+    box-shadow: inset 0 -1px 0 #94a3b8;
+}
+#fvd-atletas-root #fvd-tabla-atletas tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+#fvd-atletas-root #fvd-tabla-atletas tbody tr:nth-child(odd) {
+    background: #ffffff;
+}
+#fvd-atletas-root .fvd-mod-toolbar label,
+#fvd-atletas-root .fvd-mod-toolbar input,
+#fvd-atletas-root .fvd-mod-toolbar select,
+#fvd-atletas-root .fvd-mod-toolbar button,
+#fvd-atletas-root .fvd-mod-toolbar a,
+#fvd-atletas-root .fvd-atletas-export__label {
+    color: #000 !important;
+    font-weight: 700 !important;
+}
+#fvd-atletas-root .fvd-mod-toolbar .fvd-input {
+    background: #fff !important;
+    border-color: rgba(46, 48, 146, 0.32) !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+#fvd-atletas-root #fvd-tabla-atletas tbody td,
+#fvd-atletas-root #fvd-tabla-atletas tbody td * {
+    color: #000 !important;
+    font-weight: 700 !important;
+}
+/* Estadísticas: mitad de altura aprox., ancho completo para alinear todos los KPIs */
+.fvd-atletas-widget--strip {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    margin: 0 0 8px !important;
+    padding: 5px 8px !important;
+    border-radius: 8px;
+    border: 1px solid var(--fvd-border, #334155);
+    background: linear-gradient(135deg, rgba(46, 48, 146, 0.25) 0%, rgba(15, 23, 42, 0.6) 100%);
+}
+.fvd-atletas-widget--strip .fvd-atletas-widget__title {
+    margin: 0 0 3px !important;
+    font-size: 0.72rem !important;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--fvd-amarillo, #fff200);
+}
+.fvd-atletas-widget--strip .fvd-atletas-widget__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: stretch;
+}
+.fvd-atletas-widget--strip .fvd-atletas-asoc-head {
+    flex: 0 1 auto;
+    min-width: min(10.5rem, 100%);
+    padding: 3px 6px !important;
+    gap: 5px !important;
+    min-height: 0 !important;
+    border-radius: 6px !important;
+}
+.fvd-atletas-widget--strip .fvd-atletas-asoc-head__logo img {
+    max-height: 26px !important;
+    max-width: 48px !important;
+}
+.fvd-atletas-widget--strip .fvd-atletas-asoc-head__meta {
+    font-size: 0.62rem !important;
+    line-height: 1.15 !important;
+}
+.fvd-atletas-widget--strip .fvd-atletas-kpi-grid {
+    flex: 1 1 18rem;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr));
+    gap: 5px;
+    align-content: stretch;
+}
+@media (min-width: 900px) {
+    .fvd-atletas-widget--strip .fvd-atletas-kpi-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+.fvd-atletas-widget--strip .fvd-atletas-kpi {
+    padding: 3px 6px !important;
+    border-radius: 6px !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.fvd-atletas-widget--strip .fvd-atletas-kpi__label {
+    color: var(--fvd-muted);
+    font-size: 0.55rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.1;
+}
+.fvd-atletas-widget--strip .fvd-atletas-kpi__value {
+    font-size: 0.95rem !important;
+    font-weight: 800;
+    line-height: 1.15;
+}
+.fvd-atletas-widget--strip .fvd-atletas-kpi__value--inline {
+    font-size: 0.72rem !important;
+    font-weight: 700;
+    line-height: 1.2;
+}
+</style>
 <h1 class="fvd-atletas-title">Atletas</h1>
+<?php if ($fvdEsDelegadoAsocUi): ?>
+<p class="no-print" style="margin:0 0 .85rem">
+    <a href="<?= htmlspecialchars(\AuthService::homeUrl(), ENT_QUOTES, 'UTF-8') ?>"
+       class="inline-flex items-center text-black font-bold border-2 border-black px-4 py-2 rounded hover:bg-black hover:text-white transition-colors"
+       style="display:inline-flex;align-items:center;gap:.45rem;color:#000;font-weight:800;border:2px solid #000;padding:.5rem .9rem;border-radius:.45rem;text-decoration:none;transition:all .15s ease">
+        <i class="fas fa-arrow-left mr-2"></i> VOLVER AL PANEL
+    </a>
+</p>
+<?php endif; ?>
 
-<section class="fvd-atletas-widget no-print" aria-label="Estadísticas del contexto" style="margin:0 0 14px;padding:12px 14px;border-radius:10px;border:1px solid var(--fvd-border, #334155);background:linear-gradient(135deg, rgba(46,48,146,.25) 0%, rgba(15,23,42,.6) 100%);max-width:56rem">
-    <h2 style="margin:0 0 10px;font-size:.95rem;font-weight:700;color:var(--fvd-amarillo, #fff200)"><?= $widgetStatsTitulo ?></h2>
-    <p style="margin:0 0 10px;font-size:.68rem;color:var(--fvd-muted);line-height:1.4">Cifras alineadas con este listado (tipo «general» sin bajas; sin filtrar por cédula/nombre). Torneos: eventos en <code>torneosact</code> donde la asociación es organizadora. Participación: inscripciones en <code>inscripcion_torneo</code> (o marcador en <code>atletas</code> si la tabla no existe).</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(9.5rem, 1fr));gap:10px;font-size:.8rem">
-        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
-            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Atletas</div>
-            <div style="font-size:1.35rem;font-weight:800;color:#e2e8f0"><?= number_format((int) ($fvd_atletas_widget['total_atletas'] ?? 0), 0, ',', '.') ?></div>
-        </div>
-        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
-            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Afiliados (marc.)</div>
-            <div style="font-size:1.35rem;font-weight:800;color:#86efac"><?= number_format((int) ($fvd_atletas_widget['total_afiliados'] ?? 0), 0, ',', '.') ?></div>
-        </div>
-        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
-            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Género M / F / —</div>
-            <div style="font-weight:700;color:#e2e8f0;line-height:1.35">
-                <?= (int) ($fvd_atletas_widget['sexo_m'] ?? 0) ?> &nbsp;/&nbsp; <?= (int) ($fvd_atletas_widget['sexo_f'] ?? 0) ?> &nbsp;/&nbsp; <?= (int) ($fvd_atletas_widget['sexo_sin'] ?? 0) ?>
+<section class="fvd-atletas-widget fvd-atletas-widget--strip no-print" aria-label="Estadísticas del contexto">
+    <h2 class="fvd-atletas-widget__title"><?= $widgetStatsTitulo ?></h2>
+    <div class="fvd-atletas-widget__row">
+        <?php
+        if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ?? 0) > 0):
+            $ahLogo = isset($fvd_asociacion_header['logo']) ? fvd_asociacion_logo_public_url($appBaseAtletas !== '' ? $appBaseAtletas : '', FVD_PROJECT_ROOT, (string) $fvd_asociacion_header['logo']) : null;
+            $ahDelegado = trim((string) ($fvd_asociacion_header['delegado'] ?? ''));
+            $ahNombre = trim((string) ($fvd_asociacion_header['nombre'] ?? ''));
+            $ahHasLogo = $ahLogo !== null && $ahLogo !== '';
+            if ($ahHasLogo || $ahNombre !== '' || $ahDelegado !== ''):
+            ?>
+        <div class="fvd-atletas-asoc-head no-print" style="display:flex;align-items:center;margin:0;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.22)">
+            <?php if ($ahHasLogo): ?>
+                <div class="fvd-atletas-asoc-head__logo" style="flex-shrink:0"><img src="<?= htmlspecialchars($ahLogo, ENT_QUOTES, 'UTF-8') ?>" alt="" style="object-fit:contain"></div>
+            <?php endif; ?>
+            <div class="fvd-atletas-asoc-head__meta" style="color:#e2e8f0;min-width:0">
+                <?php if ($ahNombre !== ''): ?>
+                    <div style="font-weight:800;opacity:.95;word-break:break-word"><?= htmlspecialchars($ahNombre, ENT_QUOTES, 'UTF-8') ?></div>
+                <?php endif; ?>
+                <?php if ($ahDelegado !== ''): ?>
+                    <div style="font-weight:700;margin-top:1px"><span style="opacity:.85">Delegado</span> <?= htmlspecialchars($ahDelegado, ENT_QUOTES, 'UTF-8') ?></div>
+                <?php endif; ?>
             </div>
         </div>
-        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
-            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Torneos</div>
-            <div style="font-size:1.35rem;font-weight:800;color:#93c5fd"><?= number_format((int) ($fvd_atletas_widget['torneos'] ?? 0), 0, ',', '.') ?></div>
+        <?php
+            endif;
+        endif; ?>
+        <div class="fvd-atletas-kpi-grid">
+        <div class="fvd-atletas-kpi">
+            <div class="fvd-atletas-kpi__label">Atletas</div>
+            <div class="fvd-atletas-kpi__value" style="color:#e2e8f0"><?= number_format((int) ($fvd_atletas_widget['total_atletas'] ?? 0), 0, ',', '.') ?></div>
         </div>
-        <div style="padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.08)">
-            <div style="color:var(--fvd-muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.04em">Participación</div>
-            <div style="font-size:1.35rem;font-weight:800;color:#fcd34d"><?= number_format((int) ($fvd_atletas_widget['participacion'] ?? 0), 0, ',', '.') ?></div>
+        <div class="fvd-atletas-kpi">
+            <div class="fvd-atletas-kpi__label">Afiliados (marc.)</div>
+            <div class="fvd-atletas-kpi__value" style="color:#86efac"><?= number_format((int) ($fvd_atletas_widget['total_afiliados'] ?? 0), 0, ',', '.') ?></div>
+        </div>
+        <div class="fvd-atletas-kpi">
+            <div class="fvd-atletas-kpi__label">Género M / F / —</div>
+            <div class="fvd-atletas-kpi__value fvd-atletas-kpi__value--inline" style="color:#e2e8f0">
+                <?= (int) ($fvd_atletas_widget['sexo_m'] ?? 0) ?> / <?= (int) ($fvd_atletas_widget['sexo_f'] ?? 0) ?> / <?= (int) ($fvd_atletas_widget['sexo_sin'] ?? 0) ?>
+            </div>
+        </div>
+        <div class="fvd-atletas-kpi">
+            <div class="fvd-atletas-kpi__label">Torneos</div>
+            <div class="fvd-atletas-kpi__value" style="color:#3a3eb5"><?= number_format((int) ($fvd_atletas_widget['torneos'] ?? 0), 0, ',', '.') ?></div>
+        </div>
+        <div class="fvd-atletas-kpi">
+            <div class="fvd-atletas-kpi__label">Participación</div>
+            <div class="fvd-atletas-kpi__value" style="color:#fcd34d"><?= number_format((int) ($fvd_atletas_widget['participacion'] ?? 0), 0, ',', '.') ?></div>
+        </div>
         </div>
     </div>
 </section>
-
-<?php
-if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ?? 0) > 0):
-    $ahLogo = isset($fvd_asociacion_header['logo']) ? fvd_asociacion_logo_public_url($appBaseAtletas !== '' ? $appBaseAtletas : '', FVD_PROJECT_ROOT, (string) $fvd_asociacion_header['logo']) : null;
-    $ahDelegado = trim((string) ($fvd_asociacion_header['delegado'] ?? ''));
-    ?>
-<div class="fvd-atletas-asoc-head no-print" style="display:flex;align-items:center;gap:14px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--fvd-border, #334155);border-radius:8px;background:var(--fvd-card, #1e293b)">
-    <?php if ($ahLogo !== null && $ahLogo !== ''): ?>
-        <div class="fvd-atletas-asoc-head__logo" style="flex-shrink:0"><img src="<?= htmlspecialchars($ahLogo, ENT_QUOTES, 'UTF-8') ?>" alt="" style="max-height:56px;max-width:100px;object-fit:contain"></div>
-    <?php endif; ?>
-    <div class="fvd-atletas-asoc-head__meta" style="font-size:0.9rem;line-height:1.35">
-        <?php if ($ahDelegado !== ''): ?>
-            <div><strong>Delegado:</strong> <?= htmlspecialchars($ahDelegado, ENT_QUOTES, 'UTF-8') ?></div>
-        <?php endif; ?>
-    </div>
-</div>
-<?php endif; ?>
-<p class="fvd-atletas-intro no-print hide-on-13" style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 0.75rem">Busque por <strong>cédula</strong> (coincidencia por inicio) o refine por nombre. La tabla se actualiza al escribir (espera breve). Pantalla optimizada para 13".</p>
-<?php if (!empty($fvd_error ?? '')): ?><p class="fvd-mod-msg"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
-<?php if ($fvd_atletas_reset_msg === 'reset_ok'): ?>
-    <p class="fvd-mod-msg no-print" style="margin:0 0 .75rem;background:rgba(22,163,74,.15);border-color:#15803d">
-        Reinicio aplicado: <strong><?= (int) $fvd_atletas_reset_n ?></strong> fila(s) en
-        <code><?= htmlspecialchars((string) ($fvd_atletas_reset_etiquetas[$fvd_atletas_reset_campo] ?? $fvd_atletas_reset_campo), ENT_QUOTES, 'UTF-8') ?></code>.
-    </p>
-<?php elseif ($fvd_atletas_reset_msg === 'reset_err'): ?>
-    <p class="fvd-mod-msg no-print" style="margin:0 0 .75rem">No se pudo completar el reinicio.</p>
-<?php endif; ?>
-
 <div id="fvd-atletas-root" class="fvd-atletas-root">
 
-<div class="report-container">
-<div class="fvd-mod-toolbar no-print" style="flex-wrap:wrap;align-items:flex-end;gap:10px">
-    <form method="get" action="" class="no-print" id="fvd-atletas-filter-form" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+<div class="report-container fvd-atletas-list-page">
+<?php if (!empty($fvd_error ?? '')): ?><p class="fvd-mod-msg" style="margin:0 0 8px"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+
+<div class="fvd-mod-toolbar no-print" style="flex-wrap:wrap;align-items:flex-end;gap:10px;padding:12px 14px;border-radius:12px;border:1px solid rgba(46,48,146,.28);border-top:3px solid #fff200;background:#f8fafc;box-shadow:0 8px 18px rgba(15,23,42,.12)">
+    <form method="get" action="" class="no-print" id="fvd-atletas-filter-form" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:10px;border-radius:10px;border:1px solid rgba(46,48,146,.22);background:#ffffff">
         <input type="hidden" name="action" value="list">
         <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
         <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
@@ -123,11 +296,10 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         <?php if ($fvd_atletas_puede_elegir_alcance): ?>
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block;font-weight:600">Alcance</label>
-            <select id="fvd-atletas-alcance" class="fvd-input" name="alcance" style="max-width:16rem" aria-describedby="fvd-atletas-alcance-hint">
+            <select id="fvd-atletas-alcance" class="fvd-input" name="alcance" style="max-width:16rem">
                 <option value="todos"<?= $fvd_atletas_alcance === 'todos' ? ' selected' : '' ?>>Todos (toda la federación)</option>
                 <option value="asociacion"<?= $fvd_atletas_alcance === 'asociacion' ? ' selected' : '' ?>>Una asociación concreta…</option>
             </select>
-            <p id="fvd-atletas-alcance-hint" class="no-print" style="font-size:.68rem;color:var(--fvd-muted);margin:4px 0 0;max-width:20rem">«Todos» lista atletas de todas las asociaciones. «Una asociación» exige elegir cuál en el siguiente campo.</p>
         </div>
         <div id="fvd-atletas-asoc-wrap" class="no-print" style="display:<?= $fvd_atletas_alcance === 'asociacion' ? 'block' : 'none' ?>">
             <label for="fvd-atletas-asoc-id" style="font-size:.8125rem;color:var(--fvd-muted);display:block;font-weight:600">¿Qué asociación?</label>
@@ -165,6 +337,12 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Buscar</button>
         <a href="<?= htmlspecialchars(fvd_return_preserve_query_params($selfUrl . '?action=list'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
     </form>
+    <?php if ($fvdRetornoUrl !== ''): ?>
+    <a href="<?= htmlspecialchars($fvdRetornoUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-input no-print" style="width:auto;padding:8px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box;border-color:#000;background:#fff;color:#000;font-weight:800">
+        ← Retornar
+    </a>
+    <?php endif; ?>
+    <?php if (!$fvdEsDelegadoAsocUi): ?>
     <div class="fvd-atletas-report-links no-print" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <?php
         if (!function_exists('admin_module_url')) {
@@ -186,6 +364,7 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         <a class="fvd-atletas-informes-nav__link" style="font-size:.88rem;font-weight:700;color:#f8fafc;text-decoration:none;padding:7px 13px;border-radius:8px;border:1px solid rgba(148,163,184,.5);background:rgba(30,41,59,.75);display:inline-flex;align-items:center;box-sizing:border-box;line-height:1.2" href="<?= htmlspecialchars($uRepTr, ENT_QUOTES, 'UTF-8') ?>" title="Historial de traspasos; marcador atletas.traspaso = 1">Traspasos</a>
         </nav>
     </div>
+    <?php endif; ?>
     <div class="fvd-atletas-export no-print" role="group" aria-label="Exportar listado">
         <span class="fvd-atletas-export__label" style="font-size:.75rem;color:var(--fvd-muted);display:block;margin-bottom:4px;font-weight:600">Exportar</span>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
@@ -194,48 +373,14 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         </div>
     </div>
     <a href="<?= htmlspecialchars($atletasFormNuevoUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary no-print" style="text-decoration:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center">Nuevo atleta</a>
-</div>
-
-<?php if ($fvd_atletas_puede_reset_marcadores): ?>
-<section class="no-print fvd-atletas-reset-marcadores" aria-label="Reinicio masivo de marcadores" style="margin:0 0 12px;padding:12px 14px;border-radius:8px;border:2px solid #991b1b;background:rgba(127,29,29,.18)">
-    <h2 style="margin:0 0 6px;font-size:1rem;font-weight:800;color:#fecaca">Reiniciar marcadores (poner en 0)</h2>
-    <p style="margin:0 0 10px;font-size:.72rem;color:var(--fvd-muted);line-height:1.45">
-        Masivo sobre <code>atletas</code> en su <strong>alcance de sesión</strong> (FVD: todos; asociación/delegado: solo ese club).
-        <strong>Inscripción</strong> también pone <code>torneo_id = 0</code>.
-    </p>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <?php
-        $accionesResetList = [
-            ['carnet', 'Reset carnets', '¿Poner en 0 el marcador de carnet en todos los atletas de su alcance?'],
-            ['traspaso', 'Reset traspasos', '¿Poner en 0 el marcador de traspaso en todos los atletas de su alcance?'],
-            ['anualidad', 'Reset anualidad', '¿Poner en 0 el marcador de anualidad en todos los atletas de su alcance?'],
-            ['afiliacion', 'Reset afiliación', '¿Poner en 0 el marcador de afiliación en todos los atletas de su alcance?'],
-            ['inscripcion', 'Reset inscripciones', '¿Poner en 0 inscripción y torneo_id en todos los atletas de su alcance?'],
-        ];
-        foreach ($accionesResetList as $arL):
-            [$mkL, $mlabL, $mconfirmL] = $arL;
-        ?>
-        <form method="post" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" style="margin:0" onsubmit="return confirm(<?= htmlspecialchars(json_encode($mconfirmL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);">
-            <input type="hidden" name="_action" value="reset_marcador_atletas">
-            <input type="hidden" name="marcador" value="<?= htmlspecialchars($mkL, ENT_QUOTES, 'UTF-8') ?>">
-            <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
-            <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
-            <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
-            <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
-            <?php endif; ?>
-            <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px;font-size:.75rem;cursor:pointer;background:#7f1d1d;color:#fecaca;border-color:#991b1b"><?= htmlspecialchars($mlabL, ENT_QUOTES, 'UTF-8') ?></button>
-        </form>
-        <?php endforeach; ?>
+    <div class="fvd-atletas-view-seg fvd-atletas-view-seg--in-toolbar no-print" role="tablist" aria-label="Vista de columnas">
+        <button type="button" class="fvd-atletas-seg__btn fvd-atletas-seg__btn--on" data-fvd-atletas-view="basic" role="tab">Vista básica (contacto)</button>
+        <button type="button" class="fvd-atletas-seg__btn" data-fvd-atletas-view="tech" role="tab">Vista técnica (FVD)</button>
     </div>
-</section>
-<?php endif; ?>
-
-<div class="fvd-atletas-view-seg no-print" role="tablist" aria-label="Vista de columnas">
-    <button type="button" class="fvd-atletas-seg__btn fvd-atletas-seg__btn--on" data-fvd-atletas-view="basic" role="tab">Vista básica (contacto)</button>
-    <button type="button" class="fvd-atletas-seg__btn" data-fvd-atletas-view="tech" role="tab">Vista técnica (FVD)</button>
+    <p id="fvd-atletas-live-hint" class="fvd-atletas-live-hint fvd-atletas-live-hint--in-toolbar no-print" aria-live="polite"></p>
 </div>
 
-<p id="fvd-atletas-live-hint" class="fvd-atletas-live-hint no-print" aria-live="polite"></p>
+<div class="fvd-atletas-list-scroll">
 
 <div class="fvd-mod-table-wrap">
     <table id="fvd-tabla-atletas" class="fvd-mod-table fvd-mod-table--nowrap tabla-atletas fvd-atletas-view--basic<?= $fvd_atletas_show_asociacion_col ? '' : ' fvd-atletas-table--no-asoc-col' ?>" data-atletas-view="basic" data-show-asoc-col="<?= $fvd_atletas_show_asociacion_col ? '1' : '0' ?>">
@@ -249,7 +394,6 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
             <th class="fvd-col-asoc">Asociación</th>
             <?php endif; ?>
             <th class="fvd-col-contact fvd-col-cel">Celular</th>
-            <th class="fvd-col-sol-carnet">Solicitar carnet</th>
             <th class="fvd-col-tech fvd-col-sexo">Sexo</th>
             <th class="fvd-col-tech fvd-col-numfvd">Nº FVD</th>
             <th class="fvd-col-tech fvd-col-categ">Categ.</th>
@@ -265,13 +409,16 @@ if (is_array($fvd_asociacion_header ?? null) && ($fvd_asociacion_header['id'] ??
         endforeach;
         ?>
         <?php if ($result['rows'] === []): ?>
-            <tr><td colspan="<?= $fvd_atletas_show_asociacion_col ? '13' : '12' ?>" style="padding:12px">Sin registros con los filtros actuales.</td></tr>
+            <tr><td colspan="<?= $fvd_atletas_show_asociacion_col ? '11' : '10' ?>" style="padding:12px">Sin registros con los filtros actuales.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>
 </div>
 
+</div>
+
 <?= $fvd_atletas_pager_html ?? '' ?>
+
 </div>
 
 </div>

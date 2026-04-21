@@ -647,7 +647,7 @@ final class StatsService
 
     /**
      * Widget del listado de atletas: mismos límites de alcance que el listado (tipo «normal», sin cédula/nombre).
-     * Torneos: filas en <code>torneosact</code> (todos son eventos FVD; sin filtro regional por organizador).
+     * Torneos: filas en <code>torneosact</code>; con alcance «asociación», solo eventos donde esa asociación es organizadora (<code>organizacion_id</code>).
      * Participación: filas en <code>inscripcion_torneo</code> si existe; si no, atletas con <code>inscripcion = 1</code>.
      *
      * @param 'todos'|'asociacion' $alcance
@@ -715,12 +715,25 @@ final class StatsService
         }
 
         try {
-            $sqlT = 'SELECT COUNT(*) FROM torneosact t WHERE 1=1';
-            $stT = $pdo->prepare($sqlT);
-            $stT->execute();
-            $out['torneos'] = (int) $stT->fetchColumn();
+            if ($alcance === 'asociacion' && $asociacionFiltroId > 0) {
+                $sqlT = 'SELECT COUNT(*) FROM torneosact t WHERE t.organizacion_id = :oid';
+                $stT = $pdo->prepare($sqlT);
+                $stT->execute([':oid' => $asociacionFiltroId]);
+                $out['torneos'] = (int) $stT->fetchColumn();
+            } else {
+                $sqlT = 'SELECT COUNT(*) FROM torneosact t WHERE 1=1';
+                $stT = $pdo->prepare($sqlT);
+                $stT->execute();
+                $out['torneos'] = (int) $stT->fetchColumn();
+            }
         } catch (PDOException $e) {
-            error_log('[StatsService] atletasModuloWidgetResumen torneos: ' . $e->getMessage());
+            try {
+                $stT2 = $pdo->prepare('SELECT COUNT(*) FROM torneosact t WHERE 1=1');
+                $stT2->execute();
+                $out['torneos'] = (int) $stT2->fetchColumn();
+            } catch (PDOException $e2) {
+                error_log('[StatsService] atletasModuloWidgetResumen torneos: ' . $e->getMessage() . ' | fallback: ' . $e2->getMessage());
+            }
         }
 
         $paramsI = [];
@@ -762,7 +775,7 @@ final class StatsService
                 error_log('[StatsService] atletasModuloWidgetResumen nombre asoc: ' . $e->getMessage());
             }
         } else {
-            $out['etiqueta'] = 'Federación (todos los clubes)';
+            $out['etiqueta'] = 'Federación (todas las asociaciones)';
         }
 
         return $out;

@@ -404,10 +404,10 @@ watch(
         <a
           v-if="!inscripcionBloqueada"
           :href="href('torneo/inscripcion')"
-          class="fvd-action-btn border-blue-300/90 bg-blue-50 text-blue-950 hover:border-blue-500 hover:bg-blue-100"
+          class="fvd-action-btn border-[#2e3092]/35 bg-[#fff200]/22 text-[#1e1b4b] hover:border-[#2e3092]/55 hover:bg-[#fff200]/38"
         >
           <span>Inscripción</span>
-          <TrophyIcon class="h-5 w-5 shrink-0 text-blue-600" aria-hidden="true" />
+          <TrophyIcon class="h-5 w-5 shrink-0 text-[#2e3092]" aria-hidden="true" />
         </a>
         <div
           v-else
@@ -420,10 +420,10 @@ watch(
         <a
           v-if="!cambiosNominaBloqueados"
           :href="href('torneo/cambios')"
-          class="fvd-action-btn border-cyan-300/90 bg-cyan-50 text-cyan-950 hover:border-cyan-500 hover:bg-cyan-100"
+          class="fvd-action-btn border-[#2e3092]/40 bg-white text-[#2e3092] hover:border-[#be123c]/45 hover:bg-[#e8e9f4]"
         >
           <span>Cambios de nómina</span>
-          <ClipboardDocumentListIcon class="h-5 w-5 shrink-0 text-cyan-600" aria-hidden="true" />
+          <ClipboardDocumentListIcon class="h-5 w-5 shrink-0 text-[#be123c]" aria-hidden="true" />
         </a>
         <div
           v-else

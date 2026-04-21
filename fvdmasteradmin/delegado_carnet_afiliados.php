@@ -63,22 +63,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['_action'] ?? '') =
         exit;
     }
 
-    $tid = (int) ($row['torneo_id'] ?? 0);
+    $tidAtleta = (int) ($row['torneo_id'] ?? 0);
     if (AuthService::isDelegadoAsociacion()) {
-        if ($tid <= 0) {
-            $ctx = AuthService::delegadoTorneoContextId();
-            $tid = $ctx !== null && $ctx > 0 ? $ctx : 0;
-        }
-        if ($tid <= 0) {
+        $ctx = AuthService::delegadoTorneoContextId();
+        $ctx = $ctx !== null && $ctx > 0 ? $ctx : 0;
+        if ($ctx <= 0) {
             $_SESSION['fvd_delegado_carnet_flash'] = [
                 'tipo' => 'err',
-                'msg' => 'No se pudo validar el torneo del atleta. Acceda desde el panel con un evento activo o asigne torneo en la ficha.',
+                'msg' => 'Debe seleccionar el torneo desde el panel (entrada por invitación) para enviar solicitudes según el calendario del evento.',
+            ];
+            header('Location: ' . url('fvdmasteradmin/delegado_carnet_afiliados.php'));
+            exit;
+        }
+        if ($tidAtleta > 0 && $tidAtleta !== $ctx) {
+            $_SESSION['fvd_delegado_carnet_flash'] = [
+                'tipo' => 'err',
+                'msg' => 'El atleta está asignado a otro torneo. Seleccione en el panel el mismo torneo o corrija la ficha del atleta.',
             ];
             header('Location: ' . url('fvdmasteradmin/delegado_carnet_afiliados.php'));
             exit;
         }
         try {
-            DelegadoTorneoVentanasService::assertPuedeFase1Administrativa($pdo, $tid);
+            DelegadoTorneoVentanasService::assertPuedeFase1Administrativa($pdo, $ctx);
         } catch (Throwable $e) {
             $_SESSION['fvd_delegado_carnet_flash'] = ['tipo' => 'err', 'msg' => $e->getMessage()];
             header('Location: ' . url('fvdmasteradmin/delegado_carnet_afiliados.php'));
@@ -211,7 +217,7 @@ require __DIR__ . '/includes/layout_header.php';
     <?php endif; ?>
 
     <p style="margin-top:1.25rem;font-size:0.8125rem">
-        <a href="<?= htmlspecialchars(url('fvdmasteradmin/delegado_dashboard.php'), ENT_QUOTES, 'UTF-8') ?>">← Panel del delegado</a>
+        <a href="<?= htmlspecialchars(url('fvdmasteradmin/delegado_dashboard_new.php'), ENT_QUOTES, 'UTF-8') ?>">← Panel del delegado</a>
         · <a href="<?= htmlspecialchars(url('modules/atletas/reporte_carnets.php'), ENT_QUOTES, 'UTF-8') ?>">Reporte carnets</a>
     </p>
 </div>

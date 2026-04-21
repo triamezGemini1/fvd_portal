@@ -106,6 +106,24 @@ function fvd_master_module_url(string $path = ''): string {
 }
 
 /**
+ * Ruta canónica del módulo inscripción a torneo (para redirecciones):
+ * si la petición entró por /modules/, /fvdmasteradmin/modules/ o /admin/modules/, se mantiene esa base.
+ */
+function fvd_torneo_inscripcion_self_url(): string
+{
+    $sn = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($sn !== '' && (
+        str_contains($sn, '/modules/torneo_inscripcion/')
+        || str_contains($sn, '/fvdmasteradmin/modules/torneo_inscripcion/')
+        || str_contains($sn, '/admin/modules/torneo_inscripcion/')
+    )) {
+        return $sn;
+    }
+
+    return fvd_master_module_url('torneo_inscripcion/index.php');
+}
+
+/**
  * Base del CRUD FvdAdminService: si la petición entró por /modules/{mod}/ (o legado fvdmasteradmin/modules/), redirecciones siguen esa ruta.
  *
  * @param 'asociaciones'|'atletas'|'torneos'|'invitaciones'|'solicitudes_delegado' $module

@@ -27,7 +27,7 @@ if ($cCtx !== null && (int) $cCtx > 0) {
     $tidCtx = (int) $cCtx;
 }
 
-$unread = \FvdPortal\Services\DelegadoTorneoNotifService::contarNoVistas($pdo, $delegadoUid, $delegAidInt);
+$unread = \FvdPortal\Services\DelegadoTorneoNotifService::contarPendientesVistaAgrupada($pdo, $delegadoUid, $delegAidInt);
 $pendingAccept = false;
 if ($tidCtx > 0) {
     $pendingAccept = \FvdPortal\Services\DelegadoTorneoNotifService::invitacionPendienteDeAceptacion(

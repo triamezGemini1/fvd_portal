@@ -31,7 +31,7 @@ if (!function_exists('url')) {
 $fvdEsDelegadoPanel = AuthService::isDelegadoAsociacion();
 
 if ($fvdEsDelegadoPanel) {
-    header('Location: ' . $appBase . '/fvdmasteradmin/delegado_dashboard_new.php');
+    header('Location: ' . $appBase . '/fvdmasteradmin/perfil_delegado.php');
     exit;
 }
 
@@ -120,9 +120,9 @@ require __DIR__ . '/includes/layout_header.php';
                 </svg>
             </div>
             <div class="fvd-stat-card__body">
-                <p class="fvd-stat-card__label">Clubes</p>
+                <p class="fvd-stat-card__label">Asociaciones</p>
                 <p class="fvd-stat-card__value"><?= number_format($stats['clubes'], 0, ',', '.') ?></p>
-                <p class="fvd-stat-card__hint">Asociaciones registradas</p>
+                <p class="fvd-stat-card__hint">Registradas en el sistema</p>
             </div>
         </article>
 
