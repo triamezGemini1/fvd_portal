@@ -3,16 +3,16 @@
     "file": "assets/UserGroupIcon-CuaNf2nv.js",
     "name": "UserGroupIcon"
   },
-  "_app-BL8GXm25.css": {
-    "file": "assets/app-BL8GXm25.css",
-    "src": "_app-BL8GXm25.css"
+  "_app-DLETCTvg.css": {
+    "file": "assets/app-DLETCTvg.css",
+    "src": "_app-DLETCTvg.css"
   },
   "_layout_13-CJJ-u_k0.css": {
     "file": "assets/layout_13-CJJ-u_k0.css",
     "src": "_layout_13-CJJ-u_k0.css"
   },
   "resources/js/app.js": {
-    "file": "assets/app-DYrCRlxP.js",
+    "file": "assets/app-CEDkLZJp.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -21,12 +21,12 @@
     ],
     "css": [
       "assets/app-D0kyr_VJ.css",
-      "assets/app-BL8GXm25.css",
+      "assets/app-DLETCTvg.css",
       "assets/layout_13-CJJ-u_k0.css"
     ]
   },
   "resources/js/delegado-app.js": {
-    "file": "assets/delegado-app-Df-8_CSh.js",
+    "file": "assets/delegado-app-Jcn4iVyL.js",
     "name": "delegado-app",
     "src": "resources/js/delegado-app.js",
     "isEntry": true,
@@ -34,26 +34,26 @@
       "_UserGroupIcon-CuaNf2nv.js"
     ],
     "css": [
-      "assets/app-BL8GXm25.css"
+      "assets/app-DLETCTvg.css"
     ]
   },
   "resources/js/gestion-asociaciones.js": {
-    "file": "assets/gestion-asociaciones-ltnT61YX.js",
+    "file": "assets/gestion-asociaciones-DM41LetV.js",
     "name": "gestion-asociaciones",
     "src": "resources/js/gestion-asociaciones.js",
     "isEntry": true,
     "css": [
-      "assets/app-BL8GXm25.css",
+      "assets/app-DLETCTvg.css",
       "assets/layout_13-CJJ-u_k0.css"
     ]
   },
   "resources/js/gestion-atletas.js": {
-    "file": "assets/gestion-atletas-BCpsXW74.js",
+    "file": "assets/gestion-atletas-Ec6bvV9W.js",
     "name": "gestion-atletas",
     "src": "resources/js/gestion-atletas.js",
     "isEntry": true,
     "css": [
-      "assets/app-BL8GXm25.css",
+      "assets/app-DLETCTvg.css",
       "assets/layout_13-CJJ-u_k0.css"
     ]
   }
