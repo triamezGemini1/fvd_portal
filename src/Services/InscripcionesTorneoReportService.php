@@ -41,6 +41,12 @@ final class InscripcionesTorneoReportService
             require_once $legacy;
         }
 
+        if (!class_exists('FvdAdminService', false)) {
+            require_once dirname(__DIR__, 2) . '/src/Services/FvdAdminService.php';
+        }
+        $fvdRep = new \FvdAdminService($pdo);
+        $sexoSqlTor = $fvdRep->sqlAtletasFiltroSexoSegunTorneoTipo($torneoId, 'a');
+
         $params = [':tid' => $torneoId, ':aid' => $asociacionId];
         $dataSql = 'SELECT a.id, a.foto, a.cedula, a.nombre, a.sexo, a.numfvd, a.estatus, a.categ,
     a.carnet, a.traspaso,
@@ -48,8 +54,8 @@ final class InscripcionesTorneoReportService
     FROM atletas a
     LEFT JOIN asociaciones s ON a.asociacion = s.id
     WHERE a.torneo_id = :tid AND a.asociacion = :aid
-    AND COALESCE(a.`' . $col . '`, 0) = 1 ';
-        $countSql = 'SELECT COUNT(*) FROM atletas a WHERE a.torneo_id = :tid AND a.asociacion = :aid AND COALESCE(a.`' . $col . '`, 0) = 1 ';
+    AND COALESCE(a.`' . $col . '`, 0) = 1 ' . $sexoSqlTor;
+        $countSql = 'SELECT COUNT(*) FROM atletas a WHERE a.torneo_id = :tid AND a.asociacion = :aid AND COALESCE(a.`' . $col . '`, 0) = 1 ' . $sexoSqlTor;
         \QueryHelper::applyAsociacionScope($countSql, $dataSql, 'a.asociacion', $params);
         $dataSql .= ' ORDER BY a.nombre ASC, a.numfvd ASC';
 

@@ -38,12 +38,12 @@ $carnetConCarnet = (int) ($cr['solicitado'] ?? 0);
 
 
 
-$urlTorneoInscripcion = fvd_module_url('torneo_inscripcion/index.php')
+$fvdTorneoInscBase = fvd_module_url('torneo_inscripcion/index.php')
     . (isset($fvd_deleg_torneo_q) && $fvd_deleg_torneo_q !== ''
         ? $fvd_deleg_torneo_q
         : ($tidInt > 0 ? '?torneo_id=' . $tidInt : ''));
-
-$urlInscripcionTorneoTabla = fvd_module_url('inscripcion_torneo/index.php')
+$urlTorneoInscripcionInscribir = $fvdTorneoInscBase . '#fvd-insc-sitio-inscribir';
+$urlTorneoInscripcionAdmin = fvd_module_url('inscripcion_torneo/index.php')
     . (isset($fvd_deleg_torneo_q) && $fvd_deleg_torneo_q !== ''
         ? $fvd_deleg_torneo_q
         : ($tidInt > 0 ? '?torneo_id=' . $tidInt : ''));
@@ -147,7 +147,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 <div class="fvd-deleg-alert-invites" role="status" aria-live="polite">
 
-    <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene <?= (int) $delegNotifNoVistas ?> notificación(es) sin abrir. Revise la <a href="#fvd-deleg-guia-inscripcion">guía vía web</a> y el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones a torneos</a>, o el enlace <strong>Invitaciones</strong> en la barra superior.</span>
+    <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene invitaciones pendientes de revisar. Revise la <a href="#fvd-deleg-guia-inscripcion">guía vía web</a> y el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones a torneos</a>, o el enlace <strong>Invitaciones</strong> en la barra superior.</span>
 
 </div>
 
@@ -163,9 +163,9 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
         <li><strong>Invitación:</strong> abra el <strong>PDF</strong> si está disponible y pulse <strong>Panel del torneo</strong> para fijar el torneo en contexto y continuar el flujo.<?php if (($delegNotifNoVistas ?? 0) > 0): ?> Si tiene avisos sin abrir, también puede <a href="<?= htmlspecialchars($urlDelegUltimaInvit, ENT_QUOTES, 'UTF-8') ?>">activar la última invitación sin abrir</a>.<?php endif; ?></li>
 
-        <li><strong>Fase 1</strong> (afiliación, carnets, traspasos): cuando la ventana del calendario lo permita, use <a href="<?= htmlspecialchars($urlRegistrarAtleta, ENT_QUOTES, 'UTF-8') ?>">Registrar atleta</a>, <a href="<?= htmlspecialchars($urlSolCarnet, ENT_QUOTES, 'UTF-8') ?>">Carnets</a> y <a href="<?= htmlspecialchars($urlTraspaso, ENT_QUOTES, 'UTF-8') ?>">Traspaso</a><?php if ($tidInt > 0): ?>, y las pantallas del torneo en contexto (<a href="<?= htmlspecialchars($urlTorneoInscripcion, ENT_QUOTES, 'UTF-8') ?>">Preparación</a>)<?php endif; ?>.<?php if ($delegVentana !== null): ?> <span class="fvd-deleg-guia-web__hint"><?= $delegPuedeFase1 ? 'Ventana de fase 1 abierta.' : 'Fase 1 aún no disponible según calendario.' ?></span><?php endif; ?></li>
+        <li><strong>Fase 1</strong> (afiliación, carnets, traspasos): cuando la ventana del calendario lo permita, use <a href="<?= htmlspecialchars($urlRegistrarAtleta, ENT_QUOTES, 'UTF-8') ?>">Registrar atleta</a>, <a href="<?= htmlspecialchars($urlSolCarnet, ENT_QUOTES, 'UTF-8') ?>">Carnets</a> y <a href="<?= htmlspecialchars($urlTraspaso, ENT_QUOTES, 'UTF-8') ?>">Traspaso</a><?php if ($tidInt > 0): ?>, y las pantallas del torneo en contexto (<a href="<?= htmlspecialchars($urlTorneoInscripcionInscribir, ENT_QUOTES, 'UTF-8') ?>">Preparación</a>)<?php endif; ?>.<?php if ($delegVentana !== null): ?> <span class="fvd-deleg-guia-web__hint"><?= $delegPuedeFase1 ? 'Ventana de fase 1 abierta.' : 'Fase 1 aún no disponible según calendario.' ?></span><?php endif; ?></li>
 
-        <li><strong>Fase 2</strong> (inscripciones al torneo): <a href="<?= htmlspecialchars($urlInscripcionTorneoTabla, ENT_QUOTES, 'UTF-8') ?>">Inscripción al torneo</a> y <a href="<?= htmlspecialchars($urlReportesInscripciones, ENT_QUOTES, 'UTF-8') ?>">Reportes de inscripciones</a>.<?php if ($delegVentana !== null): ?> <span class="fvd-deleg-guia-web__hint"><?= $delegPuedeFase2 ? 'Ventana de fase 2 abierta.' : 'Fase 2 aún no disponible según calendario.' ?></span><?php endif; ?></li>
+        <li><strong>Fase 2</strong> (inscripciones al torneo): <a href="<?= htmlspecialchars($urlTorneoInscripcionInscribir, ENT_QUOTES, 'UTF-8') ?>">Alta y nómina</a> · <a href="<?= htmlspecialchars($urlTorneoInscripcionAdmin, ENT_QUOTES, 'UTF-8') ?>">Retiros y sustituciones</a> · <a href="<?= htmlspecialchars($urlReportesInscripciones, ENT_QUOTES, 'UTF-8') ?>">Reportes de inscripciones</a>.<?php if ($delegVentana !== null): ?> <span class="fvd-deleg-guia-web__hint"><?= $delegPuedeFase2 ? 'Ventana de fase 2 abierta.' : 'Fase 2 aún no disponible según calendario.' ?></span><?php endif; ?></li>
 
     </ol>
 
@@ -185,7 +185,7 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
 <section id="fvd-deleg-torneos-invites" class="fvd-deleg-notif-wrap" aria-label="Invitaciones a torneos">
 
-    <h2 class="fvd-deleg-notif-wrap__h">Invitaciones a torneos <?= ($delegNotifNoVistas ?? 0) > 0 ? ' (' . (int) $delegNotifNoVistas . ' sin abrir)' : '' ?></h2>
+    <h2 class="fvd-deleg-notif-wrap__h">Invitaciones a torneos<?= ($delegNotifNoVistas ?? 0) > 0 ? ' <span style="font-size:0.75rem;font-weight:700;color:var(--fvd-rojo,#b91c1c)">(pendientes)</span>' : '' ?></h2>
 
     <p class="fvd-deleg-notif-wrap__p">Notificaciones <strong>vía web</strong> (solo en este portal): PDF de invitación y botón para abrir el panel del torneo y seguir con la preparación e inscripción.</p>
 
@@ -197,11 +197,19 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
             $nid = (int) ($nf['id'] ?? 0);
 
-            $tn = htmlspecialchars((string) ($nf['torneo_nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $titUl = trim((string) ($nf['titulo_notificacion'] ?? ''));
 
-            $ramaRaw = trim((string) ($nf['torneo_rama_nombre'] ?? ''));
+            if ($titUl === '') {
 
-            $tnRaw = trim((string) ($nf['torneo_nombre'] ?? ''));
+                $titUl = trim((string) ($nf['torneo_nombre'] ?? ''));
+
+            }
+
+            $tn = htmlspecialchars($titUl !== '' ? $titUl : 'Invitación', ENT_QUOTES, 'UTF-8');
+
+            $esGr = !empty($nf['es_grupo_agrupado']);
+
+            $det = (isset($nf['detalle_torneos']) && is_array($nf['detalle_torneos'])) ? $nf['detalle_torneos'] : [];
 
             $fd = htmlspecialchars(substr((string) ($nf['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8');
 
@@ -217,15 +225,55 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
                 <span class="fvd-deleg-notif-wrap__tn"><?= $tn ?></span>
 
-                <?php if ($ramaRaw !== '' && strcasecmp($ramaRaw, $tnRaw) !== 0): ?>
-
-                    <span class="fvd-deleg-notif-wrap__rama" style="display:block;font-size:0.8125rem;color:var(--fvd-muted);margin-top:0.15rem">Rama: <?= htmlspecialchars($ramaRaw, ENT_QUOTES, 'UTF-8') ?></span>
-
-                <?php endif; ?>
-
                 <span class="fvd-deleg-notif-wrap__fd"><?= $fd ?></span>
 
                 <?php if ($sinAbrir): ?><span class="fvd-deleg-notif-wrap__new">Nuevo</span><?php endif; ?>
+
+                <?php if ($esGr && count($det) > 1): ?>
+
+                    <p style="margin:0.4rem 0 0;font-size:0.78rem;color:var(--fvd-muted);line-height:1.35"><?= (int) ($nf['n_en_grupo'] ?? count($det)) ?> categorías en este evento. Acceda al panel por la rama que corresponda:</p>
+
+                    <div style="margin-top:0.45rem;display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;">
+
+                        <?php if (!empty($nf['invitacion_archivo'])): ?>
+
+                            <a class="fvd-btn fvd-btn--secondary fvd-deleg-notif-wrap__btn" href="<?= htmlspecialchars($pdf, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">PDF</a>
+
+                        <?php endif; ?>
+
+                        <?php foreach ($det as $dtr): ?>
+
+                            <?php
+
+                            $nidD = (int) ($dtr['id'] ?? 0);
+
+                            $tidD = (int) ($dtr['torneo_id'] ?? 0);
+
+                            if ($nidD <= 0 || $tidD <= 0) {
+
+                                continue;
+
+                            }
+
+                            $lab = trim((string) ($dtr['rama'] ?? ''));
+
+                            if ($lab === '') {
+
+                                $lab = 'Torneo #' . $tidD;
+
+                            }
+
+                            $h = $appBase . '/fvdmasteradmin/delegado_entrar_torneo.php?notif_id=' . $nidD;
+
+                            ?>
+
+                            <a class="fvd-btn fvd-btn--primary fvd-deleg-notif-wrap__btn" href="<?= htmlspecialchars($h, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></a>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                <?php else: ?>
 
                 <span class="fvd-deleg-notif-wrap__sp"></span>
 
@@ -236,6 +284,8 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
                 <?php endif; ?>
 
                 <a class="fvd-btn fvd-btn--primary fvd-deleg-notif-wrap__btn" href="<?= htmlspecialchars($entrar, ENT_QUOTES, 'UTF-8') ?>">Panel del torneo</a>
+
+                <?php endif; ?>
 
             </li>
 
@@ -377,11 +427,11 @@ $urlGenerarDeudaTorneo = $appBase . '/fvdmasteradmin/delegado_generar_deuda_torn
 
             <div class="fvd-delegado-torneos__btn-stack">
 
-                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--i1" href="<?= htmlspecialchars($urlTorneoInscripcion, ENT_QUOTES, 'UTF-8') ?>">Inscripción torneo</a>
+                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--i1" href="<?= htmlspecialchars($urlTorneoInscripcionInscribir, ENT_QUOTES, 'UTF-8') ?>">Inscripción (alta / nómina)</a>
 
-                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--i2" href="<?= htmlspecialchars($urlInscripcionTorneoTabla, ENT_QUOTES, 'UTF-8') ?>">Administrador de inscripciones</a>
+                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--i2" href="<?= htmlspecialchars($urlTorneoInscripcionAdmin, ENT_QUOTES, 'UTF-8') ?>">Administración (retiros / sustituciones)</a>
 
-                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--i3" href="<?= htmlspecialchars($urlReportesInscripciones, ENT_QUOTES, 'UTF-8') ?>">Reportes</a>
+                <a class="fvd-delegado-torneos__action fvd-delegado-torneos__action--i3" href="<?= htmlspecialchars($urlReportesInscripciones, ENT_QUOTES, 'UTF-8') ?>">Reportes PDF / finanzas</a>
 
             </div>
 

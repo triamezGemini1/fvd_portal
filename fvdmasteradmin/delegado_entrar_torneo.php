@@ -10,10 +10,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/services/AuthService.php';
 require_once dirname(__DIR__) . '/config/paths.php';
+require_once dirname(__DIR__) . '/config/fvd_navigation_return.php';
 require_once __DIR__ . '/config/db.php';
 require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
+require_once dirname(__DIR__) . '/src/Services/TorneoFinalizacionService.php';
 
 use FvdPortal\Services\DelegadoTorneoNotifService;
+use FvdPortal\Services\TorneoFinalizacionService;
 
 AuthService::ensureSession();
 AuthService::requireLogin();
@@ -30,6 +33,15 @@ $pdo = fvd_db();
 $did = (int) AuthService::userId();
 $aidCtx = AuthService::idAsociacion();
 $aid = ($aidCtx !== null && (int) $aidCtx > 0) ? (int) $aidCtx : null;
+$fallbackHome = AuthService::homeUrl();
+$originReturn = fvd_return_from_request();
+if ($originReturn === null && isset($_SERVER['HTTP_REFERER']) && is_string($_SERVER['HTTP_REFERER'])) {
+    $originReturn = fvd_return_sanitize($_SERVER['HTTP_REFERER']);
+}
+$originRedirect = $originReturn ?? $fallbackHome;
+$withMsg = static function (string $url, string $msg): string {
+    return $url . (str_contains($url, '?') ? '&' : '?') . 'msg=' . rawurlencode($msg);
+};
 
 $notifId = isset($_GET['notif_id']) ? (int) $_GET['notif_id'] : 0;
 $tokenRaw = isset($_GET['token']) ? trim((string) $_GET['token']) : '';
@@ -53,16 +65,28 @@ if ($tokenRaw !== '') {
 }
 
 if ($row === null) {
-    $h = AuthService::homeUrl();
-    header('Location: ' . $h . (str_contains($h, '?') ? '&' : '?') . 'msg=notif_no');
+    header('Location: ' . $withMsg($originRedirect, 'notif_no'));
     exit;
 }
 
 $tid = (int) ($row['torneo_id'] ?? 0);
 if ($tid <= 0) {
-    $h = AuthService::homeUrl();
-    header('Location: ' . $h . (str_contains($h, '?') ? '&' : '?') . 'msg=notif_no');
+    header('Location: ' . $withMsg($originRedirect, 'notif_no'));
     exit;
+}
+
+if (TorneoFinalizacionService::columnaFinalizadoExiste($pdo)) {
+    try {
+        $stC = $pdo->prepare('SELECT finalizado_en FROM torneosact WHERE torneo = :t LIMIT 1');
+        $stC->execute([':t' => $tid]);
+        $finCol = $stC->fetchColumn();
+        if ($finCol !== false && $finCol !== null && trim((string) $finCol) !== '') {
+            header('Location: ' . $withMsg($originRedirect, 'torneo_cerrado'));
+            exit;
+        }
+    } catch (Throwable $e) {
+        error_log('[delegado_entrar_torneo] finalizado_en: ' . $e->getMessage());
+    }
 }
 
 $gidTorneo = (int) ($row['grupo_evento_id'] ?? 0);
@@ -70,15 +94,20 @@ $gidTorneo = (int) ($row['grupo_evento_id'] ?? 0);
 $nid = (int) ($row['id'] ?? 0);
 $accessTok = DelegadoTorneoNotifService::asegurarAccessTokenParaNotificacion($pdo, $nid);
 if ($accessTok === null || $accessTok === '') {
-    $h = AuthService::homeUrl();
-    header('Location: ' . $h . (str_contains($h, '?') ? '&' : '?') . 'msg=notif_no');
+    header('Location: ' . $withMsg($originRedirect, 'notif_no'));
     exit;
 }
 
 AuthService::setDelegadoTorneoContext($tid);
 if ($gidTorneo > 0) {
     AuthService::setDelegadoCampeonatoGrupo($gidTorneo);
-    DelegadoTorneoNotifService::marcarVistoTodasMismoGrupo($pdo, $did, $aid, $gidTorneo);
+    $fdMarca = substr((string) ($row['fechator'] ?? ''), 0, 10);
+    $ecMarca = isset($row['es_campeonato']) ? (int) $row['es_campeonato'] : null;
+    if ($fdMarca !== '' && $ecMarca !== null) {
+        DelegadoTorneoNotifService::marcarVistoTodasMismoGrupo($pdo, $did, $aid, $gidTorneo, $fdMarca, $ecMarca);
+    } else {
+        DelegadoTorneoNotifService::marcarVistoTodasMismoGrupo($pdo, $did, $aid, $gidTorneo);
+    }
 } else {
     DelegadoTorneoNotifService::marcarVisto($pdo, $nid, $did, $aid);
 }
@@ -94,5 +123,6 @@ $q = [
     'ctx_torneo'       => $tid,
 ];
 $dest = $mp . '?' . http_build_query($q);
+$dest = fvd_return_append_to_url($dest, $originRedirect);
 header('Location: ' . $dest);
 exit;

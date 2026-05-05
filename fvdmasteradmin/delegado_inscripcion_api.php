@@ -43,14 +43,14 @@ if ($method === 'POST') {
     }
 }
 
-$asoc = AuthService::idAsociacion();
-if ($asoc === null || $asoc <= 0) {
-    $asoc = 0;
-}
+$asoc = (int) (AuthService::idAsociacion() ?? 0);
 if ($asoc <= 0 && AuthService::isSuperAdmin()) {
     $asoc = (int) ($_GET['asociacion_id'] ?? 0);
     if ($asoc <= 0 && is_array($postData)) {
         $asoc = (int) ($postData['asociacion_id'] ?? 0);
+    }
+    if ($asoc <= 0) {
+        $asoc = (int) (AuthService::adminPortalDelegadoAsociacionId() ?? 0);
     }
 }
 
@@ -86,7 +86,7 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Campeonato no válido.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $lista = $svc->torneosPorGrupoCampeonato($asoc, $gr);
+        $lista = $svc->torneosPorGrupoCampeonato($asoc, $gr, $tid);
         $enLista = false;
         foreach ($lista as $r) {
             if ((int) ($r['torneo'] ?? 0) === $tid) {
@@ -120,6 +120,8 @@ try {
             'torneo_meta' => $meta,
             'fvdSitioDisponibles' => $sitio['fvdSitioDisponibles'],
             'fvdSitioInscritos' => $sitio['fvdSitioInscritos'],
+            'fvdSitioInscritosGrupos' => $sitio['fvdSitioInscritosGrupos'] ?? [],
+            'fvd_sitio_clase' => (int) ($sitio['fvd_sitio_clase'] ?? 1),
             'fvd_insc' => [
                 'torneoId' => $tid,
                 'modo' => (string) ($meta['modo'] ?? 'individual'),
@@ -162,7 +164,8 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Torneo no permitido en su evento actual.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $modoBandera = AuthService::isDelegadoAsociacion();
+        $modoBandera = AuthService::isDelegadoAsociacion()
+            || (($_GET['modo_bandera'] ?? '') === '1');
         if (!$modoBandera && !$svc->torneosInscripcionTorneoTableExists()) {
             http_response_code(400);
             echo json_encode(['ok' => false, 'error' => 'Falta la tabla inscripcion_torneo para este modo.'], JSON_UNESCAPED_UNICODE);
@@ -251,10 +254,82 @@ try {
                 exit;
             }
 
+            $nombreEquipo = isset($data['nombre_equipo']) ? trim((string) $data['nombre_equipo']) : '';
+            $nombreEquipoArg = $nombreEquipo !== '' ? $nombreEquipo : null;
+            $syncIt = $svc->torneosInscripcionTorneoTableExists();
+
             $n = $soloBandera
-                ? InscripcionService::registrarInscripcionBandera($pdo, $torneoId, $asoc, $tipo, $ids)
-                : InscripcionService::registrarInscripcion($pdo, $torneoId, $asoc, $tipo, $ids);
+                ? InscripcionService::registrarInscripcionBandera(
+                    $pdo,
+                    $torneoId,
+                    $asoc,
+                    $tipo,
+                    $ids,
+                    $nombreEquipoArg,
+                    $syncIt
+                )
+                : InscripcionService::registrarInscripcion($pdo, $torneoId, $asoc, $tipo, $ids, $nombreEquipoArg);
             echo json_encode(['ok' => true, 'inscritos' => $n, 'tipo' => $tipo, 'modo' => $soloBandera ? 'bandera' : 'tabla'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($action === 'retirar_equipo') {
+            $equipoR = (int) ($data['equipo'] ?? 0);
+            if ($equipoR <= 0) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'equipo requerido.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            if (!$svc->torneosInscripcionTorneoTableExists()) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'Tabla inscripcion_torneo no disponible.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            if (AuthService::isDelegadoAsociacion()) {
+                $ok = InscripcionService::retirarEquipoInscripcionBandera($pdo, $torneoId, $asoc, $equipoR);
+            } else {
+                $ok = InscripcionService::retirarEquipoInscripcionTabla($pdo, $torneoId, $asoc, $equipoR);
+            }
+            echo json_encode(['ok' => true, 'retirado' => $ok], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($action === 'actualizar_equipo') {
+            $equipoA = (int) ($data['equipo'] ?? 0);
+            $idsA = $data['atleta_ids'] ?? [];
+            if (!is_array($idsA)) {
+                $idsA = [];
+            }
+            $idsA = array_values(array_filter(array_map('intval', $idsA), static function (int $x): bool {
+                return $x > 0;
+            }));
+            $neqA = isset($data['nombre_equipo']) ? trim((string) $data['nombre_equipo']) : '';
+            if ($equipoA <= 0) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'equipo requerido.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            if ($idsA === []) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'atleta_ids requerido.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            if (!$svc->torneosInscripcionTorneoTableExists()) {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'error' => 'Tabla inscripcion_torneo no disponible.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $modoB = AuthService::isDelegadoAsociacion();
+            $nA = InscripcionService::actualizarEquipoInscripcion(
+                $pdo,
+                $torneoId,
+                $asoc,
+                $equipoA,
+                $idsA,
+                $neqA !== '' ? $neqA : null,
+                $modoB
+            );
+            echo json_encode(['ok' => true, 'inscritos' => $nA], JSON_UNESCAPED_UNICODE);
             exit;
         }
 

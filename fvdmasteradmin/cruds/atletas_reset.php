@@ -24,7 +24,7 @@ if (!$embedded) {
     require_once $fvdRoot . '/includes/layout_header.php';
 } else {
     header('Content-Type: text/html; charset=UTF-8');
-    $fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
+    $fvdUiCss = url('assets/css/fvd-ui-portal.css');
     ?>
 <!DOCTYPE html>
 <html lang="es">

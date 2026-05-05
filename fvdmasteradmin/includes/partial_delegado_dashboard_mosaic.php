@@ -28,7 +28,7 @@ if ($campeonatoIdInt > 0) {
 }
 $urlTorneosVinculados = fvd_module_url(
     'torneo_inscripcion/index.php' . ($qTorneoVinc !== [] ? '?' . http_build_query($qTorneoVinc) : '')
-);
+) . '#fvd-insc-sitio-inscribir';
 
 $fvd_q_nuevo = ['action' => 'form'];
 $fvd_q_lista = ['action' => 'list'];
@@ -62,7 +62,7 @@ $deudaBs = isset($totFin['monto_total_bs']) ? (float) $totFin['monto_total_bs'] 
 
     <?php if (($delegNotifNoVistas ?? 0) > 0): ?>
         <div class="fvd-deleg-alert-invites fvd-dd-alert-invites" role="status" aria-live="polite">
-            <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene <?= (int) $delegNotifNoVistas ?> notificación(es) sin abrir. Revise el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones</a> o el enlace en la barra superior.</span>
+            <span class="fvd-deleg-alert-invites__text"><strong>Nueva invitación a torneo.</strong> Tiene invitaciones pendientes de revisar. Revise el bloque <a href="#fvd-deleg-torneos-invites">Invitaciones</a> o el enlace en la barra superior.</span>
         </div>
     <?php endif; ?>
 
@@ -149,7 +149,7 @@ $deudaBs = isset($totFin['monto_total_bs']) ? (float) $totFin['monto_total_bs'] 
                     <div class="fvd-dd-card__body">
                         <p class="fvd-dd-card__label">Inscripciones</p>
                         <h2 class="fvd-dd-card__title">Torneos del campeonato</h2>
-                        <p class="fvd-dd-card__meta">Vincule ramas e inscriba atletas según la convocatoria (usa <code class="fvd-dd-code">campeonato_id</code> en sesión).</p>
+                        <p class="fvd-dd-card__meta">Vincule ramas e inscriba con el formulario en sitio del torneo; la URL debe incluir <code class="fvd-dd-code">campeonato_id</code> (grupo de evento o ID de torneo del campeonato) y <code class="fvd-dd-code">torneo_id</code>.</p>
                     </div>
                 </div>
                 <div class="fvd-dd-card__actions">
@@ -218,15 +218,19 @@ $deudaBs = isset($totFin['monto_total_bs']) ? (float) $totFin['monto_total_bs'] 
 
     <?php if (($delegNotifs ?? []) !== []): ?>
         <section id="fvd-deleg-torneos-invites" class="fvd-dd-invites fvd-deleg-notif-wrap" aria-label="Invitaciones a torneos">
-            <h2 class="fvd-deleg-notif-wrap__h">Invitaciones a torneos <?= ($delegNotifNoVistas ?? 0) > 0 ? ' (' . (int) $delegNotifNoVistas . ' sin abrir)' : '' ?></h2>
+            <h2 class="fvd-deleg-notif-wrap__h">Invitaciones a torneos<?= ($delegNotifNoVistas ?? 0) > 0 ? ' <span style="font-size:0.75rem;font-weight:700;color:var(--fvd-rojo,#b91c1c)">(pendientes)</span>' : '' ?></h2>
             <p class="fvd-deleg-notif-wrap__p" style="font-size:0.8125rem">PDF y acceso al panel del torneo.</p>
             <ul class="fvd-deleg-notif-wrap__ul">
                 <?php foreach ($delegNotifs as $nf): ?>
                     <?php
                     $nid = (int) ($nf['id'] ?? 0);
-                    $tn = htmlspecialchars((string) ($nf['torneo_nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
-                    $ramaRaw = trim((string) ($nf['torneo_rama_nombre'] ?? ''));
-                    $tnRaw = trim((string) ($nf['torneo_nombre'] ?? ''));
+                    $titUl = trim((string) ($nf['titulo_notificacion'] ?? ''));
+                    if ($titUl === '') {
+                        $titUl = trim((string) ($nf['torneo_nombre'] ?? ''));
+                    }
+                    $tn = htmlspecialchars($titUl !== '' ? $titUl : 'Invitación', ENT_QUOTES, 'UTF-8');
+                    $esGr = !empty($nf['es_grupo_agrupado']);
+                    $det = (isset($nf['detalle_torneos']) && is_array($nf['detalle_torneos'])) ? $nf['detalle_torneos'] : [];
                     $fd = htmlspecialchars(substr((string) ($nf['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8');
                     $sinAbrir = empty($nf['visto_en']);
                     $entrar = $appBase . '/fvdmasteradmin/delegado_entrar_torneo.php?notif_id=' . $nid;
@@ -234,16 +238,37 @@ $deudaBs = isset($totFin['monto_total_bs']) ? (float) $totFin['monto_total_bs'] 
                     ?>
                     <li class="fvd-deleg-notif-wrap__li">
                         <span class="fvd-deleg-notif-wrap__tn"><?= $tn ?></span>
-                        <?php if ($ramaRaw !== '' && strcasecmp($ramaRaw, $tnRaw) !== 0): ?>
-                            <span class="fvd-deleg-notif-wrap__rama" style="display:block;font-size:0.8125rem;color:var(--fvd-muted);margin-top:0.15rem">Rama: <?= htmlspecialchars($ramaRaw, ENT_QUOTES, 'UTF-8') ?></span>
-                        <?php endif; ?>
                         <span class="fvd-deleg-notif-wrap__fd"><?= $fd ?></span>
                         <?php if ($sinAbrir): ?><span class="fvd-deleg-notif-wrap__new">Nuevo</span><?php endif; ?>
+                        <?php if ($esGr && count($det) > 1): ?>
+                            <p style="margin:0.4rem 0 0;font-size:0.78rem;color:var(--fvd-muted);line-height:1.35"><?= (int) ($nf['n_en_grupo'] ?? count($det)) ?> categorías en este evento. Acceda al panel por la rama que corresponda:</p>
+                            <div style="margin-top:0.45rem;display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;">
+                                <?php if (!empty($nf['invitacion_archivo'])): ?>
+                                    <a class="fvd-btn fvd-btn--secondary fvd-deleg-notif-wrap__btn" href="<?= htmlspecialchars($pdf, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">PDF</a>
+                                <?php endif; ?>
+                                <?php foreach ($det as $dtr): ?>
+                                    <?php
+                                    $nidD = (int) ($dtr['id'] ?? 0);
+                                    $tidD = (int) ($dtr['torneo_id'] ?? 0);
+                                    if ($nidD <= 0 || $tidD <= 0) {
+                                        continue;
+                                    }
+                                    $lab = trim((string) ($dtr['rama'] ?? ''));
+                                    if ($lab === '') {
+                                        $lab = 'Torneo #' . $tidD;
+                                    }
+                                    $h = $appBase . '/fvdmasteradmin/delegado_entrar_torneo.php?notif_id=' . $nidD;
+                                    ?>
+                                    <a class="fvd-btn fvd-btn--primary fvd-deleg-notif-wrap__btn" href="<?= htmlspecialchars($h, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></a>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
                         <span class="fvd-deleg-notif-wrap__sp"></span>
                         <?php if (!empty($nf['invitacion_archivo'])): ?>
                             <a class="fvd-btn fvd-btn--secondary fvd-deleg-notif-wrap__btn" href="<?= htmlspecialchars($pdf, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">PDF</a>
                         <?php endif; ?>
                         <a class="fvd-btn fvd-btn--primary fvd-deleg-notif-wrap__btn" href="<?= htmlspecialchars($entrar, ENT_QUOTES, 'UTF-8') ?>">Panel del torneo</a>
+                        <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
             </ul>

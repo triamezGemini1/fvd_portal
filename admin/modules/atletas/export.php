@@ -30,8 +30,10 @@ $lf = fvd_atletas_resolve_list_filters($_GET);
 $alcance = $lf['alcance'];
 $tipo = $lf['tipo'];
 $asociacionFiltroId = $lf['asociacion_id'];
+$marcadorExport = fvd_atletas_resolve_marcador($_GET);
+$marcadorArg = $marcadorExport !== '' ? $marcadorExport : null;
 
-$rows = QueryHelper::selectAtletasAdminAll($cedula, $q, fvd_db(), null, $alcance, $tipo, $asociacionFiltroId);
+$rows = QueryHelper::selectAtletasAdminAll($cedula, $q, fvd_db(), null, $alcance, $tipo, $asociacionFiltroId, $marcadorArg);
 $rowCount = count($rows);
 $ts = date('Y-m-d_His');
 

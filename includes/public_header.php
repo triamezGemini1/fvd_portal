@@ -20,7 +20,7 @@ if (!defined('FVD_UI_COLOR_AZUL')) {
 
 /**
  * Variables CSS de marca (80/15/5). Sitio público: fondo azul institucional (#0A192F).
- * Incluir después de fvd-ui-mistorneos.css.
+ * Incluir después de fvd-ui-portal.css.
  */
 function fvd_ui_print_css_variables(): void
 {
@@ -117,7 +117,7 @@ function public_layout_print_brand_head(): void
 function public_layout_head(string $title): void
 {
     header('Content-Type: text/html; charset=UTF-8');
-    $fvdUiCss = function_exists('url') ? url('assets/css/fvd-ui-mistorneos.css') : '/assets/css/fvd-ui-mistorneos.css';
+    $fvdUiCss = function_exists('url') ? url('assets/css/fvd-ui-portal.css') : '/assets/css/fvd-ui-portal.css';
     ?>
 <!DOCTYPE html>
 <html lang="es" class="scroll-smooth">

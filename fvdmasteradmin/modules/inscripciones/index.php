@@ -8,7 +8,6 @@ fvd_module_require_roles();
 require_once __DIR__ . '/Controller.php';
 $ctrl = new InscripcionesController();
 
-$fvd_rep_campeonato_error = '';
 $myAid = AuthService::idAsociacion();
 $ctxTorneo = AuthService::delegadoTorneoContextId();
 $tidGet = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : 0;
@@ -24,7 +23,12 @@ if (AuthService::isDelegadoAsociacion() && $myAid !== null && (int) $myAid > 0) 
     if ($campGet <= 0) {
         $fvd_rep_campeonato_error = 'Indique campeonato_id (grupo de evento o ID de torneo del campeonato) en la URL.';
     } else {
-        $fvdRepTorneos = $ctrl->listTorneosPorCampeonatoParaDelegado((int) $myAid, $campGet);
+        $ctxFiltroList = $tidGet > 0 ? $tidGet : ($ctxTorneo !== null && $ctxTorneo > 0 ? $ctxTorneo : null);
+        $fvdRepTorneos = $ctrl->listTorneosPorCampeonatoParaDelegado(
+            (int) $myAid,
+            $campGet,
+            $ctxFiltroList !== null && $ctxFiltroList > 0 ? $ctxFiltroList : null
+        );
         if ($fvdRepTorneos === []) {
             $fvd_rep_campeonato_error = 'No hay torneos de este campeonato con convocatoria para su asociación, o el campeonato no es válido.';
         }
@@ -32,7 +36,8 @@ if (AuthService::isDelegadoAsociacion() && $myAid !== null && (int) $myAid > 0) 
 } else {
     $fvdRepTorneos = $ctrl->listTorneosParaSelector(
         $myAid !== null && (int) $myAid > 0 ? (int) $myAid : null,
-        $ctxTorneo
+        $ctxTorneo,
+        $tidGet
     );
     if ($fvdRepTorneos === [] && $ctxTorneo !== null && $ctxTorneo > 0) {
         $one = $ctrl->fetchTorneoActo($ctxTorneo);
@@ -59,6 +64,7 @@ if ($tidGet > 0) {
     }
 }
 $fvdRepAsociaciones = $ctrl->listAsociacionesParaAdmin();
+$fvdRepMaestroFinanzasEmb = function_exists('fvd_master_embed_active') && fvd_master_embed_active() && AuthService::isSuperAdmin();
 // Prioridad estricta: URL > contexto delegado > primer torneo del listado.
 $fvdRepDefaultTorneo = $tidGet > 0 ? $tidGet : ($ctxTorneo !== null && $ctxTorneo > 0 ? $ctxTorneo : 0);
 if ($fvdRepDefaultTorneo <= 0 && $fvdRepTorneos !== []) {
@@ -67,7 +73,11 @@ if ($fvdRepDefaultTorneo <= 0 && $fvdRepTorneos !== []) {
 $fvdRepDefaultAsoc = $myAid !== null && (int) $myAid > 0 ? (int) $myAid : 0;
 if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
     $aidGet = isset($_GET['asociacion_id']) ? (int) $_GET['asociacion_id'] : 0;
-    $fvdRepDefaultAsoc = $aidGet > 0 ? $aidGet : ($fvdRepAsociaciones !== [] ? (int) ($fvdRepAsociaciones[0]['id'] ?? 0) : 0);
+    if ($fvdRepMaestroFinanzasEmb) {
+        $fvdRepDefaultAsoc = $aidGet;
+    } else {
+        $fvdRepDefaultAsoc = $aidGet > 0 ? $aidGet : ($fvdRepAsociaciones !== [] ? (int) ($fvdRepAsociaciones[0]['id'] ?? 0) : 0);
+    }
 }
 
 /** @var array<string, mixed>|null Estadísticas torneo + asociación seleccionada (badges y PDF) */
@@ -93,9 +103,39 @@ if ($fvdRepDefaultTorneo > 0) {
     }
 }
 
-$fvd_page_title = 'Reportes de inscripciones y finanzas';
+/** Modo embebido panel maestro: detalle EUR por asociación */
+$fvdRepDeudaEurConceptos = null;
+$fvdRepPagosEurRows = [];
+if (!empty($fvdRepMaestroFinanzasEmb) && (int) $fvdRepDefaultAsoc > 0 && (int) $fvdRepDefaultTorneo > 0) {
+    $d = is_array($fvdRepStats['deuda'] ?? null) ? $fvdRepStats['deuda'] : null;
+    if ($d !== null) {
+        $fvdRepDeudaEurConceptos = $ctrl->allocDeudaEurPorConcepto($d);
+    } else {
+        $fvdRepDeudaEurConceptos = [
+            'inscripciones' => 0.0, 'afiliacion' => 0.0, 'carnets' => 0.0, 'traspasos' => 0.0, 'anualidad' => 0.0,
+        ];
+    }
+    $fvdRepPagosEurRows = $ctrl->listPagosTorneoAsociacionEur(
+        (int) $fvdRepDefaultTorneo,
+        (int) $fvdRepDefaultAsoc
+    );
+}
+
 $fvd_rep_campeonato_id = isset($campGet) ? (int) $campGet : 0;
 
-require FVD_MASTER_ROOT . '/includes/layout_header.php';
-include __DIR__ . '/list.view.php';
-require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+if (!empty($fvdRepMaestroFinanzasEmb) && (int) $fvdRepDefaultAsoc > 0 && (int) $fvdRepDefaultTorneo > 0) {
+    $fvd_page_title = 'Detalle del club (EUR) — inscripciones';
+    require FVD_MASTER_ROOT . '/includes/layout_header.php';
+    include __DIR__ . '/detalle_asociacion_embed.view.php';
+    require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+} elseif (!empty($fvdRepMaestroFinanzasEmb)) {
+    $fvd_page_title = 'Inscripciones y finanzas por asociación (EUR)';
+    require FVD_MASTER_ROOT . '/includes/layout_header.php';
+    include __DIR__ . '/lista_maestro_embed.view.php';
+    require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+} else {
+    $fvd_page_title = 'Reportes de inscripciones y finanzas';
+    require FVD_MASTER_ROOT . '/includes/layout_header.php';
+    include __DIR__ . '/list.view.php';
+    require FVD_MASTER_ROOT . '/includes/layout_footer.php';
+}

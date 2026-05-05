@@ -49,24 +49,114 @@ if (!function_exists('fvd_return_sanitize')) {
         if (!isset($raw[0]) || $raw[0] !== '/') {
             return null;
         }
-        $base = fvd_return_base_path_prefix();
-        if ($base !== '/' && strpos($raw, $base) !== 0) {
-            return null;
+        /* Aceptar ret si coincide con APP_BASE_PATH o con BASE_URL (p. ej. inferido), no solo uno de ellos. */
+        $prefixes = [];
+        $fromEnv = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
+        if ($fromEnv !== '') {
+            $prefixes[] = $fromEnv;
+        }
+        if (defined('BASE_URL')) {
+            $bu = rtrim((string) BASE_URL, '/');
+            if ($bu !== '' && !in_array($bu, $prefixes, true)) {
+                $prefixes[] = $bu;
+            }
+        }
+        if ($prefixes !== []) {
+            $ok = false;
+            foreach ($prefixes as $pre) {
+                if ($pre !== '' && strpos($raw, $pre) === 0) {
+                    $ok = true;
+                    break;
+                }
+            }
+            if (!$ok) {
+                return null;
+            }
         }
 
         return $raw;
     }
 }
 
+if (!function_exists('fvd_master_panel_workspace_params')) {
+    /**
+     * Contexto del panel maestro (torneo + workspace) para propagarlo en iframes y en `ret`.
+     * Prioridad: GET actual → sesión (fijada al cargar master_panel.php).
+     *
+     * @return array{ctx_torneo:int, fvd_ws:string}
+     */
+    function fvd_master_panel_workspace_params(): array
+    {
+        if (class_exists('AuthService', false)) {
+            AuthService::ensureSession();
+        }
+
+        $ctx = isset($_GET['ctx_torneo']) ? max(0, (int) $_GET['ctx_torneo']) : 0;
+        $sessCtx = 'fvd_master_panel_ctx_torneo';
+        if ($ctx <= 0 && isset($_SESSION[$sessCtx])) {
+            $ctx = max(0, (int) $_SESSION[$sessCtx]);
+        }
+
+        $ws = '';
+        if (isset($_GET['fvd_ws']) && is_string($_GET['fvd_ws'])) {
+            $cand = trim($_GET['fvd_ws']);
+            if ($cand !== '' && preg_match('#^[a-zA-Z0-9_/\-]+$#', $cand)) {
+                $ws = $cand;
+            }
+        }
+        if ($ws === '' && isset($_SESSION['fvd_master_panel_fvd_ws']) && is_string($_SESSION['fvd_master_panel_fvd_ws'])) {
+            $cand = trim($_SESSION['fvd_master_panel_fvd_ws']);
+            if ($cand !== '' && preg_match('#^[a-zA-Z0-9_/\-]+$#', $cand)) {
+                $ws = $cand;
+            }
+        }
+
+        return ['ctx_torneo' => $ctx, 'fvd_ws' => $ws];
+    }
+}
+
+if (!function_exists('fvd_master_panel_render_context_hiddens')) {
+    /**
+     * Campos ocultos para conservar ctx_torneo y fvd_ws en formularios embebidos del panel maestro.
+     */
+    function fvd_master_panel_render_context_hiddens(): void
+    {
+        if (!function_exists('fvd_master_embed_active') || !fvd_master_embed_active()) {
+            return;
+        }
+        if (!function_exists('fvd_master_panel_workspace_params')) {
+            return;
+        }
+        $wp = fvd_master_panel_workspace_params();
+        if ($wp['ctx_torneo'] > 0) {
+            echo '<input type="hidden" name="ctx_torneo" value="' . (int) $wp['ctx_torneo'] . '">' . "\n";
+        }
+        if ($wp['fvd_ws'] !== '') {
+            echo '<input type="hidden" name="fvd_ws" value="' . htmlspecialchars($wp['fvd_ws'], ENT_QUOTES, 'UTF-8') . '">' . "\n";
+        }
+    }
+}
+
 if (!function_exists('fvd_return_current_for_link')) {
     /**
      * URL de esta petición (sin ret/return), para adjuntar como próximo origen.
+     * En vista embebida del panel maestro incluye ctx_torneo y fvd_ws para que cada retorno
+     * reconstruya el mismo workspace (listado, informes, formulario).
      */
     function fvd_return_current_for_link(): string
     {
         $path = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
         $qs = $_GET;
-        unset($qs['ret'], $qs['return']);
+        unset($qs['ret'], $qs['return'], $qs['spa_json'], $qs['_fvd_embed_ts']);
+        if (function_exists('fvd_master_embed_active') && fvd_master_embed_active() && function_exists('fvd_master_panel_workspace_params')) {
+            $wp = fvd_master_panel_workspace_params();
+            if ($wp['ctx_torneo'] > 0) {
+                $qs['ctx_torneo'] = (string) $wp['ctx_torneo'];
+            }
+            if ($wp['fvd_ws'] !== '') {
+                $qs['fvd_ws'] = $wp['fvd_ws'];
+            }
+        }
         $q = http_build_query($qs);
 
         return $path . ($q !== '' ? '?' . $q : '');
@@ -137,6 +227,30 @@ if (!function_exists('fvd_return_merge_get_params')) {
         }
         if (isset($_GET['fvd_master_embed']) && (string) $_GET['fvd_master_embed'] === '1') {
             $queryParams['fvd_master_embed'] = '1';
+        }
+        if (isset($_GET['ctx_torneo']) && (int) $_GET['ctx_torneo'] > 0) {
+            $queryParams['ctx_torneo'] = (string) (int) $_GET['ctx_torneo'];
+        }
+        if (isset($_GET['fvd_ws']) && is_string($_GET['fvd_ws'])) {
+            $w = trim($_GET['fvd_ws']);
+            if ($w !== '' && preg_match('#^[a-zA-Z0-9_/\-]+$#', $w)) {
+                $queryParams['fvd_ws'] = $w;
+            }
+        }
+        if (isset($_GET['torneo_id']) && (int) $_GET['torneo_id'] > 0) {
+            $queryParams['torneo_id'] = (string) (int) $_GET['torneo_id'];
+        }
+        if (isset($_GET['campeonato_id']) && (int) $_GET['campeonato_id'] > 0) {
+            $queryParams['campeonato_id'] = (string) (int) $_GET['campeonato_id'];
+        }
+        if (function_exists('fvd_master_embed_active') && fvd_master_embed_active() && function_exists('fvd_master_panel_workspace_params')) {
+            $wp = fvd_master_panel_workspace_params();
+            if ($wp['ctx_torneo'] > 0 && !isset($queryParams['ctx_torneo'])) {
+                $queryParams['ctx_torneo'] = (string) $wp['ctx_torneo'];
+            }
+            if ($wp['fvd_ws'] !== '' && !isset($queryParams['fvd_ws'])) {
+                $queryParams['fvd_ws'] = $wp['fvd_ws'];
+            }
         }
 
         return $queryParams;
@@ -214,6 +328,17 @@ if (!function_exists('fvd_return_preserve_query_params')) {
             if (preg_match('/[?&]fvd_master_embed=1(?:&|$)/', $out) !== 1) {
                 $sep = str_contains($out, '?') ? '&' : '?';
                 $out .= $sep . 'fvd_master_embed=1';
+            }
+            if (function_exists('fvd_master_panel_workspace_params')) {
+                $wp = fvd_master_panel_workspace_params();
+                if ($wp['ctx_torneo'] > 0 && preg_match('/[?&]ctx_torneo=\d+/', $out) !== 1) {
+                    $sep = str_contains($out, '?') ? '&' : '?';
+                    $out .= $sep . 'ctx_torneo=' . (int) $wp['ctx_torneo'];
+                }
+                if ($wp['fvd_ws'] !== '' && preg_match('/[?&]fvd_ws=/', $out) !== 1) {
+                    $sep = str_contains($out, '?') ? '&' : '?';
+                    $out .= $sep . 'fvd_ws=' . rawurlencode($wp['fvd_ws']);
+                }
             }
         }
 

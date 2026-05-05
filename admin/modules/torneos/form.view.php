@@ -18,10 +18,12 @@ if (!empty($r['invitacion']) && is_string($r['invitacion']) && $r['invitacion'] 
     $invitacionUrl = upload_url($r['invitacion']);
 }
 
-$tipoVal = (int) ($r['tipo'] ?? 1);
-if ($tipoVal < 1 || $tipoVal > 2) {
-    $tipoVal = $tipoVal === 3 ? 2 : 1;
+$tipoGenVal = (int) ($r['tipo'] ?? 1);
+if ($tipoGenVal < 1 || $tipoGenVal > 3) {
+    $tipoGenVal = 1;
 }
+$fvdTorneoEsCampeonatoCol = !empty($fvdTorneoEsCampeonatoCol ?? false);
+$esCampeonatoVal = ($fvdTorneoEsCampeonatoCol && (int) ($r['es_campeonato'] ?? 0) === 1) ? 1 : 0;
 
 $vTiempo = isset($r['tiempo']) && $r['tiempo'] !== '' && $r['tiempo'] !== null ? (string) (int) $r['tiempo'] : '35';
 $vPuntos = isset($r['puntos']) && $r['puntos'] !== '' && $r['puntos'] !== null ? (string) (int) $r['puntos'] : '200';
@@ -31,11 +33,21 @@ $vCostotor = isset($r['costotor']) ? (string) $r['costotor'] : '0';
 $vPareclub = isset($r['pareclub']) && $r['pareclub'] !== '' && $r['pareclub'] !== null ? (string) (int) $r['pareclub'] : '0';
 $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== null ? (string) (int) $r['estatus'] : '0';
 
+if (!function_exists('fvd_return_preserve_query_params')) {
+    require_once FVD_PROJECT_ROOT . '/config/fvd_navigation_return.php';
+}
+$fvdTorneoFormVolverListadoUrl = fvd_return_preserve_query_params($selfUrl . '?action=list');
+$fvdTorneoFormMasterEmbed = fvd_master_embed_active();
+$fvdTorneoFormShowTitleBlock = !$fvdTorneoFormMasterEmbed
+    && (!function_exists('fvd_delegado_inner_heading_visible') || fvd_delegado_inner_heading_visible());
+
 ?>
 
 <div class="fvd-tf-form-page">
+    <?php if ($fvdTorneoFormShowTitleBlock): ?>
     <p class="fvd-tf-federacion-name"><?= htmlspecialchars(FvdAdminService::ASOCIACION_NOMBRE_FEDERACION_TORNEOS, ENT_QUOTES, 'UTF-8') ?></p>
     <h1 class="fvd-tf-form-title"><?= $isEdit ? 'Editar torneo' : 'Nuevo torneo' ?></h1>
+    <?php endif; ?>
 
     <?php if (!empty($fvd_error ?? '')): ?>
     <p class="fvd-mod-msg fvd-tf-form-page__err"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p>
@@ -80,13 +92,25 @@ $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== nu
             <?php endif; ?>
 
             <div>
-                <label for="tipo">Tipo</label>
-                <select class="fvd-input" id="tipo" name="tipo" style="max-width:14rem">
-                    <?php foreach ([1 => 'Torneo', 2 => 'Campeonato'] as $k => $lab): ?>
-                        <option value="<?= $k ?>" <?= $tipoVal === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></option>
+                <label for="tipo">Tipo de torneo (género)</label>
+                <select class="fvd-input" id="tipo" name="tipo" style="max-width:14rem" required>
+                    <?php foreach ([1 => 'Masculino', 2 => 'Femenino', 3 => 'Mixto'] as $k => $lab): ?>
+                        <option value="<?= $k ?>" <?= $tipoGenVal === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab, ENT_QUOTES, 'UTF-8') ?></option>
                     <?php endforeach; ?>
                 </select>
+                <small style="display:block;font-size:0.7rem;color:var(--fvd-muted,#94a3b8);margin-top:4px">
+                    Define el criterio de elegibles en inscripción (listado Disponibles y búsqueda de atletas).
+                </small>
             </div>
+            <?php if ($fvdTorneoEsCampeonatoCol): ?>
+            <div>
+                <input type="hidden" name="es_campeonato" value="0">
+                <label class="fvd-tf-check-readonly" style="cursor:pointer;display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.25rem">
+                    <input type="checkbox" name="es_campeonato" id="es_campeonato" value="1" <?= $esCampeonatoVal === 1 ? 'checked' : '' ?> style="margin-top:0.15rem">
+                    <span><strong>Campeonato</strong> (varias categorías / mismo evento). Si está marcado, puede indicar el <strong>ID grupo de evento</strong> para vincular con otros torneos del mismo campeonato.</span>
+                </label>
+            </div>
+            <?php endif; ?>
             <div>
                 <label for="clase">Modalidad (clase)</label>
                 <select class="fvd-input" id="clase" name="clase" style="max-width:14rem">
@@ -97,7 +121,7 @@ $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== nu
             </div>
 
             <?php if ($fvdEsAdminGeneral && $isEdit): ?>
-            <div id="fvd_grupo_evento_wrap" class="fvd-tf-grupo-wrap"<?= $tipoVal === 2 ? '' : ' style="display:none"' ?>>
+            <div id="fvd_grupo_evento_wrap" class="fvd-tf-grupo-wrap"<?= ($fvdTorneoEsCampeonatoCol ? $esCampeonatoVal === 1 : $tipoGenVal === 2) ? '' : ' style="display:none"' ?>>
                 <label for="grupo_evento_id">ID grupo de evento (campeonatos)</label>
                 <input class="fvd-input" type="number" min="1" id="grupo_evento_id" name="grupo_evento_id" style="max-width:14rem"
                     placeholder="Ej. 1"
@@ -189,7 +213,7 @@ $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== nu
 
         <div class="fvd-mod-actions fvd-tf-form__actions">
             <button type="submit">Guardar</button>
-            <a href="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>">Volver</a>
+            <a href="<?= htmlspecialchars($fvdTorneoFormVolverListadoUrl, ENT_QUOTES, 'UTF-8') ?>">Volver al listado</a>
         </div>
     </form>
 </div>
@@ -207,13 +231,15 @@ $vEstatus = isset($r['estatus']) && $r['estatus'] !== '' && $r['estatus'] !== nu
     var tipo = document.getElementById('tipo');
     var wrap = document.getElementById('fvd_grupo_evento_wrap');
     var inp = document.getElementById('grupo_evento_id');
-    if (!tipo || !wrap) return;
+    var cb = document.getElementById('es_campeonato');
+    if (!wrap) return;
     function sync() {
-        var esCamp = tipo.value === '2';
+        var esCamp = cb ? cb.checked : (tipo && tipo.value === '2');
         wrap.style.display = esCamp ? '' : 'none';
         if (!esCamp && inp) inp.value = '';
     }
-    tipo.addEventListener('change', sync);
+    if (tipo) tipo.addEventListener('change', sync);
+    if (cb) cb.addEventListener('change', sync);
 })();
 </script>
 <?php endif; ?>

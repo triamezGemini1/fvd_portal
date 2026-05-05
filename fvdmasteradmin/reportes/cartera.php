@@ -8,4 +8,5 @@ AuthService::requireLogin();
 AuthService::requireRoles([AuthService::ROLE_FVD_ADMIN]);
 
 require_once dirname(__DIR__) . '/includes/workspace_module_redirect.php';
-fvd_workspace_redirect_to_admin_module('relacion_pago/index.php');
+/* Cartera del panel: listado de deudas por torneo/asociación (no /admin/modules/ — ese path no existe). */
+fvd_workspace_redirect_to_fvd_module('deuda_asociacion/index.php');

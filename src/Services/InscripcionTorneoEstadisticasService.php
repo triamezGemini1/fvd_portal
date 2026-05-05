@@ -8,8 +8,9 @@ use PDO;
 use PDOException;
 
 /**
- * Conteos por concepto y asociación para un torneo. Preferencia: tabla `inscripcion_torneo` (inscritos al evento);
- * si no existe, `atletas` con `torneo_id` (legado / bandera).
+ * Conteos por concepto y asociación para un torneo desde la ficha {@see estadisticasDesdeAtletasTorneoId} (`atletas`
+ * con `torneo_id` e inscripción), alineado con deudas y reportes. Las consultas sobre `inscripcion_torneo` quedan
+ * como utilidades puntuales, no como fuente principal de agregados.
  */
 final class InscripcionTorneoEstadisticasService
 {
@@ -69,10 +70,6 @@ final class InscripcionTorneoEstadisticasService
     public static function estadisticasPorTorneoAgrupadas(PDO $pdo, string $asociacionScopeSql, array $params): array
     {
         require_once dirname(__DIR__, 2) . '/src/Services/QueryHelper.php';
-
-        if (self::tablaInscripcionTorneoExiste($pdo)) {
-            return self::estadisticasDesdeInscripcionTorneo($pdo, $asociacionScopeSql, $params);
-        }
 
         return self::estadisticasDesdeAtletasTorneoId($pdo, $asociacionScopeSql, $params);
     }

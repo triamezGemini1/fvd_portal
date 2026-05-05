@@ -1,68 +1,374 @@
-/* Login mínimo — sin dependencias de build ni variables PHP */
+/**
+ * FVD Master Admin — login
+ * Sistema visual: escala 4px, contraste AA, foco visible, reduced-motion.
+ */
+
+:root {
+  --fvd-ink: #0f1230;
+  --fvd-ink-muted: rgba(248, 250, 252, 0.72);
+  --fvd-ink-soft: rgba(248, 250, 252, 0.88);
+  --fvd-blue-deep: #1c1e5c;
+  --fvd-blue-mid: #2e3092;
+  --fvd-blue-card: #3438a8;
+  --fvd-blue-card-top: #3d42b8;
+  --fvd-gold: #fff200;
+  --fvd-gold-hover: #fff44d;
+  --fvd-gold-press: #e6d900;
+  --fvd-border: rgba(255, 255, 255, 0.12);
+  --fvd-border-strong: rgba(255, 255, 255, 0.2);
+  --fvd-input-bg: rgba(12, 14, 40, 0.45);
+  --fvd-shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 20px 40px -12px rgba(0, 0, 0, 0.35);
+  --fvd-radius-lg: 14px;
+  --fvd-radius-md: 10px;
+  --fvd-radius-sm: 8px;
+  --fvd-space-1: 0.25rem;
+  --fvd-space-2: 0.5rem;
+  --fvd-space-3: 0.75rem;
+  --fvd-space-4: 1rem;
+  --fvd-space-5: 1.25rem;
+  --fvd-space-6: 1.5rem;
+  --fvd-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --fvd-duration: 180ms;
+  --fvd-font: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  font-family: system-ui, sans-serif;
   margin: 0;
-  min-height: 100vh;
+  min-height: 100svh;
+  font-family: var(--fvd-font);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #f8fafc;
+  background-color: var(--fvd-blue-mid);
+  background-image:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(100, 110, 220, 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, rgba(20, 24, 80, 0.5) 0%, transparent 50%),
+    linear-gradient(165deg, var(--fvd-blue-deep) 0%, var(--fvd-blue-mid) 45%, #252870 100%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.fvd-login-page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--fvd-space-5) var(--fvd-space-4) var(--fvd-space-6);
+  gap: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+/* —— Marca: logo + afiliación —— */
+.fvd-login-brand {
+  width: 100%;
+  max-width: 42rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--fvd-space-2) var(--fvd-space-3);
+}
+
+.fvd-login-logo-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #2e3092;
-  color: #f8fafc;
-}
-.box {
-  background: #3a3eb5;
-  padding: 1.25rem 1.5rem;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-top: 3px solid #fff200;
   width: 100%;
-  max-width: 360px;
+  min-height: 7.5rem;
+  margin: 0 0 var(--fvd-space-4);
+  padding: var(--fvd-space-3);
 }
-h1 {
-  font-size: 1.1rem;
-  margin: 0 0 0.35rem;
+
+/* Marco que armoniza logos con fondo oscuro (negro) sobre el azul de la página */
+.fvd-login-logo-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(22rem, 100%);
+  padding: clamp(0.65rem, 2vw, 0.9rem) clamp(0.85rem, 2.5vw, 1.15rem);
+  background: linear-gradient(145deg, rgba(8, 10, 28, 0.65) 0%, rgba(18, 20, 45, 0.5) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-.fvd-login-tagline {
-  font-size: 0.72rem;
-  margin: 0 0 1rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 242, 0, 0.92);
-  font-weight: 600;
-}
-label {
+
+.fvd-login-logo {
+  max-height: clamp(6.5rem, 18vw, 9.25rem);
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
   display: block;
-  font-size: 13px;
-  margin-bottom: 0.25rem;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
-input {
+
+.fvd-login-affil--hero {
+  margin: 0;
+  padding: 0 var(--fvd-space-2);
+  max-width: 36rem;
+  font-size: clamp(0.8125rem, 0.2rem + 1.5vw, 1.0625rem);
+  line-height: 1.55;
+  font-weight: 500;
+  letter-spacing: 0.015em;
+  text-rendering: optimizeLegibility;
+  color: var(--fvd-ink-soft);
+}
+
+/* —— Tarjeta de acceso —— */
+.box {
+  --card-pad: clamp(1.25rem, 3vw, 1.6rem);
+  position: relative;
   width: 100%;
-  box-sizing: border-box;
-  padding: 6px 10px;
-  margin-bottom: 0.75rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.2);
-  color: #f8fafc;
+  max-width: 24rem;
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-pad);
+  background: linear-gradient(180deg, var(--fvd-blue-card-top) 0%, var(--fvd-blue-card) 100%);
+  border: 1px solid var(--fvd-border);
+  border-radius: var(--fvd-radius-lg);
+  box-shadow: var(--fvd-shadow-card);
 }
-input:focus-visible {
-  outline: 2px solid #fff200;
-  outline-offset: 2px;
-  border-color: #fff200;
+
+.box::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 1.5rem;
+  right: 1.5rem;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, var(--fvd-gold) 12%, var(--fvd-gold) 88%, transparent 100%);
+  border-radius: 0 0 2px 2px;
+  pointer-events: none;
 }
-button {
-  width: 100%;
-  padding: 8px;
-  font-size: 14px;
-  background: #fff200;
-  color: #2e3092;
-  border: 1px solid rgba(46, 48, 146, 0.35);
-  border-radius: 6px;
-  cursor: pointer;
+
+.fvd-login-card__head {
+  text-align: center;
+  margin-bottom: var(--fvd-space-5);
+  padding-bottom: var(--fvd-space-4);
+  border-bottom: 1px solid var(--fvd-border);
+}
+
+.fvd-login-card__title {
+  font-size: clamp(1.15rem, 0.3rem + 1.2vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin: 0 0 var(--fvd-space-2);
+  line-height: 1.2;
+  color: #fff;
+  text-rendering: optimizeLegibility;
+}
+
+.fvd-login-tagline {
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   font-weight: 600;
+  color: rgba(255, 244, 80, 0.95);
+  text-rendering: optimizeLegibility;
 }
+
+.fvd-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fvd-field {
+  margin-bottom: var(--fvd-space-4);
+}
+
+.fvd-field:last-of-type {
+  margin-bottom: var(--fvd-space-5);
+}
+
+.fvd-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fvd-ink-muted);
+  margin-bottom: var(--fvd-space-2);
+  line-height: 1.3;
+}
+
+.fvd-input {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: #f8fafc;
+  background: var(--fvd-input-bg);
+  border: 1px solid var(--fvd-border-strong);
+  border-radius: var(--fvd-radius-sm);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: border-color var(--fvd-duration) var(--fvd-ease), box-shadow var(--fvd-duration) var(--fvd-ease);
+}
+
+.fvd-input::placeholder {
+  color: rgba(248, 250, 252, 0.32);
+}
+
+.fvd-input:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.fvd-input:focus {
+  outline: none;
+  border-color: var(--fvd-gold);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 3px rgba(255, 242, 0, 0.22);
+}
+
+.fvd-input:focus-visible {
+  outline: none;
+}
+
+.fvd-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--fvd-ink);
+  background: linear-gradient(180deg, var(--fvd-gold) 0%, #f5e800 100%);
+  border: 1px solid rgba(30, 32, 90, 0.18);
+  border-radius: var(--fvd-radius-sm);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background var(--fvd-duration) var(--fvd-ease), transform var(--fvd-duration) var(--fvd-ease), box-shadow var(--fvd-duration) var(--fvd-ease);
+}
+
+.fvd-btn:hover {
+  background: linear-gradient(180deg, var(--fvd-gold-hover) 0%, var(--fvd-gold) 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.fvd-btn:active {
+  background: var(--fvd-gold-press);
+  transform: scale(0.99);
+}
+
+.fvd-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.fvd-login-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fvd-space-3);
+  margin: 0 0 var(--fvd-space-4);
+  padding: var(--fvd-space-3) var(--fvd-space-3);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #fee2e2;
+  background: rgba(127, 29, 29, 0.35);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: var(--fvd-radius-sm);
+  border-left: 3px solid #f87171;
+  text-rendering: optimizeLegibility;
+}
+
+.fvd-login-alert::before {
+  content: "⚠";
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+
+.fvd-login-sitio {
+  margin: var(--fvd-space-5) 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.fvd-login-sitio a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-weight: 600;
+  color: rgba(255, 244, 100, 0.95);
+  text-decoration: none;
+  text-underline-offset: 0.2em;
+  transition: color var(--fvd-duration) var(--fvd-ease);
+}
+
+.fvd-login-sitio a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.fvd-login-sitio a:focus-visible {
+  outline: 2px solid var(--fvd-gold);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+p.err,
 .err {
   color: #fecaca;
-  font-size: 13px;
-  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  margin: 0 0 var(--fvd-space-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+  .fvd-btn:hover {
+    transform: none;
+  }
+  .fvd-btn:active {
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .fvd-login-page {
+    padding: var(--fvd-space-4) var(--fvd-space-3) var(--fvd-space-5);
+    justify-content: flex-start;
+    padding-top: 1.75rem;
+  }
+
+  .fvd-login-logo-wrap {
+    min-height: 5.5rem;
+    margin-bottom: var(--fvd-space-3);
+  }
+
+  .fvd-login-affil--hero {
+    line-height: 1.5;
+  }
+
+  .box {
+    max-width: 100%;
+  }
 }

@@ -116,4 +116,35 @@ SQL;
             return [];
         }
     }
+
+    /**
+     * Marca una fila como leída si pertenece al admin actual o es broadcast (admin_user_id NULL).
+     */
+    public static function marcarLeida(PDO $pdo, int $id, ?int $adminId): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+        self::ensureTable($pdo);
+        try {
+            if ($adminId !== null && $adminId > 0) {
+                $st = $pdo->prepare(
+                    'UPDATE ' . self::TABLE . '
+                     SET leido = 1
+                     WHERE id = :id AND leido = 0 AND (admin_user_id IS NULL OR admin_user_id = :a)'
+                );
+
+                return $st->execute([':id' => $id, ':a' => $adminId]) && $st->rowCount() > 0;
+            }
+            $st = $pdo->prepare(
+                'UPDATE ' . self::TABLE . ' SET leido = 1 WHERE id = :id AND leido = 0 AND admin_user_id IS NULL'
+            );
+
+            return $st->execute([':id' => $id]) && $st->rowCount() > 0;
+        } catch (PDOException $e) {
+            error_log('[NotificacionService::marcarLeida] ' . $e->getMessage());
+
+            return false;
+        }
+    }
 }

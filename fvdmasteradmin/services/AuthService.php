@@ -62,6 +62,9 @@ class AuthService
     /** Asociación elegida en el portal asociación (admin FVD en vista delegado). */
     private const SESSION_ADMIN_PORTAL_DELEGADO_ASOC = 'fvd_admin_portal_delegado_asoc_id';
 
+    /** Ruta interna canónica del panel delegado (volver sin encadenar `ret` en cada enlace). */
+    private const SESSION_DELEGADO_PANEL_HOME = 'fvd_delegado_panel_home_url';
+
     /** @var string Código interno del último fallo (solo para depuración con APP_DEBUG). */
     private static $lastLoginFailure = '';
 
@@ -210,7 +213,70 @@ class AuthService
     {
         self::ensureSession();
         unset($_SESSION['fvd_master_delegado_notif_token'], $_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO]);
-        unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX]);
+        unset($_SESSION[self::SESSION_DELEGADO_TORNEO_CTX], $_SESSION[self::SESSION_DELEGADO_PANEL_HOME]);
+    }
+
+    /**
+     * Fija la URL de retorno al panel delegado (ruta interna, p. ej. /fvd_portal/fvdmasteradmin/delegado_dashboard_new.php).
+     * Solo aplica a delegado o admin general en modo portal-asociación.
+     */
+    public static function setDelegadoPanelHomeUrl(string $urlOrPath): void
+    {
+        self::ensureSession();
+        $portalAsoc = self::adminPortalDelegadoAsociacionId();
+        $pOk = $portalAsoc !== null && (int) $portalAsoc > 0;
+        if (!self::isDelegadoAsociacion() && !(self::isSuperAdmin() && $pOk)) {
+            return;
+        }
+        if (!function_exists('fvd_return_sanitize')) {
+            $nav = dirname(__DIR__, 2) . '/config/fvd_navigation_return.php';
+            if (is_file($nav)) {
+                require_once $nav;
+            }
+        }
+        $trim = trim($urlOrPath);
+        if ($trim === '') {
+            unset($_SESSION[self::SESSION_DELEGADO_PANEL_HOME]);
+
+            return;
+        }
+        if (preg_match('#^https?://#i', $trim) === 1) {
+            $p = parse_url($trim);
+            if (is_array($p) && isset($p['path'])) {
+                $trim = (string) $p['path']
+                    . (isset($p['query']) && (string) $p['query'] !== '' ? '?' . $p['query'] : '');
+            }
+        }
+        if (!function_exists('fvd_return_sanitize')) {
+            return;
+        }
+        $san = fvd_return_sanitize($trim);
+        if ($san !== null && $san !== '') {
+            $_SESSION[self::SESSION_DELEGADO_PANEL_HOME] = $san;
+        }
+    }
+
+    /**
+     * Ruta del panel delegado guardada en sesión (para barra «Volver» sin parámetro ret).
+     */
+    public static function delegadoPanelHomeUrl(): ?string
+    {
+        self::ensureSession();
+        if (!isset($_SESSION[self::SESSION_DELEGADO_PANEL_HOME])) {
+            return null;
+        }
+        $v = $_SESSION[self::SESSION_DELEGADO_PANEL_HOME];
+        if (!is_string($v) || $v === '') {
+            return null;
+        }
+        if (!function_exists('fvd_return_sanitize')) {
+            $nav = dirname(__DIR__, 2) . '/config/fvd_navigation_return.php';
+            if (is_file($nav)) {
+                require_once $nav;
+            }
+        }
+
+        return function_exists('fvd_return_sanitize') ? fvd_return_sanitize($v) : $v;
     }
 
     public static function isDelegadoAsociacion(): bool
@@ -280,6 +346,25 @@ class AuthService
     {
         self::ensureSession();
         unset($_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC]);
+    }
+
+    /**
+     * Deja de arrastrar el modo «portal asociación» (admin FVD actuando como club) y el «home» delegado en sesión.
+     * No toca fvd_master_delegado_notif_token (otro flujo de pruebas en master_panel).
+     * Para un admin en sesión, limpia también claves de contexto de delegado que no deberían aplicarle aunque existan por datos viejos.
+     */
+    public static function clearAdminPortalDelegadoContext(): void
+    {
+        self::ensureSession();
+        if (!self::isSuperAdmin()) {
+            return;
+        }
+        self::clearAdminPortalDelegadoAsociacionId();
+        unset($_SESSION[self::SESSION_DELEGADO_PANEL_HOME]);
+        unset(
+            $_SESSION[self::SESSION_DELEGADO_TORNEO_CTX],
+            $_SESSION[self::SESSION_DELEGADO_CAMPEONATO_GRUPO]
+        );
     }
 
     /**
@@ -479,12 +564,21 @@ class AuthService
             'id_asociacion'  => (int) $row['asociacion_id'],
             'atleta_id'      => null,
         ];
+        $root = dirname(__DIR__, 2);
+        if (!function_exists('url')) {
+            require_once $root . '/config/paths.php';
+        }
+        self::setDelegadoPanelHomeUrl(url('fvdmasteradmin/delegado_dashboard_new.php'));
     }
 
     public static function logout(): void
     {
         self::ensureSession();
-        unset($_SESSION[self::SESSION_KEY], $_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC]);
+        unset(
+            $_SESSION[self::SESSION_KEY],
+            $_SESSION[self::SESSION_ADMIN_PORTAL_DELEGADO_ASOC],
+            $_SESSION[self::SESSION_DELEGADO_PANEL_HOME]
+        );
     }
 
     /**

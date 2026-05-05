@@ -81,7 +81,11 @@ class DeudaAsociacionController extends FvdModuleController
                     ELSE NULL
                END';
         $params = [];
-        $countSql = 'SELECT COUNT(*) FROM deuda_asociaciones d WHERE 1=1';
+        require_once $this->projectRoot() . '/src/Services/FvdAdminService.php';
+        $soloAsocActivas = \FvdAdminService::asociacionesSqlFiltroEstatus('a', 'activas');
+        $countSql = 'SELECT COUNT(*) FROM deuda_asociaciones d
+            LEFT JOIN asociaciones a ON d.asociacion_id = a.id
+            WHERE 1=1' . $soloAsocActivas;
         $dataSql = 'SELECT d.*, t.nombre AS torneo_nombre, a.nombre AS asoc_nombre,
                 ROUND(' . $deudaEurExpr . ', 2) AS monto_total_eur,
                 ROUND(COALESCE(rp.pagado_eur, 0), 2) AS pagado_eur,
@@ -94,7 +98,7 @@ class DeudaAsociacionController extends FvdModuleController
                 FROM relacion_pagos
                 GROUP BY torneo_id, asociacion_id
             ) rp ON rp.torneo_id = d.torneo_id AND rp.asociacion_id = d.asociacion_id
-            WHERE 1=1
+            WHERE 1=1' . $soloAsocActivas . '
             ORDER BY d.fecha_creacion DESC';
 
         return self::paginateWithAsociacionScope($this->pdo, $countSql, $dataSql, $params, $page, $perPage, self::SCOPE_COL);
@@ -164,12 +168,18 @@ class DeudaAsociacionController extends FvdModuleController
             return [];
         }
 
+        if (!class_exists('FvdAdminService', false)) {
+            require_once dirname(__DIR__, 3) . '/src/Services/FvdAdminService.php';
+        }
+        $fvdDeu = new \FvdAdminService($this->pdo);
+        $sexoSqlDeu = $fvdDeu->sqlAtletasFiltroSexoSegunTorneoTipo($torneoId, 'a');
+
         $params = [':tid' => $torneoId, ':aid' => $asociacionId];
         $scope = self::asociacionScopeSql('a.asociacion', $params);
         $sql = 'SELECT a.id AS atleta_id, a.numfvd, a.nombre, a.cedula
             FROM atletas a
             WHERE a.torneo_id = :tid AND a.asociacion = :aid
-            AND COALESCE(a.' . $col . ', 0) = 1 ' . $scope . '
+            AND COALESCE(a.' . $col . ', 0) = 1 ' . $sexoSqlDeu . $scope . '
             ORDER BY a.nombre ASC, a.numfvd ASC';
         $st = $this->pdo->prepare($sql);
         $st->execute($params);

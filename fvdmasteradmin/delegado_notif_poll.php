@@ -15,6 +15,7 @@ if (!AuthService::isDelegadoAsociacion()) {
 
 require_once __DIR__ . '/config/db.php';
 require_once dirname(__DIR__) . '/src/Services/DelegadoTorneoNotifService.php';
+require_once dirname(__DIR__) . '/src/Services/NotificacionesDelegadosService.php';
 
 $pdo = fvd_db();
 $delegadoUid = (int) AuthService::userId();
@@ -28,6 +29,7 @@ if ($cCtx !== null && (int) $cCtx > 0) {
 }
 
 $unread = \FvdPortal\Services\DelegadoTorneoNotifService::contarPendientesVistaAgrupada($pdo, $delegadoUid, $delegAidInt);
+$novedadesUnread = \FvdPortal\Services\NotificacionesDelegadosService::contarNoLeidas($pdo, $delegadoUid);
 $pendingAccept = false;
 if ($tidCtx > 0) {
     $pendingAccept = \FvdPortal\Services\DelegadoTorneoNotifService::invitacionPendienteDeAceptacion(
@@ -42,6 +44,7 @@ echo json_encode(
     [
         'ok' => true,
         'unread' => $unread,
+        'novedades_unread' => $novedadesUnread,
         'pendingAccept' => $pendingAccept,
         'torneoId' => $tidCtx,
     ],

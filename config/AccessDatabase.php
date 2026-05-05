@@ -2,12 +2,19 @@
 /**
  * Clase AccessDatabase - Conexión y operaciones con bases de datos MySQL y Access
  * Permite migrar datos desde MySQL hacia Access de forma segura y eficiente
- * 
+ *
+ * MySQL usa la misma configuración que el resto del portal ({@see fvd_db}):
+ * variables FVD_DB_* con respaldo en DB_* (vía .env / {@see Env}).
+ *
  * Requisitos:
  * - PHP con soporte COM (solo Windows)
  * - Microsoft Access Database Engine (ACE.OLEDB.12.0 o JET.OLEDB.4.0)
  * - PDO para MySQL
  */
+
+if (!function_exists('env')) {
+    require_once __DIR__ . '/env.php';
+}
 
 class AccessDatabase {
     private $conn;
@@ -15,27 +22,34 @@ class AccessDatabase {
     private $db_type; // 'mysql' o 'access'
     private $errors = [];
     private $logs = [];
-    
-    // Configuración de conexión MySQL
-    private $mysql_config = [
-        'host' => 'localhost',
-        'database' => 'convernva',
-        'username' => 'root',
-        'password' => '',
-        'charset' => 'utf8mb4'
-    ];
+
+    /** @var string Metadatos de la conexión MySQL (mismo criterio que fvd_db) */
+    private $mysql_host = '';
+    private $mysql_port = '3306';
+    private $mysql_database = '';
+    /** Si true, $this->conn es una PDO reutilizada (no cerrar en close()) */
+    private $mysql_pdo_externo = false;
 
     /**
      * Constructor
-     * @param string $tipo - 'mysql' para origen, 'access' para destino
-     * @param string $access_path - Ruta al archivo .mdb/.accdb (solo si tipo='access')
+     *
+     * @param string      $tipo        'mysql' para origen, 'access' para destino
+     * @param string|null $access_path Ruta al archivo .mdb/.accdb (solo si tipo='access')
+     * @param PDO|null    $mysqlPdo    Opcional: PDO ya conectado (p. ej. {@see fvd_db}) para reutilizar credenciales/sesión
      */
-    public function __construct($tipo = 'mysql', $access_path = null) {
+    public function __construct($tipo = 'mysql', $access_path = null, ?PDO $mysqlPdo = null) {
         $this->db_type = $tipo;
-        
+
         try {
             if ($tipo === 'mysql') {
-                $this->conectarMySQL();
+                if ($mysqlPdo instanceof PDO) {
+                    $this->conn = $mysqlPdo;
+                    $this->mysql_pdo_externo = true;
+                    $this->resolverMetaMysqlDesdeEnv();
+                    $this->addLog('MySQL: usando PDO suministrado (misma conexión que la app).');
+                } else {
+                    $this->conectarMySQL();
+                }
             } else {
                 if (empty($access_path)) {
                     throw new Exception("Debe especificar la ruta del archivo Access");
@@ -43,7 +57,7 @@ class AccessDatabase {
                 $this->db_path = $access_path;
                 $this->conectarAccess();
             }
-            
+
             $this->addLog("Conexión establecida correctamente a {$tipo}");
         } catch (Exception $e) {
             $this->addError("Error al conectar: " . $e->getMessage());
@@ -52,13 +66,43 @@ class AccessDatabase {
     }
 
     /**
-     * Conectar a MySQL
+     * Rellena host/puerto/base para getSystemInfo al reutilizar un PDO externo.
+     */
+    private function resolverMetaMysqlDesdeEnv() {
+        $this->mysql_host = (string) env('FVD_DB_HOST', env('DB_HOST', '127.0.0.1'));
+        $this->mysql_port = (string) env('FVD_DB_PORT', env('DB_PORT', '3306'));
+        $this->mysql_database = (string) env('FVD_DB_DATABASE', env('DB_DATABASE', 'fvdmasteradmin'));
+    }
+
+    /**
+     * Conectar a MySQL (mismas claves y opciones PDO que fvdmasteradmin/config/db.php → fvd_db).
      */
     private function conectarMySQL() {
-        $dsn = "mysql:host={$this->mysql_config['host']};dbname={$this->mysql_config['database']};charset={$this->mysql_config['charset']}";
-        $this->conn = new PDO($dsn, $this->mysql_config['username'], $this->mysql_config['password']);
-        $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $host = (string) env('FVD_DB_HOST', env('DB_HOST', '127.0.0.1'));
+        $port = (string) env('FVD_DB_PORT', env('DB_PORT', '3306'));
+        $db = (string) env('FVD_DB_DATABASE', env('DB_DATABASE', 'fvdmasteradmin'));
+        $user = (string) env('FVD_DB_USERNAME', env('DB_USERNAME', 'root'));
+        $pass = (string) env('FVD_DB_PASSWORD', env('DB_PASSWORD', ''));
+
+        $this->mysql_host = $host;
+        $this->mysql_port = $port;
+        $this->mysql_database = $db;
+
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+            $host,
+            $port,
+            $db
+        );
+
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
+        ];
+
+        $this->conn = new PDO($dsn, $user, $pass, $options);
     }
 
     /**
@@ -470,8 +514,10 @@ class AccessDatabase {
         ];
         
         if ($this->db_type === 'mysql') {
-            $info['db_name'] = $this->mysql_config['database'];
-            $info['db_host'] = $this->mysql_config['host'];
+            $info['db_name'] = $this->mysql_database;
+            $info['db_host'] = $this->mysql_host;
+            $info['db_port'] = $this->mysql_port;
+            $info['pdo_reused'] = $this->mysql_pdo_externo;
             $info['connected'] = $this->conn !== null;
         } else {
             $info['db_path'] = $this->db_path;
@@ -527,7 +573,9 @@ class AccessDatabase {
         if ($this->conn) {
             try {
                 if ($this->db_type === 'mysql') {
-                    $this->conn = null;
+                    if (!$this->mysql_pdo_externo) {
+                        $this->conn = null;
+                    }
                 } else {
                     $this->conn->Close();
                 }

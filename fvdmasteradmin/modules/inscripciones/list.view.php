@@ -1,116 +1,174 @@
 <?php
 /** @var InscripcionesController $ctrl */
 $fvd_rep_campeonato_error = $fvd_rep_campeonato_error ?? '';
+if (!function_exists('fvd_append_embed_to_url')) {
+    require_once dirname(__DIR__, 3) . '/config/fvd_navigation_return.php';
+}
 $fvdUrlSelf = fvd_module_url('inscripciones/index.php');
 $fvdUrlDeuda = fvd_module_url('deuda_asociacion/index.php');
 $fvdUrlPagos = fvd_module_url('relacion_pago/index.php');
 $fvdUrlInscTorneo = fvd_module_url('inscripcion_torneo/index.php');
 $tSel = (int) $fvdRepDefaultTorneo;
 $aSel = (int) $fvdRepDefaultAsoc;
+$fvdRepCampeonatoId = isset($fvd_rep_campeonato_id) ? (int) $fvd_rep_campeonato_id : 0;
+$fvdRepEmbedActive = function_exists('fvd_master_embed_active') && fvd_master_embed_active();
+$fvdRepInscListUrl = static function (int $tid, int $aid) use ($fvdUrlSelf, $fvdRepCampeonatoId, $fvdRepEmbedActive): string {
+    $q = ['torneo_id' => max(0, $tid)];
+    if ($aid > 0) {
+        $q['asociacion_id'] = $aid;
+    }
+    if (AuthService::isDelegadoAsociacion() && $fvdRepCampeonatoId > 0) {
+        $q['campeonato_id'] = $fvdRepCampeonatoId;
+    }
+    $u = $fvdUrlSelf . '?' . http_build_query($q);
+    if ($fvdRepEmbedActive) {
+        $u = fvd_append_embed_to_url($u);
+    }
+
+    return $u;
+};
 $mkReportUrl = static function (string $tipo, bool $inline) use ($ctrl, $tSel, $aSel): string {
     $base = $ctrl->reportExportUrl($tipo, $tSel, $aSel);
     return $base . ($inline ? '&inline=1' : '');
 };
 ?>
-<h1 class="fvd-atletas-title">Reportes del torneo</h1>
-<?php if (!empty($fvd_rep_campeonato_error)): ?>
-    <p class="fvd-mod-msg" style="max-width:42rem"><?= htmlspecialchars((string) $fvd_rep_campeonato_error, ENT_QUOTES, 'UTF-8') ?></p>
-<?php endif; ?>
-<p style="font-size:0.875rem;color:var(--fvd-muted);max-width:48rem;margin:0 0 1.25rem">
-    Elija <strong>torneo</strong><?php if (AuthService::role() === AuthService::ROLE_FVD_ADMIN): ?> y <strong>asociación</strong><?php endif; ?>, aplique el filtro y descargue los PDF (o HTML si no hay Dompdf).
-    Los listados usan las marcas en <code>atletas</code> para el club en ese torneo. Los informes contables toman <code>deuda_asociaciones</code> y <code>relacion_pagos</code>.
-    <?php if (isset($_GET['torneo_id']) && (int) $_GET['torneo_id'] > 0): ?>
-        <br><span style="color:var(--fvd-amarillo,#ca8a04)">Torneo activo para los enlaces: <strong>#<?= (int) $_GET['torneo_id'] ?></strong> (parámetro <code>?torneo_id=</code> en la URL; no solo el torneo del contexto del delegado).</span>
+<div class="fvd-rep-insc-head" style="margin-bottom:1rem">
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
+    <h1 class="fvd-atletas-title" style="margin:0 0 10px">Reportes del torneo</h1>
     <?php endif; ?>
-</p>
+    <?php if (!empty($fvd_rep_campeonato_error)): ?>
+        <p class="fvd-mod-msg" style="max-width:42rem;margin:0 0 10px"><?= htmlspecialchars((string) $fvd_rep_campeonato_error, ENT_QUOTES, 'UTF-8') ?></p>
+    <?php endif; ?>
+    <?php if ($fvdRepTorneos !== []): ?>
+    <div class="fvd-rep-torneo-pills" role="tablist" aria-label="Torneos del informe" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <?php
+        $aidForTorneoUrls = $aSel;
+        if ($aidForTorneoUrls <= 0 && AuthService::role() === AuthService::ROLE_FVD_ADMIN && ($fvdRepAsociaciones ?? []) !== []) {
+            $aidForTorneoUrls = (int) ($fvdRepAsociaciones[0]['id'] ?? 0);
+        }
+        ?>
+        <?php foreach ($fvdRepTorneos as $tr): ?>
+            <?php
+            $tidP = (int) ($tr['torneo'] ?? 0);
+            if ($tidP <= 0) {
+                continue;
+            }
+            $isAct = $tidP === $tSel;
+            $hrefP = htmlspecialchars($fvdRepInscListUrl($tidP, max(0, $aidForTorneoUrls)), ENT_QUOTES, 'UTF-8');
+            $labelP = htmlspecialchars(trim((string) ($tr['nombre'] ?? '')) !== '' ? (string) $tr['nombre'] : ('Torneo #' . $tidP), ENT_QUOTES, 'UTF-8');
+            ?>
+            <a
+                role="tab"
+                aria-selected="<?= $isAct ? 'true' : 'false' ?>"
+                class="fvd-rep-torneo-pill<?= $isAct ? ' fvd-rep-torneo-pill--active' : '' ?>"
+                href="<?= $hrefP ?>"
+                style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;font-size:0.875rem;font-weight:700;text-decoration:none;border:2px solid <?= $isAct ? 'var(--fvd-amarillo,#fbbf24)' : 'rgba(255,255,255,.22)' ?>;background:<?= $isAct ? 'rgba(251,191,36,.18)' : 'rgba(0,0,0,.12)' ?>;color:var(--fvd-fg,#f5f5f5)"
+            ><?= $labelP ?> <span style="opacity:.85;font-weight:600">#<?= $tidP ?></span></a>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+</div>
 
 <?php if ($fvdRepTorneos === [] && empty($fvd_rep_campeonato_error)): ?>
-    <p class="fvd-mod-msg">No hay torneos en el selector. Si es delegado, confirme que existan atletas del club con <code>torneo_id</code> o un evento activo en contexto.</p>
-<?php elseif ($fvdRepTorneos !== []): ?>
-<form method="get" action="<?= htmlspecialchars($fvdUrlSelf, ENT_QUOTES, 'UTF-8') ?>" class="fvd-card" style="padding:14px;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
-    <?php if (AuthService::isDelegadoAsociacion() && isset($fvd_rep_campeonato_id) && (int) $fvd_rep_campeonato_id > 0): ?>
-        <input type="hidden" name="campeonato_id" value="<?= (int) $fvd_rep_campeonato_id ?>">
-    <?php endif; ?>
-    <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
-    <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
-    <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
-    <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
-    <?php endif; ?>
-    <div>
-        <label style="font-size:0.75rem;color:var(--fvd-muted);display:block">Torneo</label>
-        <select class="fvd-input" name="torneo_id" style="min-width:14rem">
-            <?php foreach ($fvdRepTorneos as $tr): ?>
-                <?php $tid = (int) ($tr['torneo'] ?? 0); ?>
-                <option value="<?= $tid ?>"<?= $tid === $tSel ? ' selected' : '' ?>><?= htmlspecialchars((string) ($tr['nombre'] ?? ('#' . $tid)), ENT_QUOTES, 'UTF-8') ?> (#<?= $tid ?>)</option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <?php if (AuthService::role() === AuthService::ROLE_FVD_ADMIN && $fvdRepAsociaciones !== []): ?>
-    <div>
-        <label style="font-size:0.75rem;color:var(--fvd-muted);display:block">Asociación</label>
-        <select class="fvd-input" name="asociacion_id" style="min-width:14rem">
-            <?php foreach ($fvdRepAsociaciones as $ar): ?>
-                <?php $aid = (int) ($ar['id'] ?? 0); ?>
-                <option value="<?= $aid ?>"<?= $aid === $aSel ? ' selected' : '' ?>><?= htmlspecialchars((string) ($ar['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <?php endif; ?>
-    <button type="submit" class="fvd-btn-primary">Aplicar filtro</button>
-</form>
+    <p class="fvd-mod-msg">No hay torneos disponibles. Si es delegado, confirme <code>campeonato_id</code> en la URL, convocatoria y <code>torneo_id</code> o evento en contexto.</p>
 <?php endif; ?>
-
-<?php if ($fvdRepTorneos !== [] && $tSel > 0 && $aSel > 0): ?>
 
 <?php
 $fvdRepStatsPorAsoc = $fvdRepStatsPorAsoc ?? [];
+$fvdRepAsociacionesList = $fvdRepAsociaciones ?? [];
 $fmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
 ?>
-<?php if (AuthService::isSuperAdmin() && $fvdRepStatsPorAsoc !== []): ?>
-<section class="fvd-card fvd-rep-asoc-resumen" style="padding:14px;margin-bottom:1rem;overflow-x:auto" aria-label="Estadísticas por asociación en el torneo">
+<?php if (AuthService::isSuperAdmin() && $fvdRepTorneos !== [] && $tSel > 0 && $fvdRepAsociacionesList !== []): ?>
+<section class="fvd-card fvd-rep-asoc-resumen" style="padding:14px;margin-bottom:1rem;overflow-x:auto" aria-label="Elegir asociación para el informe">
     <h2 style="margin:0 0 8px;font-size:1.05rem">Resumen por asociación (torneo #<?= (int) $tSel ?>)</h2>
     <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--fvd-muted);max-width:48rem">
-        Conteos desde <code>atletas</code> con este <code>torneo_id</code> y <code>asociacion</code>: inscritos (<code>inscripcion=1</code>), carnet y afiliación. Montos desde <code>deuda_asociaciones</code> y pagos en <code>relacion_pagos</code>. Use el filtro superior para fijar la asociación activa en informes PDF.
+        Datos desde <code>atletas</code> (marcas en este <code>torneo_id</code>) y finanzas en <code>deuda_asociaciones</code> / <code>relacion_pagos</code>.
+        <strong>Pulse una fila</strong> para fijar el club y cargar los informes PDF/HTML de abajo.
     </p>
-    <table class="fvd-mod-table" style="font-size:0.8125rem;min-width:52rem">
+    <table class="fvd-mod-table fvd-rep-asoc-resumen__table" style="font-size:0.8125rem;min-width:48rem">
         <thead>
         <tr>
             <th scope="col">Asociación</th>
             <th scope="col" class="fvd-rep-asoc-resumen__num">Inscritos</th>
             <th scope="col" class="fvd-rep-asoc-resumen__num">Carnet</th>
             <th scope="col" class="fvd-rep-asoc-resumen__num">Afiliación</th>
-            <th scope="col" class="fvd-rep-asoc-resumen__num">Deuda Bs ref.</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Anual.</th>
+            <th scope="col" class="fvd-rep-asoc-resumen__num">Trasp.</th>
             <th scope="col" class="fvd-rep-asoc-resumen__num">Deuda EUR</th>
             <th scope="col" class="fvd-rep-asoc-resumen__num">Pagado EUR</th>
             <th scope="col" class="fvd-rep-asoc-resumen__num">Saldo EUR</th>
-            <th scope="col"></th>
         </tr>
         </thead>
         <tbody>
-        <?php foreach ($fvdRepStatsPorAsoc as $sr): ?>
+        <?php foreach ($fvdRepAsociacionesList as $arPick): ?>
             <?php
-            $aidR = (int) ($sr['asociacion_id'] ?? 0);
-            $eurOk = ($sr['monto_total_eur'] ?? null) !== null && (float) $sr['monto_total_eur'] > 0;
-            $saldo = $eurOk ? ($sr['saldo_eur'] ?? null) : null;
+            $aidR = (int) ($arPick['id'] ?? 0);
+            if ($aidR <= 0) {
+                continue;
+            }
+            $sr = $fvdRepStatsPorAsoc[$aidR] ?? null;
+            $nomAsoc = trim((string) ($arPick['nombre'] ?? ''));
+            if ($sr !== null && ($sr['asoc_nombre'] ?? '') !== '') {
+                $nomAsoc = (string) $sr['asoc_nombre'];
+            }
+            $eurOk = $sr !== null && ($sr['monto_total_eur'] ?? null) !== null && (float) $sr['monto_total_eur'] > 0;
+            $saldo = ($sr !== null && $eurOk) ? ($sr['saldo_eur'] ?? null) : null;
+            $rowUrl = htmlspecialchars($fvdRepInscListUrl($tSel, $aidR), ENT_QUOTES, 'UTF-8');
+            $selClass = $aidR === $aSel ? ' fvd-rep-asoc-resumen__row--sel' : '';
             ?>
-            <tr class="<?= $aidR === $aSel ? 'fvd-rep-asoc-resumen__row--sel' : '' ?>">
-                <td><?= htmlspecialchars($sr['asoc_nombre'] !== '' ? $sr['asoc_nombre'] : ('#' . $aidR), ENT_QUOTES, 'UTF-8') ?></td>
-                <td class="fvd-rep-asoc-resumen__num"><?= (int) ($sr['n_inscritos'] ?? 0) ?></td>
-                <td class="fvd-rep-asoc-resumen__num"><?= (int) ($sr['n_carnets'] ?? 0) ?></td>
-                <td class="fvd-rep-asoc-resumen__num"><?= (int) ($sr['n_afiliados'] ?? 0) ?></td>
-                <td class="fvd-rep-asoc-resumen__num"><?= $fmtN((float) ($sr['monto_total_bs'] ?? 0)) ?></td>
-                <td class="fvd-rep-asoc-resumen__num"><?= $eurOk ? $fmtN((float) $sr['monto_total_eur']) . ' €' : '—' ?></td>
-                <td class="fvd-rep-asoc-resumen__num"><?= $fmtN((float) ($sr['pagado_eur'] ?? 0)) ?> €</td>
+            <tr
+                class="fvd-rep-asoc-resumen__row fvd-rep-asoc-resumen__row--click<?= $selClass ?>"
+                data-row-url="<?= $rowUrl ?>"
+                tabindex="0"
+                role="link"
+                aria-label="Seleccionar asociación <?= htmlspecialchars($nomAsoc !== '' ? $nomAsoc : ('#' . $aidR), ENT_QUOTES, 'UTF-8') ?>"
+            >
+                <td><?= htmlspecialchars($nomAsoc !== '' ? $nomAsoc : ('#' . $aidR), ENT_QUOTES, 'UTF-8') ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $sr !== null ? (int) ($sr['n_inscritos'] ?? 0) : '—' ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $sr !== null ? (int) ($sr['n_carnets'] ?? 0) : '—' ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $sr !== null ? (int) ($sr['n_afiliados'] ?? 0) : '—' ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $sr !== null ? (int) ($sr['n_anualidad'] ?? 0) : '—' ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $sr !== null ? (int) ($sr['n_traspasos'] ?? 0) : '—' ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $sr !== null && $eurOk ? $fmtN((float) $sr['monto_total_eur']) . ' €' : '—' ?></td>
+                <td class="fvd-rep-asoc-resumen__num"><?= $sr !== null ? $fmtN((float) ($sr['pagado_eur'] ?? 0)) . ' €' : '—' ?></td>
                 <td class="fvd-rep-asoc-resumen__num"><?= $saldo !== null ? $fmtN((float) $saldo) . ' €' : '—' ?></td>
-                <td style="white-space:nowrap">
-                    <a href="<?= htmlspecialchars(fvd_return_append_to_url($fvdUrlSelf . '?torneo_id=' . $tSel . '&asociacion_id=' . $aidR), ENT_QUOTES, 'UTF-8') ?>">Filtrar</a>
-                </td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
 </section>
+<script>
+(function () {
+    var tb = document.querySelector('.fvd-rep-asoc-resumen__table tbody');
+    if (!tb) return;
+    function go(tr) {
+        var u = tr.getAttribute('data-row-url');
+        if (u) window.location.href = u;
+    }
+    tb.addEventListener('click', function (ev) {
+        var tr = ev.target.closest('tr[data-row-url]');
+        if (!tr || !tb.contains(tr)) return;
+        go(tr);
+    });
+    tb.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        var tr = ev.target.closest('tr[data-row-url]');
+        if (!tr || !tb.contains(tr)) return;
+        ev.preventDefault();
+        go(tr);
+    });
+})();
+</script>
 <?php endif; ?>
+<style>
+.fvd-rep-asoc-resumen__num { text-align: right; font-variant-numeric: tabular-nums; }
+.fvd-rep-asoc-resumen__row--click { cursor: pointer; }
+.fvd-rep-asoc-resumen__row--click:hover td { background: rgba(255, 255, 255, .05); }
+.fvd-rep-asoc-resumen__row--click:focus-visible { outline: 2px solid var(--fvd-amarillo, #fbbf24); outline-offset: -2px; }
+.fvd-rep-asoc-resumen__row--sel td { background: rgba(251, 191, 36, .12); }
+</style>
+
+<?php if ($fvdRepTorneos !== [] && $tSel > 0 && $aSel > 0): ?>
 
 <style>
 .fvd-rep-two-col {
@@ -215,8 +273,6 @@ $fmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
     border-color: var(--fvd-amarillo, rgba(251,191,36,.45));
     background: rgba(251,191,36,.1);
 }
-.fvd-rep-asoc-resumen__num { text-align: right; font-variant-numeric: tabular-nums; }
-.fvd-rep-asoc-resumen__row--sel td { background: rgba(251,191,36,.12); }
 </style>
 
 <?php
@@ -240,10 +296,6 @@ $fvdRepStats = $fvdRepStats ?? null;
         <span class="fvd-rep-stat__k">Afiliación</span>
         <span class="fvd-rep-stat__v"><?= (int) ($fvdRepStats['n_afiliados'] ?? 0) ?></span>
     </div>
-    <div class="fvd-rep-stat">
-        <span class="fvd-rep-stat__k">Deuda (Bs ref.)</span>
-        <span class="fvd-rep-stat__v"><?= $fmtN((float) ($fvdRepStats['monto_total_bs'] ?? 0)) ?></span>
-    </div>
     <?php if (($fvdRepStats['monto_total_eur'] ?? null) !== null && (float) $fvdRepStats['monto_total_eur'] > 0): ?>
     <div class="fvd-rep-stat">
         <span class="fvd-rep-stat__k">Deuda (EUR)</span>
@@ -266,35 +318,36 @@ $fvdRepStats = $fvdRepStats ?? null;
 </div>
 <?php
 $dRow = $fvdRepStats['deuda'] ?? null;
+$deudaEurPorConcepto = is_array($dRow) ? $ctrl->allocDeudaEurPorConcepto($dRow) : null;
 if (is_array($dRow)):
 ?>
     <?php if (($fvdRepStats['monto_total_eur'] ?? null) !== null && (float) $fvdRepStats['monto_total_eur'] > 0): ?>
-    <p class="fvd-rep-deuda-note">Montos por concepto en referencia de <strong>deuda</strong> (si <code>monto_total_eur</code> &gt; 0, la deuda canónica es en <strong>EUR</strong>; los pagos descuentan en EUR según recibos).</p>
+    <p class="fvd-rep-deuda-note">Deuda detallada por concepto en <strong>EUR</strong> (prorrateo desde <code>deuda_asociaciones</code> según referencia Bs; total canónico <code>monto_total_eur</code>).</p>
     <?php endif; ?>
-    <div class="fvd-rep-stats fvd-rep-stats--deuda" aria-label="Deuda detallada por concepto">
+    <div class="fvd-rep-stats fvd-rep-stats--deuda" aria-label="Deuda detallada por concepto (EUR)">
         <div class="fvd-rep-stat">
-            <span class="fvd-rep-stat__k">Inscritos</span>
-            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_inscritos'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_inscritos'] ?? 0) ?>)</span></span>
+            <span class="fvd-rep-stat__k">Inscritos (€)</span>
+            <span class="fvd-rep-stat__v"><?= is_array($deudaEurPorConcepto) ? $fmtN((float) $deudaEurPorConcepto['inscripciones']) : '0,00' ?> € <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_inscritos'] ?? 0) ?>)</span></span>
         </div>
         <div class="fvd-rep-stat">
-            <span class="fvd-rep-stat__k">Afiliaciones</span>
-            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_afiliados'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_afiliados'] ?? 0) ?>)</span></span>
+            <span class="fvd-rep-stat__k">Afiliaciones (€)</span>
+            <span class="fvd-rep-stat__v"><?= is_array($deudaEurPorConcepto) ? $fmtN((float) $deudaEurPorConcepto['afiliacion']) : '0,00' ?> € <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_afiliados'] ?? 0) ?>)</span></span>
         </div>
         <div class="fvd-rep-stat">
-            <span class="fvd-rep-stat__k">Anualidad</span>
-            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_anualidad'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_anualidad'] ?? 0) ?>)</span></span>
+            <span class="fvd-rep-stat__k">Anualidad (€)</span>
+            <span class="fvd-rep-stat__v"><?= is_array($deudaEurPorConcepto) ? $fmtN((float) $deudaEurPorConcepto['anualidad']) : '0,00' ?> € <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_anualidad'] ?? 0) ?>)</span></span>
         </div>
         <div class="fvd-rep-stat">
-            <span class="fvd-rep-stat__k">Carnets</span>
-            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_carnets'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_carnets'] ?? 0) ?>)</span></span>
+            <span class="fvd-rep-stat__k">Carnets (€)</span>
+            <span class="fvd-rep-stat__v"><?= is_array($deudaEurPorConcepto) ? $fmtN((float) $deudaEurPorConcepto['carnets']) : '0,00' ?> € <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_carnets'] ?? 0) ?>)</span></span>
         </div>
         <div class="fvd-rep-stat">
-            <span class="fvd-rep-stat__k">Traspasos</span>
-            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_traspasos'] ?? 0)) ?> <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_traspasos'] ?? 0) ?>)</span></span>
+            <span class="fvd-rep-stat__k">Traspasos (€)</span>
+            <span class="fvd-rep-stat__v"><?= is_array($deudaEurPorConcepto) ? $fmtN((float) $deudaEurPorConcepto['traspasos']) : '0,00' ?> € <span class="fvd-rep-stat__n">(<?= (int) ($dRow['total_traspasos'] ?? 0) ?>)</span></span>
         </div>
         <div class="fvd-rep-stat fvd-rep-stat--total">
-            <span class="fvd-rep-stat__k">Total</span>
-            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($dRow['monto_total'] ?? 0)) ?></span>
+            <span class="fvd-rep-stat__k">Total deuda (€)</span>
+            <span class="fvd-rep-stat__v"><?= $fmtN((float) ($fvdRepStats['monto_total_eur'] ?? 0)) ?> €</span>
         </div>
     </div>
 <?php else: ?>

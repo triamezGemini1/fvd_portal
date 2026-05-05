@@ -2,16 +2,72 @@
 /** @var ?array $row */
 /** @var ?int $id */
 /** @var string $selfUrl */
+/** @var ?array<string, int> $fvd_asoc_stats */
+/** @var ?array<string, int> $fvd_asoc_stats_global */
 $isEdit = $row !== null;
 $r = $row ?? [];
 $logoUrl = '';
 if (!empty($r['logo']) && is_string($r['logo']) && $r['logo'] !== '') {
     $logoUrl = upload_url($r['logo']);
 }
+$fvd_asoc_stats = $fvd_asoc_stats ?? null;
+$fvd_asoc_stats_global = $fvd_asoc_stats_global ?? null;
 ?>
 
 <div class="fvd-asoc-form-page">
 <h1 class="fvd-asoc-form-page__title"><?= $isEdit ? 'Editar asociación' : 'Nueva asociación' ?></h1>
+
+<?php if (is_array($fvd_asoc_stats)): ?>
+<section class="fvd-asoc-stats" aria-label="Estadísticas de esta asociación">
+    <div class="fvd-asoc-stats__head">
+        <h2 class="fvd-asoc-stats__title">Estadísticas del club</h2>
+        <?php
+        $asocActiva = FvdAdminService::asociacionEstatusEsActiva($r);
+        ?>
+        <span class="fvd-asoc-stats__badge<?= $asocActiva ? ' fvd-asoc-stats__badge--ok' : ' fvd-asoc-stats__badge--off' ?>"><?= $asocActiva ? 'Asociación activa' : 'Asociación inactiva' ?></span>
+    </div>
+    <div class="fvd-asoc-stats__grid">
+        <?php
+        $fvdTilesAsoc = [
+            ['key' => 'atletas_total', 'label' => 'Atletas (total)'],
+            ['key' => 'atletas_activos', 'label' => 'Atletas activos'],
+            ['key' => 'atletas_pendientes', 'label' => 'Atletas pendientes'],
+            ['key' => 'atletas_baja', 'label' => 'Atletas de baja'],
+            ['key' => 'inscripciones_registros', 'label' => 'Filas inscripción torneo'],
+            ['key' => 'convocatorias_registros', 'label' => 'Convocatorias (torneos)'],
+            ['key' => 'deuda_filas', 'label' => 'Registros deuda / torneo'],
+        ];
+        foreach ($fvdTilesAsoc as $tile):
+            $tv = (int) ($fvd_asoc_stats[$tile['key']] ?? 0);
+            ?>
+        <div class="fvd-asoc-stat-tile">
+            <span class="fvd-asoc-stat-tile__val"><?= $tv ?></span>
+            <span class="fvd-asoc-stat-tile__lbl"><?= htmlspecialchars($tile['label'], ENT_QUOTES, 'UTF-8') ?></span>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</section>
+<?php elseif (is_array($fvd_asoc_stats_global)): ?>
+<section class="fvd-asoc-stats" aria-label="Resumen de asociaciones en el sistema">
+    <div class="fvd-asoc-stats__head">
+        <h2 class="fvd-asoc-stats__title">Estadísticas del catálogo</h2>
+    </div>
+    <div class="fvd-asoc-stats__grid">
+        <div class="fvd-asoc-stat-tile">
+            <span class="fvd-asoc-stat-tile__val"><?= (int) ($fvd_asoc_stats_global['asociaciones_total'] ?? 0) ?></span>
+            <span class="fvd-asoc-stat-tile__lbl">Asociaciones registradas</span>
+        </div>
+        <div class="fvd-asoc-stat-tile">
+            <span class="fvd-asoc-stat-tile__val"><?= (int) ($fvd_asoc_stats_global['asociaciones_activas'] ?? 0) ?></span>
+            <span class="fvd-asoc-stat-tile__lbl">Asociaciones activas</span>
+        </div>
+        <div class="fvd-asoc-stat-tile">
+            <span class="fvd-asoc-stat-tile__val"><?= (int) ($fvd_asoc_stats_global['asociaciones_inactivas'] ?? 0) ?></span>
+            <span class="fvd-asoc-stat-tile__lbl">Asociaciones inactivas</span>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
 
 <form class="fvd-mod-form fvd-mod-form--wide fvd-mod-form--asoc-2col fvd-mod-form--asoc-bordered" method="post" enctype="multipart/form-data" action="">
     <input type="hidden" name="_action" value="save">

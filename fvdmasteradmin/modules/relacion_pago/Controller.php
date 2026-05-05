@@ -55,12 +55,16 @@ class RelacionPagoController extends FvdModuleController
                 $params[':fvd_rp_filtro_aid'] = $filtroAsociacionId;
             }
         }
-        $countSql = 'SELECT COUNT(*) FROM relacion_pagos r WHERE 1=1' . $filtroSql;
+        require_once $this->projectRoot() . '/src/Services/FvdAdminService.php';
+        $soloAsocActivas = \FvdAdminService::asociacionesSqlFiltroEstatus('a', 'activas');
+        $countSql = 'SELECT COUNT(*) FROM relacion_pagos r
+            LEFT JOIN asociaciones a ON r.asociacion_id = a.id
+            WHERE 1=1' . $filtroSql . $soloAsocActivas;
         $dataSql = 'SELECT r.*, a.nombre AS asoc_nombre, t.nombre AS torneo_nombre
             FROM relacion_pagos r
             LEFT JOIN asociaciones a ON r.asociacion_id = a.id
             LEFT JOIN torneosact t ON r.torneo_id = t.torneo
-            WHERE 1=1' . $filtroSql . '
+            WHERE 1=1' . $filtroSql . $soloAsocActivas . '
             ORDER BY r.fecha DESC';
 
         return self::paginateWithAsociacionScope($this->pdo, $countSql, $dataSql, $params, $page, $perPage, self::SCOPE_COL);
@@ -84,7 +88,9 @@ class RelacionPagoController extends FvdModuleController
     public function listAsociacionesForSelect(): array
     {
         if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-            $st = $this->pdo->query('SELECT id, nombre FROM asociaciones ORDER BY nombre');
+            require_once $this->projectRoot() . '/src/Services/FvdAdminService.php';
+            $w = \FvdAdminService::asociacionesSqlFiltroEstatus('asociaciones', 'activas');
+            $st = $this->pdo->query('SELECT id, nombre FROM asociaciones WHERE 1=1' . $w . ' ORDER BY nombre');
 
             return $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
         }

@@ -7,7 +7,9 @@ $isEdit = $row !== null;
 
 <div class="fvd-costos-form-page">
     <p class="fvd-costos-federacion-name">Federación Venezolana de Dominó</p>
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <h1 class="fvd-costos-form-title"><?= $isEdit ? 'Editar tarifas' : 'Nueva tarifa' ?></h1>
+    <?php endif; ?>
 
     <?php if (!empty($fvd_error ?? '')): ?>
     <p class="fvd-mod-msg fvd-costos-form-page__err"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p>

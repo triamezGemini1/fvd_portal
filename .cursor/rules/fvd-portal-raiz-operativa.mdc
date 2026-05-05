@@ -1,0 +1,13 @@
+---
+description: App solo en raíz fvd_portal; no carpeta ni convención "todos" para despliegue
+alwaysApply: true
+---
+
+# Aplicación FVD
+
+- **Código y entrada web:** únicamente bajo `C:\wamp64\www\fvd_portal\` (sin subcarpeta de aplicación tipo `todos/`).
+- **No usar** el nombre de carpeta **`todos`** ni rutas `/fvd_portal/todos/` para la app; esa estructura no forma parte del despliegue.
+- **RBAC global:** `includes/portal_rbac_gate.php` (constantes `FVD_PORTAL_*`, variable de entorno `FVD_PORTAL_RBAC_MIN` si aplica).
+- **Front Vite:** `C:\wamp64\www\fvd_panel\`.
+
+**Nota:** En PHP pueden aparecer la palabra «todos» o el valor de negocio `alcance = todos` (toda la federación); eso es distinto de la antigua carpeta del repo.

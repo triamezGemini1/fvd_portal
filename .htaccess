@@ -112,6 +112,10 @@ Options +FollowSymLinks
 # ============================================
 
 <IfModule mod_php.c>
+    # RBAC global: NO usar aquí auto_prepend_file con ruta relativa — el CWD en subcarpetas (p. ej. fvdmasteradmin/) hace fallar la inclusión → HTTP 500.
+    # Usar fvd_portal/.user.ini → auto_prepend_file=fvd_portal_prepend.php (rutas relativas al directorio del .user.ini).
+    # Si su PHP no lee .user.ini, en php.ini del vhost: auto_prepend_file=C:\wamp64\www\fvd_portal\fvd_portal_prepend.php
+
     # Límites de carga
     php_value upload_max_filesize 10M
     php_value post_max_size 12M

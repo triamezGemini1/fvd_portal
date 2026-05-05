@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS `inscripcion_torneo` (
   `equipo` int NOT NULL DEFAULT 0 COMMENT 'Número de equipo',
   `cedula` int NOT NULL COMMENT 'Cédula numérica (legado)',
   `nombre` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nombre_equipo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Nombre pareja/equipo (misma en integrantes del mismo equipo)',
   `numfvd` int NOT NULL DEFAULT 0,
   `sexo` int NOT NULL DEFAULT 0 COMMENT '1=M, 2=F',
   `telefono` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

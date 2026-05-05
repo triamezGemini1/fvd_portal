@@ -25,6 +25,7 @@ try {
     $alcance = $lf['alcance'];
     $tipo = $lf['tipo'];
     $asociacionFiltroId = $lf['asociacion_id'];
+    $marcadorApi = fvd_atletas_resolve_marcador($_GET);
 
     $filtros = [
         '__cedula'         => $cedula,
@@ -33,6 +34,9 @@ try {
         '__tipo'           => $tipo,
         '__asociacion_id'  => $asociacionFiltroId,
     ];
+    if ($marcadorApi !== '') {
+        $filtros['__marcador'] = $marcadorApi;
+    }
 
     if ($filtrosParam !== '') {
         $decoded = json_decode($filtrosParam, true);
@@ -58,16 +62,36 @@ try {
     $atletaRowTpl = FVD_PROJECT_ROOT . '/templates/components/atleta_table_row.php';
     $fvd_puede_traspaso = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
     $fvd_atletas_show_asociacion_col = !($alcance === 'asociacion' && $asociacionFiltroId > 0);
-    $appBaseAtletas = rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/');
-    $fvd_url_solicitud_carnet_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_carnet.php' : '/fvdmasteradmin/solicitud_carnet.php';
-    $fvd_url_solicitud_traspaso_base = $appBaseAtletas !== '' ? $appBaseAtletas . '/fvdmasteradmin/solicitud_traspaso.php' : '/fvdmasteradmin/solicitud_traspaso.php';
+    if (!function_exists('url')) {
+        require_once FVD_PROJECT_ROOT . '/config/paths.php';
+    }
+    $fvd_url_solicitud_carnet_base = url('fvdmasteradmin/solicitud_carnet.php');
+    $fvd_url_solicitud_traspaso_base = url('fvdmasteradmin/solicitud_traspaso.php');
+    $fvd_atletas_delegado_line = AuthService::isDelegadoAsociacion();
+    $fvd_delegado_traspaso_destinos = [];
+    if ($fvd_atletas_delegado_line) {
+        $myAsTr = (int) (AuthService::idAsociacion() ?? 0);
+        if ($myAsTr > 0) {
+            try {
+                $stTr = fvd_db()->prepare('SELECT id, nombre FROM asociaciones WHERE id <> :my ORDER BY nombre ASC');
+                $stTr->execute([':my' => $myAsTr]);
+                $fvd_delegado_traspaso_destinos = $stTr->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            } catch (Throwable $e) {
+                error_log('[atletas/search_api] traspaso destinos: ' . $e->getMessage());
+            }
+        }
+    }
 
     ob_start();
     foreach ($paged['registros'] as $r) {
         require $atletaRowTpl;
     }
     if ($paged['registros'] === []) {
-        $cs = $fvd_atletas_show_asociacion_col ? '11' : '10';
+        if ($fvd_atletas_delegado_line) {
+            $cs = '6';
+        } else {
+            $cs = $fvd_atletas_show_asociacion_col ? '9' : '8';
+        }
         echo '<tr><td colspan="' . $cs . '" style="padding:12px">Sin registros con los filtros actuales.</td></tr>';
     }
     $tbodyHtml = ob_get_clean();

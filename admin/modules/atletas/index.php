@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/PaginationView.php';
+require_once FVD_MASTER_ROOT . '/includes/fvd_delegado_internal_nav.php';
 use FvdPortal\Services\PaginationView;
 use FvdPortal\Services\QueryHelper;
 
@@ -112,17 +113,36 @@ if ($action === 'lookup_cedula') {
 
         exit;
     }
-    $foundRow = $svc->atletasFindByCedula($cedLookup);
+    $foundRow = $svc->atletasFindByCedulaGlobal($cedLookup);
     if ($foundRow === null) {
         echo json_encode(['found' => false]);
 
         exit;
     }
+    $fid = (int) ($foundRow['id'] ?? 0);
+    $inScope = $fid > 0 && $svc->atletasFind($fid) !== null;
+    $estN = (int) ($foundRow['estatus'] ?? 0);
+    $solPend = $fid > 0 ? $svc->atletasSolicitudDelegadoPendientePorAtleta($fid) : null;
+    $solicitudJson = null;
+    if (is_array($solPend)) {
+        $solicitudJson = [
+            'id'        => (int) ($solPend['id'] ?? 0),
+            'tipo'      => (string) ($solPend['tipo'] ?? ''),
+            'creado_en' => (string) ($solPend['creado_en'] ?? ''),
+            'nota'      => $solPend['nota'] !== null && trim((string) $solPend['nota']) !== '' ? (string) $solPend['nota'] : '',
+        ];
+    }
     echo json_encode([
-        'found' => true,
-        'id' => (int) $foundRow['id'],
-        'nombre' => (string) ($foundRow['nombre'] ?? ''),
-        'redirect' => fvd_return_append_to_url($selfUrl . '?action=form&id=' . (int) $foundRow['id']),
+        'found'                 => true,
+        'id'                    => $fid,
+        'cedula'                => (string) ($foundRow['cedula'] ?? ''),
+        'nombre'                => (string) ($foundRow['nombre'] ?? ''),
+        'numfvd'                => (int) ($foundRow['numfvd'] ?? 0),
+        'estatus_etiqueta'      => FvdAdminService::atletasEstatusEtiqueta($estN, isset($foundRow['numfvd']) ? (int) $foundRow['numfvd'] : null),
+        'asociacion_nombre'     => (string) ($foundRow['asociacion_nombre'] ?? ''),
+        'alta_desde_delegado'  => (int) ($foundRow['alta_desde_delegado'] ?? 0),
+        'solicitud_pendiente'  => $solicitudJson,
+        'scope_notice'          => $inScope ? '' : 'Este documento figura en otra asociación o fuera de su ámbito; con su sesión no puede editar esa ficha.',
     ], JSON_UNESCAPED_UNICODE);
 
     exit;
@@ -231,11 +251,22 @@ if ($action === 'carnets') {
 }
 
 if ($action === 'form') {
-    $row = $svc->atletasFind($id);
+    $fvdRepoblarNuevo = ($fvd_error !== ''
+        && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+        && (($_POST['_action'] ?? '') === 'save')
+        && (!isset($_POST['id']) || trim((string) $_POST['id']) === ''));
+    if ($fvdRepoblarNuevo) {
+        $row = FvdAdminService::atletasRepoblarRowDesdePost($_POST);
+        $id = null;
+    } else {
+        $row = $svc->atletasFind($id);
+    }
     $asociaciones = $svc->atletasListAsociacionesForSelect();
     if ($id !== null && $row === null) {
         http_response_code(404);
         $fvd_page_title = 'No encontrado';
+    } else {
+        $fvd_page_title = $id !== null ? 'Editar atleta' : 'Nuevo atleta';
     }
     $fvd_form_embed = isset($_GET['embed']) && $_GET['embed'] === '1';
     if ($fvd_form_embed) {
@@ -243,7 +274,7 @@ if ($action === 'form') {
         if (!function_exists('url')) {
             require_once FVD_PROJECT_ROOT . '/config/paths.php';
         }
-        $embedCss = url('assets/css/fvd-ui-mistorneos.css');
+        $embedCss = url('assets/css/fvd-ui-portal.css');
         header('Content-Type: text/html; charset=UTF-8');
         ?>
 <!DOCTYPE html>
@@ -292,16 +323,22 @@ $lf = fvd_atletas_resolve_list_filters($_GET);
 $fvd_atletas_alcance = $lf['alcance'];
 $fvd_atletas_tipo = $lf['tipo'];
 $asociacionFiltroId = $lf['asociacion_id'];
+$fvd_atletas_marcador = fvd_atletas_resolve_marcador($_GET);
+
+$filtrosAtletasList = [
+    '__cedula'         => $cedula,
+    '__nombre'         => $q,
+    '__alcance'        => $fvd_atletas_alcance,
+    '__tipo'           => $fvd_atletas_tipo,
+    '__asociacion_id'  => $asociacionFiltroId,
+];
+if ($fvd_atletas_marcador !== '') {
+    $filtrosAtletasList['__marcador'] = $fvd_atletas_marcador;
+}
 
 $paged = QueryHelper::selectPaginado(
     'atletas',
-    [
-        '__cedula'         => $cedula,
-        '__nombre'         => $q,
-        '__alcance'        => $fvd_atletas_alcance,
-        '__tipo'           => $fvd_atletas_tipo,
-        '__asociacion_id'  => $asociacionFiltroId,
-    ],
+    $filtrosAtletasList,
     $page,
     $perPage,
     fvd_db()
@@ -342,6 +379,9 @@ $paginationQueryParams = [
 if ($fvd_atletas_alcance === 'asociacion' && $asociacionFiltroId > 0) {
     $paginationQueryParams['asociacion_id'] = $asociacionFiltroId;
 }
+if ($fvd_atletas_marcador !== '') {
+    $paginationQueryParams['marcador'] = $fvd_atletas_marcador;
+}
 $paginationQueryParams = fvd_return_merge_get_params($paginationQueryParams);
 
 $sn = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
@@ -358,6 +398,25 @@ $atletasExportUrl = fvd_return_preserve_query_params($atletasExportUrl);
 $atletasReportBaseUrl = $fvdAtletasSite
     ? fvd_master_module_url('atletas/')
     : admin_module_url('atletas/');
+$fvd_delegado_traspaso_destinos = [];
+$fvd_delegado_solicitud_una_api_url = '';
+if (AuthService::isDelegadoAsociacion()) {
+    $myAsTr = (int) (AuthService::idAsociacion() ?? 0);
+    if ($myAsTr > 0) {
+        try {
+            $stTr = fvd_db()->prepare('SELECT id, nombre FROM asociaciones WHERE id <> :my ORDER BY nombre ASC');
+            $stTr->execute([':my' => $myAsTr]);
+            $fvd_delegado_traspaso_destinos = $stTr->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            error_log('[atletas/list] traspaso destinos: ' . $e->getMessage());
+        }
+    }
+    $fvd_delegado_solicitud_una_api_url = fvd_return_preserve_query_params(
+        $fvdAtletasSite
+            ? fvd_master_module_url('atletas/delegado_solicitud_una_api.php')
+            : admin_module_url('atletas/delegado_solicitud_una_api.php')
+    );
+}
 $fvd_atletas_pager_html = PaginationView::navHtml(
     $selfUrl,
     (int) $result['page'],
@@ -373,6 +432,28 @@ $fvd_atletas_widget = \FvdPortal\Services\StatsService::atletasModuloWidgetResum
     $fvd_atletas_alcance,
     $asociacionFiltroId
 );
+
+/** Panel maestro (Vue): listado sin recargar el documento — HTML del fragmento en JSON. */
+if ($action === 'list' && isset($_GET['spa_json']) && (string) $_GET['spa_json'] === '1') {
+    $fvd_atletas_spa_fragment = true;
+    $fvd_atletas_filter_form_action = $selfUrl;
+    header('Content-Type: application/json; charset=UTF-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    ob_start();
+    include __DIR__ . '/list.view.php';
+    $html = ob_get_clean();
+    echo json_encode([
+        'ok'    => true,
+        'html'  => $html,
+        'title' => 'Atletas',
+    ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    exit;
+}
+
+if ($action === 'list' && AuthService::isDelegadoAsociacion()) {
+    $fvd_defer_return_bar = true;
+}
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';

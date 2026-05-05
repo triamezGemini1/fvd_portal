@@ -11,7 +11,9 @@ $fvdTorneoNombreStats = $fvdTorneoNombreStats ?? '';
 $fvd_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 ?>
 
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1>Estadísticas por torneo — <?= htmlspecialchars(($fvdEstadisticasInscripcion['fuente'] ?? '') === 'inscripcion_torneo' ? 'inscripcion_torneo' : 'atletas', ENT_QUOTES, 'UTF-8') ?></h1>
+<?php endif; ?>
 <p class="muted" style="font-size:0.875rem;line-height:1.5;margin-bottom:16px">
     <?php if (($fvdEstadisticasInscripcion['fuente'] ?? '') === 'inscripcion_torneo'): ?>
         Filas del torneo en <code>inscripcion_torneo</code>. <code>inscripcion</code> en 1 o 2 cuenta como inscrito al evento (sitio o movimiento).

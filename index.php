@@ -32,8 +32,8 @@ public_layout_header('inicio');
 public_layout_main_open();
 
 $logoLanding = public_layout_logo_url();
-/* Login fijo para todos los accesos administrativos de la landing. */
-$urlLogin = '/fvd_portal/login.php';
+/* Login canónico en la raíz del proyecto. */
+$urlLogin = function_exists('url') ? url('login.php') : '/fvd_portal/login.php';
 ?>
 
 <?php if ($dbError !== ''): ?>

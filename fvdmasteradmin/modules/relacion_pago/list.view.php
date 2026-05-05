@@ -16,7 +16,9 @@ $fvdFmtNum = static function ($value, int $decimals): string {
 };
 ?>
 
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1>Pagos registrados</h1>
+<?php endif; ?>
 <?php
 $fvdFiltroAsociacionId = isset($fvdFiltroAsociacionId) ? (int) $fvdFiltroAsociacionId : 0;
 ?>

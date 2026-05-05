@@ -6,7 +6,9 @@ $r = $row ?? [];
 $isEdit = $row !== null;
 ?>
 
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1><?= $isEdit ? 'Editar torneo' : 'Nuevo torneo' ?></h1>
+<?php endif; ?>
 
 <form method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['torneo'] : ''), ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="_action" value="save">

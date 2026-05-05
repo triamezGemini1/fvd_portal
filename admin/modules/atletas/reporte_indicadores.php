@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/IndicadoresTablaDefs.php';
+require_once __DIR__ . '/inc_reporte_atletas_columnas.php';
+require_once __DIR__ . '/report_asoc_filter.inc.php';
 
 use FvdPortal\Services\IndicadoresTablaDefs;
 use FvdPortal\Services\QueryHelper;
@@ -21,14 +23,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rese
     }
     $retPost = isset($_POST['ret']) && is_string($_POST['ret']) ? fvd_return_sanitize($_POST['ret']) : null;
     $qsRet = $retPost !== null ? '&ret=' . rawurlencode($retPost) : '';
+    $asocPost = isset($_POST['asociacion_id']) ? (int) $_POST['asociacion_id'] : 0;
+    $qsAsoc = ($asocPost > 0) ? '&asociacion_id=' . $asocPost : '';
     $campo = trim((string) ($_POST['marcador'] ?? ''));
     $svc = new FvdAdminService();
     try {
         $n = $svc->atletasResetMarcadorMasivo($campo);
-        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo) . $qsRet);
+        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_ok&n=' . (int) $n . '&campo=' . rawurlencode($campo) . $qsRet . $qsAsoc);
     } catch (Throwable $e) {
         error_log('[reporte_indicadores reset] ' . $e->getMessage());
-        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_err' . $qsRet);
+        header('Location: ' . fvd_atletas_reporte_indicadores_self_url() . '?msg=reset_err' . $qsRet . $qsAsoc);
     }
     exit;
 }
@@ -45,25 +49,33 @@ $marcadoresInforme = ['afiliacion', 'anualidad', 'carnet', 'traspaso', 'inscripc
 $marcadorGet = isset($_GET['marcador']) ? trim((string) $_GET['marcador']) : '';
 $marcadorFijo = $marcadorGet !== '' && in_array($marcadorGet, $marcadoresInforme, true) ? $marcadorGet : null;
 
-$rows = QueryHelper::selectAtletasPorIndicadoresServicioFull($modo, $cedula, $nombre, fvd_db(), $marcadorFijo);
+$filtroAsocRep = fvd_report_filter_asociacion_id_from_get();
+
+$rows = QueryHelper::selectAtletasPorIndicadoresServicioFull($modo, $cedula, $nombre, fvd_db(), $marcadorFijo, $filtroAsocRep);
+fvd_rep_atletas_strip_telefonos($rows);
+$rowsAll = $rows;
+$resolvedCols = fvd_rep_atletas_resolve_columnas($rowsAll[0] ?? null);
+$fvdRepIndicadoresColsVisibles = $resolvedCols['columns'];
+$fvdRepIndicadoresColEtiquetaPorKey = $resolvedCols['labels'];
+$fvdRepIndicadoresLogicalLcPorKey = $resolvedCols['logical'];
 
 if ($marcadorFijo === null) {
-    $totalesAlcance = QueryHelper::aggregateIndicadoresAtletasTotales(fvd_db());
-    $porAsociacion = QueryHelper::aggregateIndicadoresAtletasPorAsociacion(fvd_db());
+    $totalesAlcance = QueryHelper::aggregateIndicadoresAtletasTotales(fvd_db(), $filtroAsocRep);
+    $porAsociacion = QueryHelper::aggregateIndicadoresAtletasPorAsociacion(fvd_db(), $filtroAsocRep);
 } else {
     $totalesAlcance = [];
     $porAsociacion = [];
 }
 
 $stats = [
-    'total'       => count($rows),
+    'total'       => count($rowsAll),
     'afiliacion'  => 0,
     'anualidad'   => 0,
     'carnet'      => 0,
     'traspaso'    => 0,
     'inscripcion' => 0,
 ];
-foreach ($rows as $r) {
+foreach ($rowsAll as $r) {
     foreach (['afiliacion', 'anualidad', 'carnet', 'traspaso', 'inscripcion'] as $k) {
         if ((int) ($r[$k] ?? 0) === 1) {
             ++$stats[$k];
@@ -83,10 +95,14 @@ if ($format === 'csv') {
         exit;
     }
     fwrite($out, "\xEF\xBB\xBF");
-    if ($rows !== []) {
-        $cols = array_keys($rows[0]);
-        fputcsv($out, $cols, ';');
-        foreach ($rows as $r) {
+    if ($rowsAll !== []) {
+        $cols = $fvdRepIndicadoresColsVisibles;
+        $hdrCsv = [];
+        foreach ($cols as $c) {
+            $hdrCsv[] = $fvdRepIndicadoresColEtiquetaPorKey[$c] ?? $c;
+        }
+        fputcsv($out, $hdrCsv, ';');
+        foreach ($rowsAll as $r) {
             $line = [];
             foreach ($cols as $c) {
                 $v = $r[$c] ?? null;
@@ -148,32 +164,32 @@ $resetEtiquetas = [
 ];
 $rolSesionUi = trim((string) (AuthService::role() ?? ''));
 $fvdEsDelegadoAsoc = $rolSesionUi === AuthService::ROLE_DELEGADO_ASOC;
-$fvdPuedeResetMarcadores = $rolSesionUi === AuthService::ROLE_FVD_ADMIN;
 $fvdEsAdminAsociacion = $rolSesionUi === AuthService::ROLE_ASO_ADMIN;
 
-$columnas = $rows !== [] ? array_keys($rows[0]) : [];
+$columnas = $fvdRepIndicadoresColsVisibles;
 
 $fvdIndCols = IndicadoresTablaDefs::columnasMetricas();
 $totalesVals = $totalesAlcance !== []
     ? IndicadoresTablaDefs::valoresMetricasInt($totalesAlcance, 'totales alcance')
     : [];
 
+require_once FVD_PROJECT_ROOT . '/includes/fvd_report_pagination.php';
+$pag = fvd_report_paginator_slice($rowsAll);
+$rows = $pag['slice'];
+$fvd_repPaginator = $pag;
+$fvd_repPaginatorSelf = $selfReport;
+$movimientosSolicitados = fvd_rep_atletas_movimientos_sidebar_rows($rowsAll);
+
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
-<div class="report-container fvd-rep-indicadores" style="max-width:100%">
-    <p class="no-print" style="margin:0 0 .85rem">
-        <a href="/fvd_portal/fvdmasteradmin/delegado_dashboard_new.php"
-           class="inline-flex items-center text-black font-bold border-2 border-black px-4 py-2 rounded hover:bg-black hover:text-white transition-colors"
-           style="display:inline-flex;align-items:center;gap:.45rem;color:#000;font-weight:800;border:2px solid #000;padding:.5rem .9rem;border-radius:.45rem;text-decoration:none;transition:all .15s ease">
-            <i class="fas fa-arrow-left mr-2"></i> VOLVER AL PANEL
-        </a>
-    </p>
-    <!-- fvd indicadores: bloque reinicio masivo v2026-04 -->
+<div class="report-container fvd-rep-indicadores" style="box-sizing:border-box;width:100%;max-width:100%;margin:0;padding:0 0 1rem">
+    <?php require __DIR__ . '/partial_atletas_informes_nav.php'; ?>
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <h1 class="fvd-atletas-title"><?= htmlspecialchars($h1Reporte, ENT_QUOTES, 'UTF-8') ?></h1>
-    <?php if ($fvdPuedeResetMarcadores): ?>
-    <p class="no-print" style="margin:0 0 .75rem;padding:10px 12px;border:2px solid #b91c1c;border-radius:8px;background:rgba(254,226,226,.35);font-size:.875rem;line-height:1.45">
-        <strong>Reinicio masivo de marcadores:</strong> use los botones rojos más abajo (carnet, traspaso, anualidad, afiliación, inscripciones).
-        Alcance según su sesión (FVD: todos los atletas; asociación/delegado: solo su club).
+    <?php endif; ?>
+    <?php if ($retOrigen !== null): ?>
+    <p class="no-print" style="margin:0 0 .65rem">
+        <a class="fvd-input" style="width:auto;padding:7px 14px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:800;border:2px solid #2e3092" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>">← Volver a la consulta (listado / filtros)</a>
     </p>
     <?php endif; ?>
     <?php if ($marcadorFijo !== null && !$fvdEsDelegadoAsoc): ?>
@@ -196,38 +212,6 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         </p>
     <?php elseif ($msgUi === 'reset_err'): ?>
         <p class="fvd-mod-msg" style="margin:0 0 .75rem">No se pudo completar el reinicio. Revise el registro del servidor o permisos.</p>
-    <?php endif; ?>
-
-    <?php if ($fvdPuedeResetMarcadores): ?>
-    <section class="fvd-rep-indicadores__reset no-print" data-fvd-reset-marcadores="1" aria-label="Reinicio masivo de marcadores" style="margin:0 0 1.25rem;padding:14px;border-radius:8px;border:2px solid #991b1b;background:rgba(127,29,29,.18)">
-        <h2 style="margin:0 0 .35rem;font-size:1.05rem;font-weight:800;color:#fecaca">Reiniciar marcadores (poner en 0)</h2>
-        <p style="margin:0 0 .75rem;font-size:.72rem;color:var(--fvd-muted);line-height:1.45">
-            Operación masiva sobre <code>atletas</code> en <strong>su alcance</strong> (FVD: toda la federación; delegado: solo esa asociación).
-            Cada botón ejecuta <code>UPDATE … SET campo = 0</code>. <strong>Inscripción</strong> también pone <code>torneo_id = 0</code>.
-        </p>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-            <?php
-            $accionesReset = [
-                ['carnet', 'Reset carnets', '¿Poner en 0 el marcador de carnet en todos los atletas de su alcance?'],
-                ['traspaso', 'Reset traspasos', '¿Poner en 0 el marcador de traspaso en todos los atletas de su alcance?'],
-                ['anualidad', 'Reset anualidad', '¿Poner en 0 el marcador de anualidad en todos los atletas de su alcance?'],
-                ['afiliacion', 'Reset afiliación', '¿Poner en 0 el marcador de afiliación en todos los atletas de su alcance?'],
-                ['inscripcion', 'Reset inscripciones', '¿Poner en 0 inscripción y torneo_id en todos los atletas de su alcance?'],
-            ];
-            foreach ($accionesReset as $ar):
-                [$mk, $mlab, $mconfirm] = $ar;
-            ?>
-            <form method="post" action="<?= htmlspecialchars($selfReport, ENT_QUOTES, 'UTF-8') ?>" style="margin:0" onsubmit="return confirm(<?= htmlspecialchars(json_encode($mconfirm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);">
-                <input type="hidden" name="_action" value="reset_marcador_atletas">
-                <input type="hidden" name="marcador" value="<?= htmlspecialchars($mk, ENT_QUOTES, 'UTF-8') ?>">
-                <?php if ($fvdRetPreserve !== ''): ?>
-                <input type="hidden" name="ret" value="<?= htmlspecialchars($fvdRetPreserve, ENT_QUOTES, 'UTF-8') ?>">
-                <?php endif; ?>
-                <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px;font-size:.75rem;cursor:pointer;background:#7f1d1d;color:#fecaca;border-color:#991b1b"><?= htmlspecialchars($mlab, ENT_QUOTES, 'UTF-8') ?></button>
-            </form>
-            <?php endforeach; ?>
-        </div>
-    </section>
     <?php endif; ?>
 
     <?php if ($marcadorFijo === null): ?>
@@ -295,6 +279,9 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         <?php if ($fvdRetPreserve !== ''): ?>
         <input type="hidden" name="ret" value="<?= htmlspecialchars($fvdRetPreserve, ENT_QUOTES, 'UTF-8') ?>">
         <?php endif; ?>
+        <?php if ($filtroAsocRep > 0): ?>
+        <input type="hidden" name="asociacion_id" value="<?= (int) $filtroAsocRep ?>">
+        <?php endif; ?>
         <?php if ($marcadorFijo !== null): ?>
         <input type="hidden" name="marcador" value="<?= htmlspecialchars($marcadorFijo, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="modo" value="cualquiera">
@@ -324,6 +311,9 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         if ($fvdRetPreserve !== '') {
             $qsReset['ret'] = $fvdRetPreserve;
         }
+        if ($filtroAsocRep > 0) {
+            $qsReset['asociacion_id'] = (string) $filtroAsocRep;
+        }
         $urlRestablecer = $selfReport . ($qsReset !== [] ? '?' . http_build_query($qsReset, '', '&', PHP_QUERY_RFC3986) : '');
         ?>
         <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($urlRestablecer, ENT_QUOTES, 'UTF-8') ?>">Restablecer</a>
@@ -341,12 +331,13 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         if ($fvdRetPreserve !== '') {
             $qsCsv['ret'] = $fvdRetPreserve;
         }
+        if ($filtroAsocRep > 0) {
+            $qsCsv['asociacion_id'] = (string) $filtroAsocRep;
+        }
         $urlCsv = $selfReport . '?' . http_build_query($qsCsv, '', '&', PHP_QUERY_RFC3986);
         ?>
         <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:600" href="<?= htmlspecialchars($urlCsv, ENT_QUOTES, 'UTF-8') ?>">Descargar CSV</a>
-        <?php if ($retOrigen === null): ?>
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>">← Listado atletas</a>
-        <?php endif; ?>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:700" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $retOrigen !== null ? '← Volver a la consulta' : '← Listado atletas' ?></a>
     </form>
 
     <section class="fvd-rep-indicadores__stats" aria-label="Resumen por indicador" style="margin:0 0 1rem;padding:12px;border-radius:8px;border:1px solid var(--fvd-border);background:rgba(255,255,255,0.04)">
@@ -362,37 +353,7 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
         <p style="margin:.5rem 0 0;font-size:.72rem;color:var(--fvd-muted)">Los conteos por columna cuentan cuántas filas tienen ese marcador en 1 (un mismo atleta puede sumar en varios).</p>
     </section>
 
-    <div class="fvd-mod-table-wrap" style="overflow-x:auto;max-height:min(70vh,900px);overflow-y:auto">
-        <table class="fvd-mod-table tabla-atletas" style="font-size:.72rem">
-            <thead>
-            <tr>
-                <?php foreach ($columnas as $col): ?>
-                    <th scope="col" style="white-space:nowrap;position:sticky;top:0;background:var(--fvd-azul-card,#1e293b);z-index:1"><?= htmlspecialchars($col, ENT_QUOTES, 'UTF-8') ?></th>
-                <?php endforeach; ?>
-                <th scope="col" class="no-print" style="position:sticky;top:0;background:var(--fvd-azul-card,#1e293b);z-index:1">Acción</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($rows as $r): ?>
-                <tr>
-                    <?php foreach ($columnas as $col): ?>
-                        <?php
-                        $cell = $r[$col] ?? null;
-                        $disp = $cell === null || $cell === '' ? '—' : (is_scalar($cell) || $cell instanceof \Stringable ? (string) $cell : '');
-                        ?>
-                        <td style="max-width:14rem;overflow:hidden;text-overflow:ellipsis" title="<?= htmlspecialchars($disp, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($disp, ENT_QUOTES, 'UTF-8') ?></td>
-                    <?php endforeach; ?>
-                    <td class="no-print" style="white-space:nowrap">
-                        <a href="<?= htmlspecialchars($atletasUrl . '?action=form&id=' . (int) ($r['id'] ?? 0), ENT_QUOTES, 'UTF-8') ?>">Editar</a>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if ($rows === []): ?>
-                <tr><td colspan="<?= max(1, count($columnas) + 1) ?>" style="padding:12px">Sin registros con este criterio.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+    <?php require __DIR__ . '/partial_reporte_atletas_main_grid.php'; ?>
 </div>
 <?php
 require FVD_MASTER_ROOT . '/includes/layout_footer.php';

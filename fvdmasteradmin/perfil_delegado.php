@@ -191,30 +191,145 @@ $fotoCarnetUrl = ($hasFotoCarnet && !empty($row['foto_carnet']))
 $fotoCedulaUrl = ($hasFotoCedula && !empty($row['foto_cedula']))
     ? $media->resolveDisplayUrl((string) $row['foto_cedula']) : '';
 
+$fvd_defer_return_bar = true;
 require __DIR__ . '/includes/layout_header.php';
 ?>
-<div class="fvd-delegado-perfil-resumen" style="max-width:42rem;margin:0 auto 1rem;color:#000;font-weight:700;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;">
-    <h1 style="margin:0 0 .75rem;font-size:1.35rem;font-weight:700;color:#000;">Tu perfil</h1>
-    <p style="margin:.35rem 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
-        Nombre: <?= htmlspecialchars(trim((string) ($row['nombre_contacto'] ?? '')) !== '' ? (string) $row['nombre_contacto'] : '—', ENT_QUOTES, 'UTF-8') ?>
-    </p>
-    <p style="margin:.35rem 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
-        Correo: <?= htmlspecialchars((string) ($row['email_acceso'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-    </p>
-    <p style="margin:.35rem 0 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
-        Asociación: <?= htmlspecialchars((string) ($row['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-    </p>
-</div>
-<?php if ($notifActivas > 0): ?>
-<a href="<?= htmlspecialchars($fvdDelegadoDashboardUrl, ENT_QUOTES, 'UTF-8') ?>"
-   class="fvd-delegado-notif-banner"
-   style="display:block;max-width:42rem;margin:0 auto 1.25rem;box-sizing:border-box;padding:1rem 1.25rem;background:#FFEB3E;color:#000;font-weight:700;font-size:1.2rem;text-align:center;text-decoration:none;border:3px solid #000;border-radius:10px;line-height:1.35;cursor:pointer;box-shadow:0 4px 0 #000;">
-    TIENES <?= $notifActivas ?> NOTIFICACIONES ACTIVAS
-</a>
-<?php endif; ?>
-
-<div class="fvd-card" style="max-width:36rem">
-    <h1 style="color:#000;font-weight:700;">Mi perfil (delegado)</h1>
+<style>
+.fvd-delegado-perfil-grid {
+    max-width: 72rem;
+    margin: 0 auto 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    align-items: start;
+    box-sizing: border-box;
+    padding: 0 0.5rem;
+}
+@media (min-width: 900px) {
+    .fvd-delegado-perfil-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+        gap: 1.5rem 2rem;
+        padding: 0;
+    }
+}
+.fvd-delegado-perfil-col--info {
+    color: #000;
+    font-weight: 700;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.fvd-delegado-perfil-col--form .fvd-card { max-width: none; }
+.fvd-delegado-perfil-ident { margin: 0 0 0.35rem; }
+.fvd-delegado-perfil-nombre-badge {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #2e3092 0%, #1a1c6e 100%);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.35;
+    border: 2px solid #0f172a;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+    max-width: 100%;
+    box-sizing: border-box;
+}
+.fvd-delegado-perfil-nombre-badge__lbl {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.88;
+}
+.fvd-delegado-perfil-nombre-badge__val {
+    color: #fde047;
+    word-break: break-word;
+}
+.fvd-delegado-perfil-panel-btn {
+    display: inline-block;
+    margin: 0 0 0.85rem;
+    padding: 0.55rem 1.2rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: #0f172a;
+    background: #fde047;
+    border: 2px solid #0f172a;
+    border-radius: 10px;
+    box-shadow: 0 3px 0 #0f172a;
+    line-height: 1.35;
+    font-family: inherit;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+.fvd-delegado-perfil-panel-btn:hover {
+    filter: brightness(1.06);
+    color: #0f172a;
+}
+.fvd-delegado-perfil-panel-btn:focus-visible {
+    outline: 3px solid #2e3092;
+    outline-offset: 2px;
+}
+</style>
+<?php
+$fvdPerfilPanelHref = (isset($fvd_return_nav_url) && is_string($fvd_return_nav_url) && $fvd_return_nav_url !== '')
+    ? $fvd_return_nav_url
+    : $fvdDelegadoDashboardUrl;
+?>
+<div class="fvd-delegado-perfil-grid">
+    <div class="fvd-delegado-perfil-col fvd-delegado-perfil-col--info">
+        <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
+        <h1 style="margin:0 0 .75rem;font-size:1.35rem;font-weight:700;color:#000;">Tu perfil</h1>
+        <?php endif; ?>
+        <div class="fvd-delegado-perfil-ident">
+            <div class="fvd-delegado-perfil-nombre-badge" role="group" aria-label="Nombre del delegado">
+                <span class="fvd-delegado-perfil-nombre-badge__lbl">Nombre</span>
+                <span class="fvd-delegado-perfil-nombre-badge__val"><?= htmlspecialchars(trim((string) ($row['nombre_contacto'] ?? '')) !== '' ? (string) $row['nombre_contacto'] : '—', ENT_QUOTES, 'UTF-8') ?></span>
+            </div>
+            <p style="margin:0;">
+                <a class="fvd-delegado-perfil-panel-btn no-print" href="<?= htmlspecialchars($fvdPerfilPanelHref, ENT_QUOTES, 'UTF-8') ?>">Ir al panel delegado</a>
+            </p>
+        </div>
+        <p style="margin:.35rem 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
+            Correo: <?= htmlspecialchars((string) ($row['email_acceso'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+        </p>
+        <p style="margin:.35rem 0 0;line-height:1.45;font-size:1rem;color:#000;font-weight:700;">
+            Asociación: <?= htmlspecialchars((string) ($row['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+        </p>
+        <?php if ($notifActivas > 0): ?>
+        <a href="<?= htmlspecialchars($fvdDelegadoDashboardUrl, ENT_QUOTES, 'UTF-8') ?>"
+           class="fvd-delegado-notif-banner"
+           style="display:block;margin:1rem 0 0;box-sizing:border-box;padding:1rem 1.25rem;background:#FFEB3E;color:#000;font-weight:700;font-size:1.05rem;text-align:center;text-decoration:none;border:3px solid #000;border-radius:10px;line-height:1.35;cursor:pointer;box-shadow:0 4px 0 #000;">
+            TIENES <?= $notifActivas ?> NOTIFICACIONES ACTIVAS
+        </a>
+        <?php endif; ?>
+        <?php if ($hasFotoCarnet || $hasFotoCedula): ?>
+        <div style="display:flex;flex-wrap:wrap;gap:1rem;margin:1rem 0 0;">
+            <?php if ($hasFotoCarnet): ?>
+            <div>
+                <p style="margin:0 0 0.35rem;color:var(--fvd-muted);font-size:0.75rem;">Foto carnet actual</p>
+                <div style="width:100px;height:100px;border-radius:8px;overflow:hidden;border:1px solid var(--fvd-border);">
+                    <img src="<?= htmlspecialchars($fotoCarnetUrl !== '' ? $fotoCarnetUrl : $media->defaultAvatar(), ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
+                </div>
+            </div>
+            <?php endif; ?>
+            <?php if ($hasFotoCedula): ?>
+            <div>
+                <p style="margin:0 0 0.35rem;color:var(--fvd-muted);font-size:0.75rem;">Imagen cédula actual</p>
+                <div style="width:100px;height:100px;border-radius:8px;overflow:hidden;border:1px solid var(--fvd-border);">
+                    <img src="<?= htmlspecialchars($fotoCedulaUrl !== '' ? $fotoCedulaUrl : $media->defaultAvatar(), ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <div class="fvd-delegado-perfil-col fvd-delegado-perfil-col--form">
+<div class="fvd-card" style="max-width:none">
+    <h2 style="margin:0 0 .35rem;color:#000;font-weight:700;font-size:1.2rem;">Editar datos y seguridad</h2>
     <p style="font-size:0.8125rem;color:var(--fvd-muted)">Asociación: <strong><?= htmlspecialchars((string) ($row['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong></p>
     <?php if ($msg !== ''): ?><p class="fvd-mod-msg" style="color:#86efac"><?= htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
     <?php if ($err !== ''): ?><p class="fvd-mod-msg"><?= htmlspecialchars($err, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
@@ -226,28 +341,7 @@ require __DIR__ . '/includes/layout_header.php';
         </p>
     <?php endif; ?>
 
-    <?php if ($hasFotoCarnet || $hasFotoCedula): ?>
-    <div style="display:flex;flex-wrap:wrap;gap:1rem;margin:0.75rem 0 1rem;">
-        <?php if ($hasFotoCarnet): ?>
-        <div>
-            <p style="margin:0 0 0.35rem;color:var(--fvd-muted);font-size:0.75rem;">Foto carnet actual</p>
-            <div style="width:100px;height:100px;border-radius:8px;overflow:hidden;border:1px solid var(--fvd-border);">
-                <img src="<?= htmlspecialchars($fotoCarnetUrl !== '' ? $fotoCarnetUrl : $media->defaultAvatar(), ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
-            </div>
-        </div>
-        <?php endif; ?>
-        <?php if ($hasFotoCedula): ?>
-        <div>
-            <p style="margin:0 0 0.35rem;color:var(--fvd-muted);font-size:0.75rem;">Imagen cédula actual</p>
-            <div style="width:100px;height:100px;border-radius:8px;overflow:hidden;border:1px solid var(--fvd-border);">
-                <img src="<?= htmlspecialchars($fotoCedulaUrl !== '' ? $fotoCedulaUrl : $media->defaultAvatar(), ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
-            </div>
-        </div>
-        <?php endif; ?>
-    </div>
-    <?php endif; ?>
-
-    <form method="post" class="fvd-atleta-form" enctype="multipart/form-data" style="max-width:32rem">
+    <form method="post" class="fvd-atleta-form" enctype="multipart/form-data" style="max-width:none">
         <p><label>Correo de acceso</label><br><input class="fvd-input" type="text" value="<?= htmlspecialchars((string) ($row['email_acceso'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" disabled></p>
         <p><label for="nombre_contacto">Nombre contacto</label><br><input class="fvd-input" id="nombre_contacto" name="nombre_contacto" value="<?= htmlspecialchars((string) ($row['nombre_contacto'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></p>
         <p><label for="telefono">Teléfono</label><br><input class="fvd-input" id="telefono" name="telefono" value="<?= htmlspecialchars((string) ($row['telefono'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"></p>
@@ -281,6 +375,8 @@ require __DIR__ . '/includes/layout_header.php';
         <p><label for="password_new2">Repetir contraseña</label><br><input class="fvd-input" id="password_new2" name="password_new2" type="password" autocomplete="new-password"></p>
         <p><button type="submit" class="fvd-btn-primary">Guardar</button></p>
     </form>
+</div>
+    </div>
 </div>
 <script src="<?= htmlspecialchars(url('assets/js/file-preview.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 <script>

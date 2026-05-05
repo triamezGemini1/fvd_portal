@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/services/AuthService.php';
 require_once __DIR__ . '/includes/fvd_app_base_path.php';
+require_once dirname(__DIR__) . '/config/fvd_navigation_return.php';
 require_once dirname(__DIR__) . '/src/Services/DeudaAsociacionGeneratorService.php';
 
 use FvdPortal\Services\DeudaAsociacionGeneratorService;
@@ -23,6 +24,16 @@ if (!AuthService::checkAccess([AuthService::ROLE_DELEGADO_ASOC, AuthService::ROL
 }
 
 $redir = AuthService::homeUrl();
+$originReturn = fvd_return_from_request();
+if ($originReturn === null && isset($_SERVER['HTTP_REFERER']) && is_string($_SERVER['HTTP_REFERER'])) {
+    $originReturn = fvd_return_sanitize($_SERVER['HTTP_REFERER']);
+}
+if ($originReturn !== null) {
+    $redir = $originReturn;
+}
+$redirWithMsg = static function (string $url, string $msg): string {
+    return $url . (str_contains($url, '?') ? '&' : '?') . 'msg=' . rawurlencode($msg);
+};
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || ($_POST['_action'] ?? '') !== 'generar_deuda_torneo') {
     header('Location: ' . $redir);
@@ -31,7 +42,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || ($_POST['_action'] ?? '') !
 
 $asoc = AuthService::idAsociacion();
 if ($asoc === null || (int) $asoc <= 0) {
-    header('Location: ' . $redir . '?msg=deuda_gen_sin_asoc');
+    header('Location: ' . $redirWithMsg($redir, 'deuda_gen_sin_asoc'));
     exit;
 }
 
@@ -42,23 +53,23 @@ if ($torneo <= 0 && AuthService::isDelegadoAsociacion()) {
 }
 
 if ($torneo <= 0) {
-    header('Location: ' . $redir . '?msg=deuda_gen_sin_torneo');
+    header('Location: ' . $redirWithMsg($redir, 'deuda_gen_sin_torneo'));
     exit;
 }
 
 require_once __DIR__ . '/config/db.php';
 
 if (!AuthService::canManageAsociacion((int) $asoc)) {
-    header('Location: ' . $redir . '?msg=deuda_gen_denegado');
+    header('Location: ' . $redirWithMsg($redir, 'deuda_gen_denegado'));
     exit;
 }
 
 try {
     DeudaAsociacionGeneratorService::generarParaTorneoYAsociacion(fvd_db(), $torneo, (int) $asoc);
-    header('Location: ' . $redir . '?msg=deuda_generada');
+    header('Location: ' . $redirWithMsg($redir, 'deuda_generada'));
 } catch (Throwable $e) {
     AuthService::ensureSession();
     $_SESSION['fvd_delegado_deuda_err'] = $e->getMessage();
-    header('Location: ' . $redir . '?msg=deuda_gen_error');
+    header('Location: ' . $redirWithMsg($redir, 'deuda_gen_error'));
 }
 exit;

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/_init.php';
+require_once __DIR__ . '/inc_reporte_atletas_columnas.php';
 
 fvd_admin_require_roles();
 
@@ -38,14 +39,20 @@ $st = fvd_db()->prepare($sql);
 $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-// Resumen (ámbito ya aplicado en $rows)
-$n = count($rows);
+fvd_rep_atletas_strip_telefonos($rows);
+$rowsAll = $rows;
+$resolvedCols = fvd_rep_atletas_resolve_columnas($rowsAll[0] ?? null);
+$fvdRepIndicadoresColsVisibles = $resolvedCols['columns'];
+$fvdRepIndicadoresColEtiquetaPorKey = $resolvedCols['labels'];
+$fvdRepIndicadoresLogicalLcPorKey = $resolvedCols['logical'];
+
+$n = count($rowsAll);
 $sumAfi = 0;
 $sumAnu = 0;
 $sumCar = 0;
 $sumTra = 0;
 $sumIns = 0;
-foreach ($rows as $rw) {
+foreach ($rowsAll as $rw) {
     if ((int) ($rw['afiliacion'] ?? 0) === 1) {
         ++$sumAfi;
     }
@@ -64,7 +71,20 @@ foreach ($rows as $rw) {
 }
 
 $selfReport = fvd_crud_self_url('atletas/reporte_marcas_atletas.php');
-$listUrl = fvd_crud_self_url('atletas') . '?action=list';
+$atletasUrl = fvd_crud_self_url('atletas');
+$listUrl = $atletasUrl . '?action=list';
+$retOrigen = fvd_return_from_request();
+$atletasBackUrl = $retOrigen !== null ? $retOrigen : $listUrl;
+$fvdRetPreserve = '';
+if ($retOrigen !== null) {
+    if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+        $fvdRetPreserve = $_GET['ret'];
+    } elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+        $fvdRetPreserve = $_GET['return'];
+    } else {
+        $fvdRetPreserve = rawurlencode($retOrigen);
+    }
+}
 
 if ($format === 'csv') {
     header('Content-Type: text/csv; charset=UTF-8');
@@ -78,14 +98,18 @@ if ($format === 'csv') {
         exit;
     }
     fwrite($out, "\xEF\xBB\xBF");
-    if ($rows !== []) {
-        $keys = array_keys($rows[0]);
-        fputcsv($out, $keys, ';');
-        foreach ($rows as $r) {
+    if ($rowsAll !== []) {
+        $cols = $fvdRepIndicadoresColsVisibles;
+        $hdrCsv = [];
+        foreach ($cols as $c) {
+            $hdrCsv[] = $fvdRepIndicadoresColEtiquetaPorKey[$c] ?? $c;
+        }
+        fputcsv($out, $hdrCsv, ';');
+        foreach ($rowsAll as $r) {
             $line = [];
-            foreach ($keys as $k) {
-                $v = $r[$k] ?? null;
-                $line[] = $v === null ? '' : (string) $v;
+            foreach ($cols as $c) {
+                $v = $r[$c] ?? null;
+                $line[] = $v === null ? '' : (is_scalar($v) || $v instanceof \Stringable ? (string) $v : '');
             }
             fputcsv($out, $line, ';');
         }
@@ -96,17 +120,32 @@ if ($format === 'csv') {
     exit;
 }
 
-$fvd_page_title = 'Atletas con marcas (ficha completa)';
-require FVD_MASTER_ROOT . '/includes/layout_header.php';
+$fvd_page_title = 'Atletas con marcas (informe)';
+$columnas = $fvdRepIndicadoresColsVisibles;
 
-$cols = $rows !== [] ? array_keys($rows[0]) : [];
+$qsCsv = ['format' => 'csv'];
+if ($fvdRetPreserve !== '') {
+    $qsCsv['ret'] = $fvdRetPreserve;
+}
+$urlCsv = $selfReport . '?' . http_build_query($qsCsv, '', '&', PHP_QUERY_RFC3986);
+
+require_once FVD_PROJECT_ROOT . '/includes/fvd_report_pagination.php';
+$pag = fvd_report_paginator_slice($rowsAll);
+$rows = $pag['slice'];
+$fvd_repPaginator = $pag;
+$fvd_repPaginatorSelf = $selfReport;
+$movimientosSolicitados = fvd_rep_atletas_movimientos_sidebar_rows($rowsAll);
+
+require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
-<div class="report-container" style="max-width:100%">
+<div class="report-container fvd-rep-indicadores" style="box-sizing:border-box;width:100%;max-width:100%;margin:0;padding:0 0 1rem">
+    <?php require __DIR__ . '/partial_atletas_informes_nav.php'; ?>
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <h1 class="fvd-atletas-title">Atletas con al menos una marca activa</h1>
+    <?php endif; ?>
     <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 .75rem;line-height:1.45">
         Criterio: <code>afiliacion</code>, <code>anualidad</code>, <code>carnet</code>, <code>traspaso</code> o <code>inscripcion</code> = 1.
-        Se muestran <strong>todas las columnas</strong> devueltas por la consulta (incl. <code>asociacion_nombre</code>) para revisión y estadísticas por fila.
-        Máximo <strong>15.000</strong> filas. Ámbito: su asociación (o todas si es administrador FVD).
+        Misma estructura de columnas que el informe de afiliación. Máximo <strong>15.000</strong> filas. Ámbito: su asociación (o todas si es administrador FVD).
     </p>
     <div class="fvd-marcas-resumen no-print" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(9rem,1fr));gap:.5rem;margin:0 0 1rem;font-size:.75rem">
         <div style="padding:.5rem .65rem;border-radius:.35rem;border:1px solid var(--fvd-border);background:var(--fvd-azul-card)">
@@ -128,38 +167,21 @@ $cols = $rows !== [] ? array_keys($rows[0]) : [];
             <strong>inscripcion=1</strong><br><?= (int) $sumIns ?>
         </div>
     </div>
-    <p class="no-print" style="margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($listUrl, ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;font-weight:600" href="<?= htmlspecialchars($selfReport . '?format=csv', ENT_QUOTES, 'UTF-8') ?>">Descargar Excel (CSV)</a>
-    </p>
-    <div class="fvd-mod-table-wrap" style="overflow-x:auto">
-        <table class="fvd-mod-table tabla-atletas" style="font-size:.68rem;white-space:nowrap">
-            <?php if ($cols !== []): ?>
-            <thead>
-            <tr>
-                <?php foreach ($cols as $c): ?>
-                    <th scope="col"><?= htmlspecialchars($c, ENT_QUOTES, 'UTF-8') ?></th>
-                <?php endforeach; ?>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($rows as $r): ?>
-                <tr>
-                    <?php foreach ($cols as $c): ?>
-                        <?php
-                        $v = $r[$c] ?? null;
-                        $cell = $v === null ? '' : (string) $v;
-                        ?>
-                        <td title="<?= htmlspecialchars($cell, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($cell, ENT_QUOTES, 'UTF-8') ?></td>
-                    <?php endforeach; ?>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-            <?php else: ?>
-            <tbody><tr><td style="padding:12px">Sin registros que cumplan el criterio en su ámbito.</td></tr></tbody>
-            <?php endif; ?>
-        </table>
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 1rem">
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:600" href="<?= htmlspecialchars($urlCsv, ENT_QUOTES, 'UTF-8') ?>">Descargar CSV</a>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:700" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $retOrigen !== null ? '← Volver a la consulta' : '← Listado atletas' ?></a>
     </div>
+    <section class="fvd-rep-indicadores__stats no-print" aria-label="Resumen" style="margin:0 0 1rem;padding:12px;border-radius:8px;border:1px solid var(--fvd-border);background:rgba(255,255,255,0.04)">
+        <p style="margin:0;font-size:.8125rem;line-height:1.6">
+            <strong>Registros:</strong> <?= (int) $n ?> &nbsp;|&nbsp;
+            <strong>Afil.</strong> <?= (int) $sumAfi ?> &nbsp;
+            <strong>Anual.</strong> <?= (int) $sumAnu ?> &nbsp;
+            <strong>Carnet</strong> <?= (int) $sumCar ?> &nbsp;
+            <strong>Trasp.</strong> <?= (int) $sumTra ?> &nbsp;
+            <strong>Insc.</strong> <?= (int) $sumIns ?>
+        </p>
+    </section>
+    <?php require __DIR__ . '/partial_reporte_atletas_main_grid.php'; ?>
 </div>
 <?php
 require FVD_MASTER_ROOT . '/includes/layout_footer.php';

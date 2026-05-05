@@ -1,34 +1,60 @@
 {
-  "_UserGroupIcon-BwCON6Jl.css": {
-    "file": "assets/UserGroupIcon-BwCON6Jl.css",
-    "src": "_UserGroupIcon-BwCON6Jl.css"
+  "_UserGroupIcon-CuaNf2nv.js": {
+    "file": "assets/UserGroupIcon-CuaNf2nv.js",
+    "name": "UserGroupIcon"
   },
-  "_UserGroupIcon-C5MckpgG.js": {
-    "file": "assets/UserGroupIcon-C5MckpgG.js",
-    "name": "UserGroupIcon",
-    "css": [
-      "assets/UserGroupIcon-BwCON6Jl.css"
-    ]
+  "_app-BL8GXm25.css": {
+    "file": "assets/app-BL8GXm25.css",
+    "src": "_app-BL8GXm25.css"
+  },
+  "_layout_13-CJJ-u_k0.css": {
+    "file": "assets/layout_13-CJJ-u_k0.css",
+    "src": "_layout_13-CJJ-u_k0.css"
   },
   "resources/js/app.js": {
-    "file": "assets/app-C12FELV9.js",
+    "file": "assets/app-DYrCRlxP.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_UserGroupIcon-C5MckpgG.js"
+      "_UserGroupIcon-CuaNf2nv.js"
     ],
     "css": [
-      "assets/app-D0kyr_VJ.css"
+      "assets/app-D0kyr_VJ.css",
+      "assets/app-BL8GXm25.css",
+      "assets/layout_13-CJJ-u_k0.css"
     ]
   },
   "resources/js/delegado-app.js": {
-    "file": "assets/delegado-app-CVkRV3zl.js",
+    "file": "assets/delegado-app-Df-8_CSh.js",
     "name": "delegado-app",
     "src": "resources/js/delegado-app.js",
     "isEntry": true,
     "imports": [
-      "_UserGroupIcon-C5MckpgG.js"
+      "_UserGroupIcon-CuaNf2nv.js"
+    ],
+    "css": [
+      "assets/app-BL8GXm25.css"
+    ]
+  },
+  "resources/js/gestion-asociaciones.js": {
+    "file": "assets/gestion-asociaciones-ltnT61YX.js",
+    "name": "gestion-asociaciones",
+    "src": "resources/js/gestion-asociaciones.js",
+    "isEntry": true,
+    "css": [
+      "assets/app-BL8GXm25.css",
+      "assets/layout_13-CJJ-u_k0.css"
+    ]
+  },
+  "resources/js/gestion-atletas.js": {
+    "file": "assets/gestion-atletas-BCpsXW74.js",
+    "name": "gestion-atletas",
+    "src": "resources/js/gestion-atletas.js",
+    "isEntry": true,
+    "css": [
+      "assets/app-BL8GXm25.css",
+      "assets/layout_13-CJJ-u_k0.css"
     ]
   }
 }

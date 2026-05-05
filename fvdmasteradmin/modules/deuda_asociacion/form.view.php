@@ -219,7 +219,9 @@ $renglones = [
 </style>
 
 <div class="fvd-deuda-detalle-titulo">
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <h1>Reporte detallado de costos</h1>
+    <?php endif; ?>
     <p>Torneo #<?= $fvdDeudaTid ?> · Asociación #<?= $fvdDeudaAid ?></p>
     <p style="margin:0.25rem 0 0;font-size:0.86rem">Vista de solo lectura. <strong>Actualizar deuda</strong> vuelve a leer <code>atletas</code> (inscripción, afiliación, carnet, traspaso, anualidad) para este torneo y asociación, aplica tarifas de <code>costos</code> y actualiza el estado de cuenta.</p>
     <?php if (isset($_GET['msg']) && $_GET['msg'] === 'deuda_actualizada'): ?>

@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/QueryHelper.php';
+require_once __DIR__ . '/inc_reporte_atletas_columnas.php';
+require_once __DIR__ . '/report_asoc_filter.inc.php';
 
 use FvdPortal\Services\QueryHelper;
 
 fvd_admin_require_roles();
 
-// Solo el valor 1 es indicador de negocio; no se informa por carnet = 0.
-$rows = QueryHelper::selectAtletasAdminAll('', '', fvd_db(), 1);
-$titulo = 'Solicitud de carnets (atletas.carnet = 1)';
-$fvd_page_title = 'Reporte carnets';
-$selfReport = admin_module_url('atletas/reporte_carnets.php');
+$filtroAsocRep = fvd_report_filter_asociacion_id_from_get();
+$alcCarnets = $filtroAsocRep > 0 ? 'asociacion' : 'todos';
+$asocCarnets = $filtroAsocRep > 0 ? $filtroAsocRep : 0;
+$rows = QueryHelper::selectAtletasAdminAll('', '', fvd_db(), 1, $alcCarnets, 'normal', $asocCarnets);
+fvd_rep_atletas_strip_telefonos($rows);
+$rowsAll = $rows;
 
 require_once FVD_PROJECT_ROOT . '/fvdmasteradmin/includes/fvd_asociacion_helpers.php';
-
-$retOrigen = fvd_return_from_request();
-$atletasBackUrl = $retOrigen !== null ? $retOrigen : (fvd_crud_self_url('atletas') . '?action=list');
 
 $repOmitAsocCol = false;
 $repAsocNombreCorto = '';
@@ -36,7 +36,7 @@ if ($aidHdr !== null && $aidHdr > 0) {
     }
 } else {
     $asocIds = [];
-    foreach ($rows as $rw) {
+    foreach ($rowsAll as $rw) {
         $ax = (int) ($rw['asociacion'] ?? 0);
         if ($ax > 0) {
             $asocIds[$ax] = true;
@@ -60,16 +60,120 @@ if ($aidHdr !== null && $aidHdr > 0) {
     }
 }
 
+$resolvedCols = fvd_rep_atletas_resolve_columnas($rowsAll[0] ?? null);
+$fvdRepIndicadoresColsVisibles = $resolvedCols['columns'];
+$fvdRepIndicadoresColEtiquetaPorKey = $resolvedCols['labels'];
+$fvdRepIndicadoresLogicalLcPorKey = $resolvedCols['logical'];
+
+if ($repOmitAsocCol) {
+    $filtered = [];
+    foreach ($fvdRepIndicadoresColsVisibles as $ck) {
+        if (($fvdRepIndicadoresLogicalLcPorKey[$ck] ?? '') === 'asociacion_nombre') {
+            unset($fvdRepIndicadoresColEtiquetaPorKey[$ck], $fvdRepIndicadoresLogicalLcPorKey[$ck]);
+            continue;
+        }
+        $filtered[] = $ck;
+    }
+    $fvdRepIndicadoresColsVisibles = $filtered;
+}
+
+$titulo = 'Solicitud de carnets (atletas.carnet = 1)';
+$fvd_page_title = 'Reporte carnets';
+$selfReport = admin_module_url('atletas/reporte_carnets.php');
+
+$retOrigen = fvd_return_from_request();
+$atletasUrl = fvd_crud_self_url('atletas');
+$atletasBackUrl = $retOrigen !== null ? $retOrigen : ($atletasUrl . '?action=list');
+$fvdRetPreserve = '';
+if ($retOrigen !== null) {
+    if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+        $fvdRetPreserve = $_GET['ret'];
+    } elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+        $fvdRetPreserve = $_GET['return'];
+    } else {
+        $fvdRetPreserve = rawurlencode($retOrigen);
+    }
+}
+
+$format = isset($_GET['format']) ? strtolower(trim((string) $_GET['format'])) : '';
+if ($format === 'csv') {
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="atletas_carnets_' . date('Y-m-d_His') . '.csv"');
+    header('X-Content-Type-Options: nosniff');
+    $out = fopen('php://output', 'wb');
+    if ($out === false) {
+        http_response_code(500);
+        echo 'Error al generar CSV.';
+        exit;
+    }
+    fwrite($out, "\xEF\xBB\xBF");
+    if ($rowsAll !== []) {
+        $cols = $fvdRepIndicadoresColsVisibles;
+        $hdrCsv = [];
+        foreach ($cols as $c) {
+            $hdrCsv[] = $fvdRepIndicadoresColEtiquetaPorKey[$c] ?? $c;
+        }
+        fputcsv($out, $hdrCsv, ';');
+        foreach ($rowsAll as $r) {
+            $line = [];
+            foreach ($cols as $c) {
+                $v = $r[$c] ?? null;
+                if ($v === null) {
+                    $line[] = '';
+                } elseif (is_scalar($v) || $v instanceof \Stringable) {
+                    $line[] = (string) $v;
+                } else {
+                    $line[] = '';
+                }
+            }
+            fputcsv($out, $line, ';');
+        }
+    } else {
+        fputcsv($out, ['sin_registros'], ';');
+    }
+    fclose($out);
+    exit;
+}
+
+$stats = [
+    'total'       => count($rowsAll),
+    'afiliacion'  => 0,
+    'anualidad'   => 0,
+    'carnet'      => 0,
+    'traspaso'    => 0,
+    'inscripcion' => 0,
+];
+foreach ($rowsAll as $r) {
+    foreach (['afiliacion', 'anualidad', 'carnet', 'traspaso', 'inscripcion'] as $k) {
+        if ((int) ($r[$k] ?? 0) === 1) {
+            ++$stats[$k];
+        }
+    }
+}
+
+$columnas = $fvdRepIndicadoresColsVisibles;
+
+$qsCsv = ['format' => 'csv'];
+if ($fvdRetPreserve !== '') {
+    $qsCsv['ret'] = $fvdRetPreserve;
+}
+if ($filtroAsocRep > 0) {
+    $qsCsv['asociacion_id'] = (string) $filtroAsocRep;
+}
+$urlCsv = $selfReport . '?' . http_build_query($qsCsv, '', '&', PHP_QUERY_RFC3986);
+
+require_once FVD_PROJECT_ROOT . '/includes/fvd_report_pagination.php';
+$pag = fvd_report_paginator_slice($rowsAll);
+$rows = $pag['slice'];
+$fvd_repPaginator = $pag;
+$fvd_repPaginatorSelf = $selfReport;
+$movimientosSolicitados = fvd_rep_atletas_movimientos_sidebar_rows($rowsAll);
+
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 ?>
-<div class="report-container" style="max-width:56rem">
-    <p class="no-print" style="margin:0 0 .85rem">
-        <a href="/fvd_portal/fvdmasteradmin/delegado_dashboard_new.php"
-           class="inline-flex items-center text-black font-bold border-2 border-black px-4 py-2 rounded hover:bg-black hover:text-white transition-colors"
-           style="display:inline-flex;align-items:center;gap:.45rem;color:#000;font-weight:800;border:2px solid #000;padding:.5rem .9rem;border-radius:.45rem;text-decoration:none;transition:all .15s ease">
-            <i class="fas fa-arrow-left mr-2"></i> VOLVER AL PANEL
-        </a>
-    </p>
+<div class="report-container fvd-rep-indicadores" style="box-sizing:border-box;width:100%;max-width:100%;margin:0;padding:0 0 1rem">
+    <?php require __DIR__ . '/partial_atletas_informes_nav.php'; ?>
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <?php if ($repAsocNombreCorto !== '' || $repAsocLogoUrl !== null): ?>
     <div class="fvd-rep-carnets-head" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding-bottom:12px;border-bottom:2px solid var(--fvd-amarillo)">
         <?php if ($repAsocLogoUrl !== null): ?>
@@ -81,46 +185,27 @@ require FVD_MASTER_ROOT . '/includes/layout_header.php';
     </div>
     <?php endif; ?>
     <h1 class="fvd-atletas-title"><?= htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') ?></h1>
-    <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 1rem">
-        Igual que el resto de banderas en <code>atletas</code>, solo cuenta el valor <strong>1</strong>: indica solicitud / carnet registrado. Otros valores no se usan como criterio de informe.
-        Total: <strong><?= count($rows) ?></strong>
-    </p>
-    <?php if ($retOrigen === null): ?>
-    <p class="no-print" style="margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:8px">
-        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>">← Atletas</a>
-    </p>
     <?php endif; ?>
-    <div class="fvd-mod-table-wrap">
-        <table class="fvd-mod-table tabla-atletas">
-            <thead>
-            <tr>
-                <th>ID</th>
-                <th>Cédula</th>
-                <th>Nombre</th>
-                <?php if (!$repOmitAsocCol): ?><th>Asociación</th><?php endif; ?>
-                <th>Nº FVD</th>
-                <th>carnet</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($rows as $r): ?>
-                <tr>
-                    <td><?= (int) ($r['id'] ?? 0) ?></td>
-                    <td><?= htmlspecialchars((string) ($r['cedula'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td><?= htmlspecialchars((string) ($r['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <?php if (!$repOmitAsocCol): ?>
-                    <td><?= htmlspecialchars((string) ($r['asociacion_nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <?php endif; ?>
-                    <td><?= (int) ($r['numfvd'] ?? 0) ?></td>
-                    <td><?= (int) ($r['carnet'] ?? 0) ?></td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if ($rows === []): ?>
-                <tr><td colspan="<?= $repOmitAsocCol ? '5' : '6' ?>" style="padding:12px">Sin registros.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
+    <p style="font-size:.8125rem;color:var(--fvd-muted);margin:0 0 .75rem;line-height:1.45">
+        Igual que el resto de banderas en <code>atletas</code>, solo cuenta el valor <strong>1</strong>: indica solicitud / carnet registrado. Otros valores no se usan como criterio de informe.
+        Total en conjunto filtrado: <strong><?= count($rowsAll) ?></strong> (tabla paginada).
+    </p>
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 1rem">
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:600" href="<?= htmlspecialchars($urlCsv, ENT_QUOTES, 'UTF-8') ?>">Descargar CSV</a>
+        <a class="fvd-input" style="width:auto;padding:6px 12px;text-decoration:none;display:inline-flex;align-items:center;box-sizing:border-box;font-weight:700" href="<?= htmlspecialchars($atletasBackUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $retOrigen !== null ? '← Volver a la consulta' : '← Listado atletas' ?></a>
     </div>
+    <section class="fvd-rep-indicadores__stats" aria-label="Resumen por indicador" style="margin:0 0 1rem;padding:12px;border-radius:8px;border:1px solid var(--fvd-border);background:rgba(255,255,255,0.04)">
+        <h2 style="margin:0 0 .5rem;font-size:.9rem">Estadísticas (sobre este listado)</h2>
+        <p style="margin:0;font-size:.8125rem;line-height:1.6">
+            <strong>Registros:</strong> <?= (int) $stats['total'] ?> &nbsp;|&nbsp;
+            <span title="afiliacion=1"><strong>Afil.</strong> <?= (int) $stats['afiliacion'] ?></span> &nbsp;
+            <span title="anualidad=1"><strong>Anual.</strong> <?= (int) $stats['anualidad'] ?></span> &nbsp;
+            <span title="carnet=1"><strong>Carnet</strong> <?= (int) $stats['carnet'] ?></span> &nbsp;
+            <span title="traspaso=1"><strong>Trasp.</strong> <?= (int) $stats['traspaso'] ?></span> &nbsp;
+            <span title="inscripcion=1"><strong>Insc.</strong> <?= (int) $stats['inscripcion'] ?></span>
+        </p>
+    </section>
+    <?php require __DIR__ . '/partial_reporte_atletas_main_grid.php'; ?>
 </div>
 <?php
 require FVD_MASTER_ROOT . '/includes/layout_footer.php';

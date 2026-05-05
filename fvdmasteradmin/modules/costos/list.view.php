@@ -7,7 +7,9 @@ if (!function_exists('fvd_format_contable')) {
 }
 ?>
 
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1>Tarifas (costos)</h1>
+<?php endif; ?>
 <p class="fvd-atl-muted" style="margin-top:0">Tabla global sin filtro por asociación.</p>
 <?php if (!empty($fvd_error)): ?><p class="fvd-mod-msg"><?= htmlspecialchars($fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 

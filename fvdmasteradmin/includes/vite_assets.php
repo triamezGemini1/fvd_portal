@@ -3,6 +3,89 @@
 declare(strict_types=1);
 
 /**
+ * Proyecto Vite/Node en disco: C:\wamp64\www\fvd_panel (hermano de fvd_portal bajo www).
+ */
+function fvd_vite_disk_root(): string
+{
+    if (function_exists('env')) {
+        $custom = env('FVD_VITE_DISK_ROOT', '');
+        if (is_string($custom) && $custom !== '' && is_dir($custom)) {
+            return rtrim($custom, '/\\');
+        }
+    }
+    $g = getenv('FVD_VITE_DISK_ROOT');
+    if ($g !== false && is_string($g) && $g !== '' && is_dir($g)) {
+        return rtrim($g, '/\\');
+    }
+
+    /** includes → fvdmasteradmin → fvd_portal (raíz) → www → fvd_panel */
+    return dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'fvd_panel';
+}
+
+/**
+ * Manifest de producción: hermano `fvd_panel` o copia en `fvd_portal/public/build`
+ * (tras `npm run build` en la raíz del portal, que ejecuta el copy).
+ */
+function fvd_vite_manifest_path(): string
+{
+    $portalRoot = dirname(__DIR__, 2);
+    $portalManifest = $portalRoot . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'build'
+        . DIRECTORY_SEPARATOR . '.vite' . DIRECTORY_SEPARATOR . 'manifest.json';
+
+    if (function_exists('env')) {
+        $ov = env('FVD_VITE_MANIFEST', '');
+        if (is_string($ov) && $ov !== '' && is_readable($ov)) {
+            return $ov;
+        }
+    }
+    $g = getenv('FVD_VITE_MANIFEST');
+    if ($g !== false && is_string($g) && $g !== '' && is_readable($g)) {
+        return $g;
+    }
+
+    $siblingManifest = fvd_vite_disk_root() . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'build'
+        . DIRECTORY_SEPARATOR . '.vite' . DIRECTORY_SEPARATOR . 'manifest.json';
+
+    $portalOk = is_readable($portalManifest);
+    $siblingOk = is_readable($siblingManifest);
+    if ($portalOk && $siblingOk) {
+        $mtP = (int) (@filemtime($portalManifest) ?: 0);
+        $mtS = (int) (@filemtime($siblingManifest) ?: 0);
+
+        /* Más reciente gana; empate → portal (mismo host que atletas.php / panel). */
+        return $mtS > $mtP ? $siblingManifest : $portalManifest;
+    }
+    if ($portalOk) {
+        return $portalManifest;
+    }
+    if ($siblingOk) {
+        return $siblingManifest;
+    }
+
+    return $siblingManifest;
+}
+
+/**
+ * URL base para enlazar CSS/JS del build (DocumentRoot típico: /fvd_panel/public/build).
+ * Sobrescribir con FVD_VITE_PUBLIC_BASE en .env si la ruta pública difiere.
+ */
+function fvd_vite_public_build_url(): string
+{
+    if (function_exists('env')) {
+        $b = env('FVD_VITE_PUBLIC_BASE', '');
+        if (is_string($b) && $b !== '') {
+            return rtrim($b, '/');
+        }
+    }
+    $g = getenv('FVD_VITE_PUBLIC_BASE');
+    if ($g !== false && (string) $g !== '') {
+        return rtrim((string) $g, '/');
+    }
+
+    return '/fvd_panel/public/build';
+}
+
+/**
  * Rutas CSS del manifest Vite para un entry, incluyendo las hojas declaradas en chunks importados.
  * En builds con code-splitting, Tailwind u otras hojas pueden vivir en un chunk compartido y no en el entry.
  *
@@ -79,10 +162,17 @@ function fvd_vite_tags(string $entry = 'resources/js/app.js'): string
         );
     }
 
-    $manifestPath = $projRoot . '/public/build/.vite/manifest.json';
+    $manifestPath = fvd_vite_manifest_path();
+    if (!is_readable($manifestPath)) {
+        $legacy = $projRoot . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'build'
+            . DIRECTORY_SEPARATOR . '.vite' . DIRECTORY_SEPARATOR . 'manifest.json';
+        if (is_readable($legacy)) {
+            $manifestPath = $legacy;
+        }
+    }
     if (!is_readable($manifestPath)) {
         return '<p class="fvd-mod-msg" role="alert" style="margin:0.75rem 0;padding:0.75rem;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-size:0.875rem;">'
-            . 'No se encontró el build de Vite (<code>public/build/.vite/manifest.json</code>). En la raíz del proyecto ejecute <code>npm install</code> y <code>npm run build</code>, o active el modo desarrollo (<code>FVD_VITE_DEV=true</code> y servidor Vite en el puerto configurado).</p>';
+            . 'No se encontró el build de Vite (<code>fvd_panel/public/build/.vite/manifest.json</code>). En <code>C:\\wamp64\\www\\fvd_panel</code> ejecute <code>npm install</code> y <code>npm run build</code>, o active el modo desarrollo (<code>FVD_VITE_DEV=true</code> y servidor Vite en el puerto configurado).</p>';
     }
     /** @var mixed $decoded */
     $decoded = json_decode((string) file_get_contents($manifestPath), true);
@@ -92,9 +182,39 @@ function fvd_vite_tags(string $entry = 'resources/js/app.js'): string
     }
     /** @var array<string, mixed> $chunk */
     $chunk = $decoded[$entry];
-    /* Los archivos de Vite están en public/build (outDir de vite.config.js). */
-    $base = rtrim(url('public/build'), '/');
-    $v = (string) (@filemtime($manifestPath) ?: time());
+    $mp = str_replace('\\', '/', $manifestPath);
+    /* Manifest bajo fvd_portal/public/build → assets relativos a esta app (evita 404 si /fvd_panel no está mapeado). */
+    $fromSiblingPanel = (str_contains($mp, '/fvd_panel/') || preg_match('#(^|/)fvd_panel/public/build/#', $mp) === 1)
+        && !str_contains($mp, '/fvd_portal/');
+    $base = $fromSiblingPanel
+        ? fvd_vite_public_build_url()
+        : rtrim(url('public/build'), '/');
+    /** Versión de caché: manifest + archivo del entry (evita JS viejo tras build con mismo manifest si el navegador cachea agresivamente). */
+    $v = (int) (@filemtime($manifestPath) ?: time());
+    if (isset($chunk['file']) && is_string($chunk['file']) && $chunk['file'] !== '') {
+        $buildRoot = dirname($manifestPath, 2);
+        $chunkOnDisk = $buildRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, ltrim((string) $chunk['file'], '/'));
+        if (is_readable($chunkOnDisk)) {
+            $t = @filemtime($chunkOnDisk);
+            if ($t !== false) {
+                $v = max($v, (int) $t);
+            }
+        }
+    }
+    foreach (fvd_vite_manifest_css_for_entry($decoded, $entry) as $cssRel) {
+        if (!is_string($cssRel) || $cssRel === '') {
+            continue;
+        }
+        $buildRoot = dirname($manifestPath, 2);
+        $cssOnDisk = $buildRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, ltrim($cssRel, '/'));
+        if (is_readable($cssOnDisk)) {
+            $t = @filemtime($cssOnDisk);
+            if ($t !== false) {
+                $v = max($v, (int) $t);
+            }
+        }
+    }
+    $v = (string) $v;
     $html = '';
     foreach (fvd_vite_manifest_css_for_entry($decoded, $entry) as $css) {
         $href = $base . '/' . ltrim($css, '/') . '?v=' . rawurlencode($v);

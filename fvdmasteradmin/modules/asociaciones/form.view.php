@@ -11,7 +11,9 @@ if (!empty($r['logo']) && is_string($r['logo']) && $r['logo'] !== '') {
 ?>
 
 <div class="fvd-asoc-form-page">
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1 class="fvd-asoc-form-page__title"><?= $isEdit ? 'Editar asociación' : 'Nueva asociación' ?></h1>
+<?php endif; ?>
 
 <form class="fvd-mod-form fvd-mod-form--wide fvd-mod-form--asoc-2col fvd-mod-form--asoc-bordered" method="post" enctype="multipart/form-data" action="">
     <input type="hidden" name="_action" value="save">

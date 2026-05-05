@@ -59,6 +59,10 @@ class Env {
     private static function loadDefaults() {
         $defaults = [
             'APP_NAME' => 'Sistema FVD',
+            // true: fuerza omitir ventanas aunque FVD_DELEGADO_CALENDARIO_STRICT esté activo.
+            'FVD_DELEGADO_MODO_PRUEBAS' => 'false',
+            // true: aplica ventanas por fecha del torneo y límite de nómina para delegados. false = sin límites de tiempo.
+            'FVD_DELEGADO_CALENDARIO_STRICT' => 'false',
             'APP_ENV' => 'production',
             'APP_DEBUG' => 'false',
             'APP_URL' => 'https://federacionvenezolanadedomino.com',

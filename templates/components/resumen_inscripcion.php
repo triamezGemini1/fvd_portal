@@ -10,11 +10,16 @@ $fvd_resumen_inscripcion = $fvd_resumen_inscripcion ?? [];
 $fvd_resumen_titulo = isset($fvd_resumen_titulo) && is_string($fvd_resumen_titulo) && $fvd_resumen_titulo !== ''
     ? $fvd_resumen_titulo
     : 'Integrantes seleccionados';
+$fvd_resumen_empty_hint = isset($fvd_resumen_empty_hint) && is_string($fvd_resumen_empty_hint) && $fvd_resumen_empty_hint !== ''
+    ? $fvd_resumen_empty_hint
+    : 'Añada atletas desde el buscador.';
 ?>
-<div class="fvd-insc-nomina-title"><?= htmlspecialchars($fvd_resumen_titulo, ENT_QUOTES, 'UTF-8') ?></div>
-<?php if ($fvd_resumen_inscripcion === []): ?>
-    <p class="fvd-insc-hint" id="fvd-insc-resumen-empty">Añada atletas desde el buscador.</p>
-<?php endif; ?>
+<div class="fvd-insc-resumen-heading">
+    <div class="fvd-insc-nomina-title"><?= htmlspecialchars($fvd_resumen_titulo, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php if ($fvd_resumen_inscripcion === []): ?>
+        <p class="fvd-insc-hint" id="fvd-insc-resumen-empty"><?= htmlspecialchars($fvd_resumen_empty_hint, ENT_QUOTES, 'UTF-8') ?></p>
+    <?php endif; ?>
+</div>
 <div class="fvd-insc-resumen-grid" id="fvd-insc-resumen-grid"<?= $fvd_resumen_inscripcion === [] ? ' hidden' : '' ?>>
     <?php foreach ($fvd_resumen_inscripcion as $t): ?>
         <?php

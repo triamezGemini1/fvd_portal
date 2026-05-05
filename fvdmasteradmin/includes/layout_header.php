@@ -74,6 +74,21 @@ if (function_exists('fvd_user_is_delegado') && fvd_user_is_delegado()) {
     $fvd_hide_sidebar = true;
 }
 
+// Delegado en vista completa: la barra superior ya muestra $fvd_page_title; las vistas pueden omitir <h1> duplicados.
+// No aplica en embed (?embedded=1): allí no hay topbar y el contenido debe conservar su título.
+$GLOBALS['fvd_delegado_suppress_inner_page_heading'] = (
+    function_exists('fvd_user_is_delegado') && fvd_user_is_delegado() && empty($fvd_master_embed)
+);
+if (!function_exists('fvd_delegado_inner_heading_visible')) {
+    /**
+     * @return bool True si la vista puede mostrar su propio <h1> (admin FVD, embed, o no delegado).
+     */
+    function fvd_delegado_inner_heading_visible(): bool
+    {
+        return empty($GLOBALS['fvd_delegado_suppress_inner_page_heading'] ?? null);
+    }
+}
+
 // Admin general: no usar el layout con menú lateral salvo vistas embebidas (?embedded=1 / fvd_master_embed).
 // Versión compatible con PHP 7.4 (manual, sin str_ends_with).
 $current_script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
@@ -82,8 +97,28 @@ $fvdEmbedRequestActivo = function_exists('fvd_master_embed_active')
     ? fvd_master_embed_active()
     : (isset($_GET['embedded']) && (string) $_GET['embedded'] === '1');
 if (fvd_user_is_admin_gral() && !$is_master_panel && !$fvdEmbedRequestActivo) {
-    $fvdNavBaseRedir = rtrim((string) BASE_URL, '/') . '/fvdmasteradmin';
-    header('Location: ' . $fvdNavBaseRedir . '/master_panel.php');
+    $fvdNavBaseRedir = rtrim((string) BASE_URL, '/') . '/fvdmasteradmin/master_panel.php';
+    $redirQs = [];
+    $sessKeyCtx = 'fvd_master_panel_ctx_torneo';
+    if (is_file(dirname(__DIR__, 2) . '/src/Services/MasterPanelContextService.php')) {
+        require_once dirname(__DIR__, 2) . '/src/Services/MasterPanelContextService.php';
+        $sessKeyCtx = \FvdPortal\Services\MasterPanelContextService::SESSION_MASTER_PANEL_CTX_TORNEO;
+    }
+    $ctxTorneoRedir = isset($_SESSION[$sessKeyCtx]) ? (int) $_SESSION[$sessKeyCtx] : 0;
+    if ($ctxTorneoRedir <= 0 && isset($_GET['ctx_torneo'])) {
+        $ctxTorneoRedir = (int) $_GET['ctx_torneo'];
+    }
+    if ($ctxTorneoRedir > 0) {
+        $redirQs['ctx_torneo'] = (string) $ctxTorneoRedir;
+    }
+    if (str_contains($current_script, '/atletas/')) {
+        $redirQs['fvd_ws'] = 'servicios/atletas';
+    }
+    $redirUrl = $fvdNavBaseRedir;
+    if ($redirQs !== []) {
+        $redirUrl .= '?' . http_build_query($redirQs, '', '&', PHP_QUERY_RFC3986);
+    }
+    header('Location: ' . $redirUrl);
     exit;
 }
 unset($current_script);
@@ -94,6 +129,10 @@ if (!isset($fvd_head_extra_html)) {
 /** Si true, el menú lateral arranca ancho (sin modo “rail” estrecho). Opcional por página, p. ej. delegado_dashboard_new.php */
 if (!isset($fvd_sidebar_start_expanded)) {
     $fvd_sidebar_start_expanded = false;
+}
+/** Si true, no se imprime la barra aquí; la vista debe incluir partial_fvd_return_nav.php donde corresponda. */
+if (!isset($fvd_defer_return_bar)) {
+    $fvd_defer_return_bar = false;
 }
 
 $fvd_user = AuthService::user();
@@ -114,9 +153,38 @@ if (isset($fvd_page_return_url) && is_string($fvd_page_return_url) && $fvd_page_
 } else {
     $fvd_return_nav_url = fvd_return_from_request();
 }
+if (($fvd_return_nav_url === null || $fvd_return_nav_url === '') && class_exists(AuthService::class, false)) {
+    $fvdPan = AuthService::delegadoPanelHomeUrl();
+    if ($fvdPan !== null && $fvdPan !== '') {
+        $fvd_return_nav_url = $fvdPan;
+    }
+}
+/* Rutas guardadas o en ?ret= sin prefijo de subcarpeta (p. ej. /modules/… o /fvdmasteradmin/…): el
+ * navegador las resuelve contra el vhost y puede provocar ERR_TOO_MANY_REDIRECTS al ir al panel delegado. */
+if (
+    is_string($fvd_return_nav_url)
+    && $fvd_return_nav_url !== ''
+    && ($fvd_return_nav_url[0] ?? '') === '/'
+    && defined('BASE_URL')
+) {
+    $fvdRetBase = rtrim((string) BASE_URL, '/');
+    if (
+        $fvdRetBase !== ''
+        && !str_starts_with($fvd_return_nav_url, $fvdRetBase . '/')
+        && $fvd_return_nav_url !== $fvdRetBase
+        && (str_starts_with($fvd_return_nav_url, '/modules/')
+            || str_starts_with($fvd_return_nav_url, '/fvdmasteradmin/'))
+    ) {
+        $fvd_return_nav_url = $fvdRetBase . $fvd_return_nav_url;
+    }
+}
+$fvd_return_nav_label = '← Volver al origen';
+if ($fvd_return_nav_url !== null && $fvd_return_nav_url !== '' && preg_match('#/delegado_dashboard_new\\.php(?:\\?|$)#', $fvd_return_nav_url) === 1) {
+    $fvd_return_nav_label = '← Panel delegado';
+}
 require_once $fvdRoot . '/includes/fvd_brand.php';
 $fvd_brand_logo_url = fvd_brand_logo_public_url();
-$fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
+$fvdUiCss = url('assets/css/fvd-ui-portal.css');
 $fvdNavBase = rtrim((string) BASE_URL, '/') . '/fvdmasteradmin';
 $fvdPanelUrl = $fvdNavBase . (AuthService::isDelegadoAsociacion()
     ? '/delegado_dashboard_new.php'
@@ -285,6 +353,12 @@ if ($fvd_deleg_ctx_tid > 0 || $fvd_deleg_campeonato_id > 0) {
     }
     $fvd_deleg_torneo_q = '?' . http_build_query($qDel);
 }
+
+/** Módulo torneo_inscripcion: alta/nómina (texto según clase) vs. inscritos/retiros/sustituciones. */
+$fvd_url_torneo_inscripcion_base = fvd_module_url('torneo_inscripcion/index.php' . $fvd_deleg_torneo_q);
+$fvd_url_torneo_inscripcion_inscribir = $fvd_url_torneo_inscripcion_base . '#fvd-insc-sitio-inscribir';
+/** Tabla inscripcion_torneo: listado completo, editar / sustituir y recálculo de deuda (no solo ancla en vista sitio). */
+$fvd_url_torneo_inscripcion_admin = fvd_module_url('inscripcion_torneo/index.php' . $fvd_deleg_torneo_q);
 
 $fvd_deleg_asoc_q = '';
 if (AuthService::isDelegadoAsociacion()) {
@@ -692,6 +766,135 @@ header('Content-Type: text/html; charset=UTF-8');
         .fvd-shell--no-sidebar.fvd-shell--sidebar-rail .fvd-main-column {
             width: 100%;
         }
+        /* Franja «Torneos asociados» (delegado) en módulos con layout maestro */
+        .fvd-dd-torneos-strip--layout {
+            margin: 0 0 1rem;
+            padding: 0.85rem 1rem 0.95rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: rgba(248, 250, 252, 0.97);
+            color: #0f172a;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+            text-align: center;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneos-strip__head {
+            margin-bottom: 0.55rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneos-strip__title {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #2e3092;
+            margin-bottom: 0.2rem;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneos-strip__instr {
+            margin: 0 0 0.65rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.5;
+            max-width: 52rem;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneos-strip__hint {
+            margin: 0;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #334155;
+            line-height: 1.45;
+            max-width: 52rem;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneos-strip__list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: stretch;
+            justify-content: center;
+            max-height: 11rem;
+            overflow-y: auto;
+            padding-top: 0.15rem;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip {
+            flex: 0 1 auto;
+            min-width: 0;
+            max-width: 100%;
+            text-decoration: none;
+            text-align: left;
+            padding: 0.5rem 0.7rem 0.45rem;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            background: #fff;
+            color: #0f172a;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            line-height: 1.3;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            box-sizing: border-box;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip:hover {
+            border-color: rgba(46, 48, 146, 0.45);
+            box-shadow: 0 4px 12px rgba(46, 48, 146, 0.15);
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip--activo {
+            border-color: var(--fvd-amarillo);
+            background: linear-gradient(135deg, #2e3092 0%, #3a3eb5 100%);
+            color: #fff;
+            box-shadow: 0 6px 18px rgba(46, 48, 146, 0.28);
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip--activo:hover {
+            border-color: #fde047;
+            color: #fff;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip__id {
+            display: block;
+            font-size: 0.62rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 0.12rem;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip--activo .fvd-dd-torneo-chip__id {
+            color: rgba(255, 242, 0, 0.92);
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip__name { word-break: break-word; }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip__genero {
+            display: inline-block;
+            margin-top: 0.22rem;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            color: #2e3092;
+            border: 1px solid rgba(46, 48, 146, 0.28);
+            border-radius: 6px;
+            padding: 0.1rem 0.32rem;
+            background: #eef2ff;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip--activo .fvd-dd-torneo-chip__genero {
+            color: #fef9c3;
+            border-color: rgba(255, 255, 255, 0.45);
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip__meta {
+            display: block;
+            margin-top: 0.22rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneo-chip--activo .fvd-dd-torneo-chip__meta {
+            color: rgba(248, 250, 252, 0.88);
+        }
+        .fvd-dd-torneos-strip--layout .fvd-dd-torneos-strip--empty {
+            margin: 0;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #64748b;
+            line-height: 1.45;
+        }
         .fvd-topbar {
             flex-shrink: 0;
             position: sticky;
@@ -814,6 +1017,17 @@ header('Content-Type: text/html; charset=UTF-8');
             font-weight: 800;
             background: var(--fvd-azul, #2e3092);
             color: #fff;
+        }
+        .fvd-topbar__notif-inv { position: relative; padding-right: 0.75rem; }
+        .fvd-topbar__notif-dot {
+            position: absolute;
+            top: 0.1rem;
+            right: 0.18rem;
+            width: 0.42rem;
+            height: 0.42rem;
+            border-radius: 999px;
+            background: #f43f5e;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
         }
         .fvd-topbar__perfil {
             display: inline-flex;
@@ -1203,8 +1417,8 @@ $fvdShellDelegadoWs = (
                 <details class="fvd-sn-acc"<?= $fvd_acc_fin_open ? ' open' : '' ?>>
                     <summary class="fvd-sn-acc__summary" title="Inscripciones al torneo y pagos">Inscripc. / pagos <span class="fvd-sn-acc__chev" aria-hidden="true"></span></summary>
                     <div class="fvd-sn-acc__body">
-                        <a class="fvd-sn<?= $fvd_sn_active('torneo_inscripcion') ?>" href="<?= htmlspecialchars(fvd_module_url('torneo_inscripcion/index.php' . $fvd_deleg_torneo_q), ENT_QUOTES, 'UTF-8') ?>" title="Inscribir afiliados al torneo en curso">Inscripciones al torneo</a>
-                        <a class="fvd-sn<?= $fvd_sn_active('inscripcion_torneo') ?>" href="<?= htmlspecialchars(fvd_module_url('inscripcion_torneo/index.php' . $fvd_deleg_torneo_q), ENT_QUOTES, 'UTF-8') ?>" title="Tabla inscripción por torneo y banderas">Administrador de inscripciones</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('torneo_inscripcion') ?>" href="<?= htmlspecialchars($fvd_url_torneo_inscripcion_inscribir, ENT_QUOTES, 'UTF-8') ?>" title="Alta y nómina según modalidad del torneo (individual, parejas o equipos)">Inscripciones al torneo</a>
+                        <a class="fvd-sn<?= $fvd_sn_active('inscripcion_torneo') ?>" href="<?= htmlspecialchars($fvd_url_torneo_inscripcion_admin, ENT_QUOTES, 'UTF-8') ?>" title="Inscritos al torneo en contexto: tabla, editar, retirar y sincronización con deudas">Administración de inscripciones</a>
                         <a class="fvd-sn<?= $fvd_sn_active('inscripciones') ?>" href="<?= htmlspecialchars(fvd_module_url('inscripciones/index.php' . $fvd_deleg_torneo_q), ENT_QUOTES, 'UTF-8') ?>" title="Reportes PDF/HTML y finanzas por torneo">Reportes de inscripciones</a>
                         <a class="fvd-sn<?= $fvd_sn_active('pagos') ?>" href="<?= htmlspecialchars(fvd_module_url('relacion_pago/index.php'), ENT_QUOTES, 'UTF-8') ?>" title="Pagos registrados">Pagos</a>
                     </div>
@@ -1255,9 +1469,20 @@ $fvdShellDelegadoWs = (
             </div>
             <div class="fvd-topbar__actions">
                 <?php if ($fvd_topbar_deleg_notif_no_vistas > 0): ?>
-                <a class="fvd-topbar__notif-inv" href="<?= htmlspecialchars($fvdPanelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Notificaciones web — invitaciones a torneos sin abrir">
+                <?php
+                if (!function_exists('fvd_return_append_to_url') && is_file($fvdProjRoot . '/config/fvd_navigation_return.php')) {
+                    require_once $fvdProjRoot . '/config/fvd_navigation_return.php';
+                }
+                $fvdDelegInvitEntrarUrl = $fvdNavBase . '/delegado_entrar_torneo.php?ultima=1';
+                if ($fvd_return_nav_url !== null && $fvd_return_nav_url !== '') {
+                    $fvdDelegInvitEntrarUrl = function_exists('fvd_return_append_to_url')
+                        ? fvd_return_append_to_url($fvdDelegInvitEntrarUrl, $fvd_return_nav_url)
+                        : $fvdDelegInvitEntrarUrl;
+                }
+                ?>
+                <a class="fvd-topbar__notif-inv" href="<?= htmlspecialchars($fvdDelegInvitEntrarUrl, ENT_QUOTES, 'UTF-8') ?>" title="Abrir el panel maestro en el contexto de la invitación pendiente (torneo y grupo si aplica)">
                     Invitaciones
-                    <span class="fvd-topbar__notif-badge"><?= (int) $fvd_topbar_deleg_notif_no_vistas ?></span>
+                    <span class="fvd-topbar__notif-dot" aria-hidden="true"></span>
                 </a>
                 <?php endif; ?>
                 <a class="fvd-topbar__perfil<?= $fvd_sidebar_active === 'perfil' ? ' fvd-topbar__perfil--active' : '' ?>" href="<?= htmlspecialchars($fvd_perfil_url, ENT_QUOTES, 'UTF-8') ?>">Mi perfil</a>
@@ -1268,8 +1493,6 @@ $fvdShellDelegadoWs = (
     <?php endif; ?>
     <div class="fvd-main-wrap">
         <main class="fvd-main">
-        <?php if (empty($fvd_master_embed) && $fvd_return_nav_url !== null && $fvd_return_nav_url !== ''): ?>
-            <nav class="fvd-return-bar no-print" aria-label="Volver al origen">
-                <a href="<?= htmlspecialchars($fvd_return_nav_url, ENT_QUOTES, 'UTF-8') ?>">← Volver al origen</a>
-            </nav>
+        <?php if (!$fvd_defer_return_bar): ?>
+            <?php require __DIR__ . '/partial_fvd_return_nav.php'; ?>
         <?php endif; ?>

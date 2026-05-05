@@ -446,9 +446,17 @@ if (!function_exists('fvd_invitaciones_monitor_line')) {
     {
         try {
             fvd_notifier_ensure_schema($pdo);
-            $totCam = (int) $pdo->query('SELECT COUNT(*) FROM torneosact WHERE tipo = 2')->fetchColumn();
+            $hasEsCampeonato = false;
+            try {
+                $pdo->query('SELECT es_campeonato FROM torneosact LIMIT 0');
+                $hasEsCampeonato = true;
+            } catch (Throwable $e) {
+                $hasEsCampeonato = false;
+            }
+            $condCamp = $hasEsCampeonato ? 'COALESCE(t.es_campeonato, 0) = 1' : '(t.tipo = 2)';
+            $totCam = (int) $pdo->query('SELECT COUNT(*) FROM torneosact t WHERE ' . $condCamp)->fetchColumn();
             $desp = (int) $pdo->query(
-                'SELECT COUNT(*) FROM torneosact WHERE tipo = 2 AND COALESCE(invitaciones_despachadas, 0) = 1'
+                'SELECT COUNT(*) FROM torneosact t WHERE ' . $condCamp . ' AND COALESCE(t.invitaciones_despachadas, 0) = 1'
             )->fetchColumn();
             $pct = $totCam > 0 ? (int) round(100 * $desp / $totCam) : 100;
             $totDel = (int) $pdo->query('SELECT COUNT(*) FROM delegados WHERE activo = 1')->fetchColumn();

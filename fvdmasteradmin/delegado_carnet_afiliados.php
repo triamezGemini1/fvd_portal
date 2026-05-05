@@ -133,6 +133,23 @@ if ($q !== '') {
         $conds[] = 'a.cedula LIKE :like1';
     }
 
+    if (AuthService::isDelegadoAsociacion()) {
+        $ctxBus = AuthService::delegadoTorneoContextId();
+        if ($ctxBus !== null && (int) $ctxBus > 0) {
+            if (!class_exists('FvdAdminService', false)) {
+                require_once dirname(__DIR__) . '/src/Services/FvdAdminService.php';
+            }
+            $fvdBus = new \FvdAdminService($pdo);
+            $fragSex = trim($fvdBus->sqlAtletasFiltroSexoSegunTorneoTipo((int) $ctxBus, 'a'));
+            if ($fragSex !== '') {
+                $fragSex = preg_replace('/^\s*AND\s+/i', '', $fragSex);
+                if ($fragSex !== '') {
+                    $conds[] = '(' . $fragSex . ')';
+                }
+            }
+        }
+    }
+
     $sql = 'SELECT a.id, a.cedula, a.nombre, a.numfvd, a.carnet, a.torneo_id
             FROM atletas a
             WHERE ' . implode(' AND ', $conds) . '
@@ -148,7 +165,9 @@ $fvd_page_title = 'Marcar carnet — afiliados';
 require __DIR__ . '/includes/layout_header.php';
 ?>
 <div class="fvd-dash" style="max-width:56rem">
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <h1>Marcar carnet (afiliados)</h1>
+    <?php endif; ?>
     <p style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 1rem">
         Busque por <strong>cédula</strong> o <strong>número FVD</strong>. Al confirmar, se actualiza <code>atletas.carnet = 1</code> (carnet solicitado).
         <?php if (AuthService::isDelegadoAsociacion()): ?>

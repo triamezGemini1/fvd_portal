@@ -25,10 +25,16 @@ if (!function_exists('fvd_return_append_to_url')) {
 if (!function_exists('fvd_module_url')) {
     /**
      * URL pública hacia un script bajo /modules/ (sin "fvdmasteradmin" en la ruta; rewrite → fvdmasteradmin/modules/).
+     * Debe usar el mismo prefijo que {@see fvd_master_module_url()} (BASE_URL inferido); si solo se usa
+     * env('APP_BASE_PATH') vacío, el navegador resuelve `/modules/…` contra la raíz del vhost y puede
+     * encadenar redirecciones (ERR_TOO_MANY_REDIRECTS) respecto a la subcarpeta del proyecto.
      */
     function fvd_module_url(string $path): string
     {
-        $base = rtrim((string) env('APP_BASE_PATH', ''), '/');
+        if (!defined('BASE_URL')) {
+            require_once FVD_PROJECT_ROOT . '/config/paths.php';
+        }
+        $base = defined('BASE_URL') ? rtrim((string) BASE_URL, '/') : rtrim((string) env('APP_BASE_PATH', ''), '/');
 
         return $base . '/modules/' . ltrim($path, '/');
     }

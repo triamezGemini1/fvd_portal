@@ -12,11 +12,11 @@ use RuntimeException;
  * Genera o actualiza una fila en deuda_asociaciones a partir de atletas del club en un torneo
  * y la última fila de tarifas en costos (productos: cantidad × precio unitario).
  *
- * **Actualizar deuda (estado de cuenta):** si existe `inscripcion_torneo`, cada ejecución cuenta allí;
- * si no, lee `atletas` para el par `torneo_id` + `asociacion`, con marca 1 en cada concepto:
- * `inscripcion`, `afiliacion`, `carnet`, `traspaso`, `anualidad`. Cualquier alta o baja
- * (p. ej. marcar/desmarcar conceptos o retirar de la competencia) se refleja al pulsar
- * actualizar en el módulo de deudas, siempre que exista tarifa en `costos`.
+ * **Actualizar deuda (estado de cuenta):** los conteos y montos se calculan siempre desde
+ * la tabla **`atletas`** del club en el torneo (`torneo_id` + `asociacion`), con marca 1 en cada
+ * concepto: `inscripcion`, `afiliacion`, `carnet`, `traspaso`, `anualidad` (alineado con reportes
+ * de inscripciones, afiliaciones, carnets y traspasos). La tabla `inscripcion_torneo` puede existir
+ * como volcado auxiliar; no sustituye a `atletas` para finanzas.
  */
 final class DeudaAsociacionGeneratorService
 {
@@ -80,27 +80,12 @@ final class DeudaAsociacionGeneratorService
     }
 
     /**
-     * Si existe la tabla `inscripcion_torneo`, los conteos de deuda por torneo/asociación
-     * se calculan sobre esa tabla (filas de inscripción); si no, sobre `atletas` con `torneo_id`.
+     * Los conteos de deuda por torneo/asociación se toman siempre de {@see conteosPorTorneoYAsociacion}
+     * sobre **`atletas`**. Se mantiene el método por compatibilidad; ya no delega en `inscripcion_torneo`.
      */
     public static function conteosUsanTablaInscripcionTorneo(PDO $pdo): bool
     {
-        try {
-            $db = $pdo->query('SELECT DATABASE()')->fetchColumn();
-            if ($db === false || $db === null || $db === '') {
-                return false;
-            }
-            $st = $pdo->prepare(
-                'SELECT 1 FROM information_schema.tables WHERE table_schema = :db AND table_name = :t LIMIT 1'
-            );
-            $st->execute([':db' => (string) $db, ':t' => 'inscripcion_torneo']);
-
-            return (bool) $st->fetchColumn();
-        } catch (PDOException $e) {
-            error_log('[DeudaAsociacionGeneratorService] conteosUsanTablaInscripcionTorneo: ' . $e->getMessage());
-
-            return false;
-        }
+        return false;
     }
 
     /**

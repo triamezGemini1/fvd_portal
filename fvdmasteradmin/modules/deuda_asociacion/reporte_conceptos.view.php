@@ -100,7 +100,9 @@ $labelsToShow = ($fvdReporteConceptoFiltro !== null && isset($labels[$fvdReporte
 </style>
 
 <div class="fvd-deuda-reporte-page">
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1>Detalle por concepto</h1>
+<?php endif; ?>
 <?php if ($row !== null): ?>
     <p class="fvd-deuda-reporte-sub">Torneo #<?= (int) ($r['torneo_id'] ?? 0) ?> · Asociación #<?= (int) ($r['asociacion_id'] ?? 0) ?></p>
 <?php endif; ?>

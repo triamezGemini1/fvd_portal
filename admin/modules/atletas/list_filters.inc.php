@@ -34,11 +34,15 @@ function fvd_atletas_resolve_list_filters(array $get): array
         }
     }
 
+    if ($tipo === '' && AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
+        $tipo = 'ultimos';
+    }
+
     if (!in_array($alcance, $allowedAlcance, true)) {
         $alcance = 'todos';
     }
     if (!in_array($tipo, $allowedTipo, true)) {
-        $tipo = 'normal';
+        $tipo = AuthService::role() === AuthService::ROLE_FVD_ADMIN ? 'ultimos' : 'normal';
     }
 
     if (AuthService::role() !== AuthService::ROLE_FVD_ADMIN) {
@@ -53,6 +57,14 @@ function fvd_atletas_resolve_list_filters(array $get): array
             $alcance = 'todos';
             $asociacionId = 0;
         }
+    } else {
+        /** Admin FVD: un solo selector `asociacion_id` — >0 = club; 0 = toda la federación. */
+        if ($asociacionId > 0) {
+            $alcance = 'asociacion';
+        } else {
+            $alcance = 'todos';
+            $asociacionId = 0;
+        }
     }
 
     return [
@@ -60,4 +72,18 @@ function fvd_atletas_resolve_list_filters(array $get): array
         'tipo'            => $tipo,
         'asociacion_id'   => $asociacionId,
     ];
+}
+
+/**
+ * Marcador de servicio para el listado admin de atletas (columna en 1).
+ *
+ * @param array<string, scalar|null> $get
+ * @return ''|'carnet'|'traspaso'|'afiliacion'|'anualidad'|'inscripcion'
+ */
+function fvd_atletas_resolve_marcador(array $get): string
+{
+    $allowed = ['carnet', 'traspaso', 'afiliacion', 'anualidad', 'inscripcion'];
+    $m = isset($get['marcador']) ? trim((string) $get['marcador']) : '';
+
+    return in_array($m, $allowed, true) ? $m : '';
 }

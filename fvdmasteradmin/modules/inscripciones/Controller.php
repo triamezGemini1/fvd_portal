@@ -26,21 +26,21 @@ class InscripcionesController extends FvdModuleController
     }
 
     /**
-     * Torneos para el selector: administrador FVD ve todos; delegado/asoc solo torneos con atletas del club + contexto.
+     * Torneos para el selector: administrador FVD solo el torneo ancla (URL o contexto) y el mismo grupo_evento_id;
+     * delegado/asoc solo torneos con atletas del club + contexto.
+     *
+     * @param int $preferTorneoId Prioridad de ancla para FVD admin: torneo_id en URL si es positivo, si no contexto de sesión.
      *
      * @return list<array{torneo:int|string,nombre:string}>
      */
-    public function listTorneosParaSelector(?int $asociacionId, ?int $ctxTorneoId): array
+    public function listTorneosParaSelector(?int $asociacionId, ?int $ctxTorneoId, int $preferTorneoId = 0): array
     {
         if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
-            try {
-                $st = $this->pdo->query('SELECT torneo, nombre FROM torneosact ORDER BY torneo DESC LIMIT 400');
-                $rows = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
+            $anchor = $preferTorneoId > 0
+                ? $preferTorneoId
+                : ($ctxTorneoId !== null && $ctxTorneoId > 0 ? $ctxTorneoId : 0);
 
-                return is_array($rows) ? $rows : [];
-            } catch (\Throwable $e) {
-                return [];
-            }
+            return $this->listTorneosFvdAdminPorGrupo($anchor);
         }
         if ($asociacionId === null || $asociacionId <= 0) {
             return [];
@@ -66,12 +66,57 @@ class InscripcionesController extends FvdModuleController
     }
 
     /**
+     * Administrador FVD: torneo activo (ancla) y demás filas de torneosact con el mismo grupo_evento_id.
+     * Sin ancla o sin fila en BD devuelve lista vacía. Si no existe grupo_evento_id en la tabla, solo el ancla.
+     *
+     * @return list<array{torneo:int|string,nombre:string}>
+     */
+    private function listTorneosFvdAdminPorGrupo(int $anchorTorneoId): array
+    {
+        if ($anchorTorneoId <= 0) {
+            return [];
+        }
+        $svc = new \FvdAdminService($this->pdo);
+        if (!$svc->torneosactGrupoEventoColumnExists()) {
+            $one = $this->fetchTorneoActo($anchorTorneoId);
+
+            return $one !== null ? [$one] : [];
+        }
+        try {
+            $st = $this->pdo->prepare(
+                'SELECT torneo, nombre, COALESCE(grupo_evento_id, 0) AS grupo_evento_id
+                FROM torneosact WHERE torneo = :t LIMIT 1'
+            );
+            $st->execute([':t' => $anchorTorneoId]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($row)) {
+                return [];
+            }
+            $gid = (int) ($row['grupo_evento_id'] ?? 0);
+            if ($gid <= 0) {
+                return [['torneo' => $row['torneo'], 'nombre' => (string) ($row['nombre'] ?? '')]];
+            }
+            $st2 = $this->pdo->prepare(
+                'SELECT torneo, nombre FROM torneosact
+                WHERE COALESCE(grupo_evento_id, 0) = :g
+                ORDER BY COALESCE(tipo, 0) ASC, nombre ASC'
+            );
+            $st2->execute([':g' => $gid]);
+            $rows = $st2->fetchAll(\PDO::FETCH_ASSOC);
+
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
      * Torneos del campeonato (grupo_evento_id) con convocatoria para la asociación del delegado.
      * Requiere {@see $campeonatoParam} resuelto a un grupo válido (ID de torneo o de grupo).
      *
      * @return list<array<string, mixed>>
      */
-    public function listTorneosPorCampeonatoParaDelegado(int $asociacionId, int $campeonatoParam): array
+    public function listTorneosPorCampeonatoParaDelegado(int $asociacionId, int $campeonatoParam, ?int $contextTorneoId = null): array
     {
         if ($asociacionId <= 0 || $campeonatoParam <= 0) {
             return [];
@@ -82,7 +127,10 @@ class InscripcionesController extends FvdModuleController
             return [];
         }
 
-        $rows = $svc->torneosPorGrupoCampeonato($asociacionId, $grupo);
+        $ctx = $contextTorneoId !== null && $contextTorneoId > 0
+            ? $contextTorneoId
+            : (int) (\AuthService::delegadoTorneoContextId() ?? 0);
+        $rows = $svc->torneosPorGrupoCampeonato($asociacionId, $grupo, $ctx > 0 ? $ctx : null);
         if ($rows !== []) {
             AuthService::setDelegadoCampeonatoGrupo($grupo);
         }
@@ -91,6 +139,8 @@ class InscripcionesController extends FvdModuleController
     }
 
     /**
+     * Listado para reportes (maestro EUR, etc.): solo asociaciones activas, misma regla que el catálogo admin.
+     *
      * @return list<array{id:int|string,nombre:string}>
      */
     public function listAsociacionesParaAdmin(): array
@@ -99,7 +149,8 @@ class InscripcionesController extends FvdModuleController
             return [];
         }
         try {
-            $st = $this->pdo->query('SELECT id, nombre FROM asociaciones ORDER BY nombre');
+            $est = \FvdAdminService::asociacionesSqlFiltroEstatus('asociaciones', 'activas');
+            $st = $this->pdo->query('SELECT id, nombre FROM asociaciones WHERE 1=1' . $est . ' ORDER BY nombre');
             $rows = $st ? $st->fetchAll(\PDO::FETCH_ASSOC) : [];
 
             return is_array($rows) ? $rows : [];
@@ -153,7 +204,9 @@ class InscripcionesController extends FvdModuleController
                 'SELECT
                     SUM(CASE WHEN COALESCE(a.inscripcion,0)=1 THEN 1 ELSE 0 END) AS n_insc,
                     SUM(CASE WHEN COALESCE(a.carnet,0)=1 THEN 1 ELSE 0 END) AS n_carn,
-                    SUM(CASE WHEN COALESCE(a.afiliacion,0)=1 THEN 1 ELSE 0 END) AS n_afi
+                    SUM(CASE WHEN COALESCE(a.afiliacion,0)=1 THEN 1 ELSE 0 END) AS n_afi,
+                    SUM(CASE WHEN COALESCE(a.anualidad,0)=1 THEN 1 ELSE 0 END) AS n_anu,
+                    SUM(CASE WHEN COALESCE(a.traspaso,0)=1 THEN 1 ELSE 0 END) AS n_tras
                 FROM atletas a
                 WHERE a.torneo_id = :t AND a.asociacion = :a'
             );
@@ -198,6 +251,8 @@ class InscripcionesController extends FvdModuleController
                 'n_inscritos'    => (int) ($rowA['n_insc'] ?? 0),
                 'n_carnets'      => (int) ($rowA['n_carn'] ?? 0),
                 'n_afiliados'    => (int) ($rowA['n_afi'] ?? 0),
+                'n_anualidad'    => (int) ($rowA['n_anu'] ?? 0),
+                'n_traspasos'    => (int) ($rowA['n_tras'] ?? 0),
                 'monto_total_bs' => $montoBs,
                 'monto_total_eur'=> $montoEur,
                 'pagado_eur'     => round($pagadoEur, 2),
@@ -208,6 +263,62 @@ class InscripcionesController extends FvdModuleController
             error_log('[InscripcionesController::reportStatsTorneoAsociacion] ' . $e->getMessage());
 
             return null;
+        }
+    }
+
+    /**
+     * Reparte {@see deuda_asociaciones.monto_total_eur} entre conceptos en proporción a montos Bs (referencia de tasas).
+     *
+     * @return array{inscripciones: float, afiliacion: float, carnets: float, traspasos: float, anualidad: float}
+     */
+    public function allocDeudaEurPorConcepto(array $d): array
+    {
+        $keys = [
+            'inscripciones' => (float) ($d['monto_inscritos'] ?? 0),
+            'afiliacion'    => (float) ($d['monto_afiliados'] ?? 0),
+            'carnets'       => (float) ($d['monto_carnets'] ?? 0),
+            'traspasos'     => (float) ($d['monto_traspasos'] ?? 0),
+            'anualidad'     => (float) ($d['monto_anualidad'] ?? 0),
+        ];
+        $bsTotal = (float) ($d['monto_total'] ?? 0);
+        $eurTotal = $d['monto_total_eur'] ?? null;
+        $eur = $eurTotal !== null && $eurTotal !== '' ? (float) $eurTotal : null;
+        if ($eur === null || $eur <= 0 || $bsTotal <= 0) {
+            return array_fill_keys(array_keys($keys), 0.0);
+        }
+        $out = [];
+        foreach ($keys as $k => $bs) {
+            $out[$k] = round($eur * ($bs / $bsTotal), 2);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Recibos en EUR (monto_dolares) para un torneo + asociación.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listPagosTorneoAsociacionEur(int $torneoId, int $asociacionId, int $limit = 200): array
+    {
+        if ($torneoId <= 0 || $asociacionId <= 0) {
+            return [];
+        }
+        try {
+            $st = $this->pdo->prepare(
+                'SELECT r.id, r.torneo_id, r.asociacion_id, r.monto_dolares, r.monto_total, r.fecha, r.secuencia, r.tipo_pago, r.moneda, r.referencia, r.observaciones
+                 FROM relacion_pagos r
+                 WHERE r.torneo_id = :t AND r.asociacion_id = :a
+                 ORDER BY r.fecha DESC, r.id DESC
+                 LIMIT ' . max(1, $limit)
+            );
+            $st->execute([':t' => $torneoId, ':a' => $asociacionId]);
+
+            return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            error_log('[InscripcionesController::listPagosTorneoAsociacionEur] ' . $e->getMessage());
+
+            return [];
         }
     }
 }

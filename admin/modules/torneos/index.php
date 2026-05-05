@@ -5,8 +5,10 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . '/_init.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/TorneoService.php';
 require_once FVD_PROJECT_ROOT . '/src/Services/DelegadoTorneoNotifService.php';
+require_once FVD_PROJECT_ROOT . '/src/Services/DelegadoTorneoVentanasService.php';
 
 use FvdPortal\Services\DelegadoTorneoNotifService;
+use FvdPortal\Services\DelegadoTorneoVentanasService;
 use FvdPortal\Services\TorneoService;
 
 fvd_admin_require_roles();
@@ -141,23 +143,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'torneo_finalizar') {
     require_once FVD_PROJECT_ROOT . '/src/Services/TorneoFinalizacionService.php';
     AuthService::ensureSession();
+    $fromList = (($_POST['_from'] ?? '') === 'list');
     try {
         $tidF = (int) ($_POST['torneo_id'] ?? 0);
         $svc->torneosEventoRequireGestionPanel($tidF);
         $out = \FvdPortal\Services\TorneoFinalizacionService::finalizarTorneo(fvd_db(), $tidF);
-        $_SESSION['fvd_torneo_evento_flash'] = sprintf(
-            'Torneo dado por concluido. Histórico: %d registro(s); inscritos (bandera): %d; filas en tabla: %d.',
-            $out['movimientos'],
-            $out['participantes_bandera'],
-            $out['filas_tabla']
-        );
-        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $tidF . '&msg=ok'));
+        if ($fromList) {
+            $_SESSION['fvd_torneo_list_flash'] = sprintf(
+                'Torneo #%d dado por concluido. Histórico: %d registro(s); inscritos (bandera): %d; filas en tabla: %d.',
+                $tidF,
+                $out['movimientos'],
+                $out['participantes_bandera'],
+                $out['filas_tabla']
+            );
+            $listQs = '?action=list';
+            $pgL = max(1, (int) ($_POST['list_page'] ?? 1));
+            $qL = trim((string) ($_POST['list_q'] ?? ''));
+            if ($qL !== '') {
+                $listQs .= '&q=' . rawurlencode($qL);
+            }
+            if ($pgL > 1) {
+                $listQs .= '&page=' . $pgL;
+            }
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . $listQs));
+        } else {
+            $_SESSION['fvd_torneo_evento_flash'] = sprintf(
+                'Torneo dado por concluido. Histórico: %d registro(s); inscritos (bandera): %d; filas en tabla: %d.',
+                $out['movimientos'],
+                $out['participantes_bandera'],
+                $out['filas_tabla']
+            );
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $tidF . '&msg=ok'));
+        }
         exit;
     } catch (Throwable $e) {
         AuthService::ensureSession();
-        $_SESSION['fvd_torneo_evento_flash'] = $e->getMessage();
         $tidF = (int) ($_POST['torneo_id'] ?? 0);
-        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . max(1, $tidF)));
+        if ($fromList) {
+            $_SESSION['fvd_torneo_list_err'] = $e->getMessage();
+            $listQs = '?action=list';
+            $pgL = max(1, (int) ($_POST['list_page'] ?? 1));
+            $qL = trim((string) ($_POST['list_q'] ?? ''));
+            if ($qL !== '') {
+                $listQs .= '&q=' . rawurlencode($qL);
+            }
+            if ($pgL > 1) {
+                $listQs .= '&page=' . $pgL;
+            }
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . $listQs));
+        } else {
+            $_SESSION['fvd_torneo_evento_flash'] = $e->getMessage();
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . max(1, $tidF)));
+        }
         exit;
     }
 }
@@ -174,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
         $savedId = $svc->torneosSave($tid, $_POST, $_FILES);
         $wasNew = $tid === null;
         if ($wasNew && in_array(AuthService::role(), [AuthService::ROLE_FVD_ADMIN, AuthService::ROLE_ASO_ADMIN], true)) {
-            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $savedId . '&msg=torneo_creado_invitaciones'));
+            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $savedId . '&msg=ok'));
             exit;
         }
         header('Location: ' . fvd_return_preserve_query_params($selfUrl));
@@ -187,6 +224,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'save
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'relacion_grupo_aplicar') {
     AuthService::ensureSession();
+    $relacionFiltroPost = trim((string) ($_POST['filtro'] ?? ''));
+    $relacionFiltroQs = $relacionFiltroPost !== '' ? '&filtro=' . rawurlencode($relacionFiltroPost) : '';
     try {
         $ids = $_POST['torneo_id'] ?? [];
         if (!is_array($ids)) {
@@ -197,13 +236,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_action'] ?? '') === 'rela
         $_SESSION['fvd_torneo_relacion_flash']
             = 'Relación aplicada: código de grupo #' . $gid
             . '. Las invitaciones a delegados se han actualizado cuando correspondía; en inscripción (sitio y panel) podrá cambiar de categoría entre torneos del mismo grupo.';
-        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=relacion_grupo&msg=ok'));
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=relacion_grupo&msg=ok' . $relacionFiltroQs));
         exit;
     } catch (Throwable $e) {
         AuthService::ensureSession();
         $_SESSION['fvd_torneo_relacion_err'] = $e->getMessage();
         error_log('[admin/torneos relacion_grupo] ' . $e->getMessage());
-        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=relacion_grupo'));
+        header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=relacion_grupo' . $relacionFiltroQs));
         exit;
     }
 }
@@ -212,23 +251,27 @@ $fvd_page_title = 'Torneos';
 $action = $_GET['action'] ?? 'list';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : null;
 
-if (AuthService::isDelegadoAsociacion() && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-    $ctx = AuthService::delegadoTorneoContextId();
-    $asocDel = (int) (AuthService::idAsociacion() ?? 0);
-    if ($ctx !== null && $ctx > 0) {
-        if ($action !== 'evento' || $id === null || $id <= 0) {
-            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $ctx));
-            exit;
-        }
-        if ($asocDel > 0 && !$svc->delegadoPuedeAbrirPantallaEvento($asocDel, (int) $id)) {
-            header('Location: ' . fvd_return_preserve_query_params($selfUrl . '?action=evento&id=' . $ctx));
-            exit;
-        }
-    } elseif ($action !== 'evento' || $id === null || $id <= 0) {
-        $base = rtrim((string) env('APP_BASE_PATH', ''), '/');
-        header('Location: ' . $base . '/fvdmasteradmin/delegado_dashboard_new.php');
-        exit;
+/** Vista delegado: el panel operativo es siempre `delegado_dashboard_new.php`, no `action=evento` en este módulo. */
+$vistaDelegadoPanel = AuthService::isDelegadoAsociacion()
+    || (AuthService::isSuperAdmin() && (int) (AuthService::adminPortalDelegadoAsociacionId() ?? 0) > 0);
+if ($vistaDelegadoPanel && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    if (!function_exists('fvd_delegado_dashboard_torneo_url')) {
+        require_once FVD_PROJECT_ROOT . '/config/paths.php';
     }
+    $tidGo = ($id !== null && $id > 0) ? $id : 0;
+    if ($tidGo <= 0) {
+        $ctx = AuthService::delegadoTorneoContextId();
+        if ($ctx !== null && (int) $ctx > 0) {
+            $tidGo = (int) $ctx;
+        }
+    }
+    $grupoDelegDash = 0;
+    if ($tidGo > 0) {
+        $grupoDelegDash = (int) ($svc->torneoGrupoEventoId($tidGo) ?? 0);
+    }
+    $dest = fvd_delegado_dashboard_torneo_url($tidGo, $grupoDelegDash > 0 ? $grupoDelegDash : 0);
+    header('Location: ' . fvd_return_preserve_query_params($dest));
+    exit;
 }
 
 if ($action === 'evento_status_json' && $id !== null && $id > 0) {
@@ -414,6 +457,12 @@ if ($action === 'evento' && $id !== null && $id > 0) {
         }
         AuthService::setDelegadoTorneoContext((int) $id);
         $eventoTorneo = $svc->torneosFind($id);
+        if ($eventoTorneo !== null) {
+            $gidCtxEv = (int) ($eventoTorneo['grupo_evento_id'] ?? 0);
+            if ($gidCtxEv > 0) {
+                AuthService::setDelegadoCampeonatoGrupo($gidCtxEv);
+            }
+        }
         if ($eventoTorneo === null) {
             http_response_code(404);
             $fvd_page_title = 'Torneo no encontrado';
@@ -442,6 +491,58 @@ if ($action === 'evento' && $id !== null && $id > 0) {
         $appBase = rtrim((string) env('APP_BASE_PATH', ''), '/');
         $fvd_url_salir_torneo_ctx = $appBase . '/fvdmasteradmin/delegado_salir_torneo.php';
         $fvd_url_pdf_invitacion = $appBase . '/fvdmasteradmin/delegado_invitacion_pdf.php?notif_id=' . $fvd_delegado_notif_id;
+        $tidEvDeleg = (int) $id;
+        $grupoDesdeTorneoEv = $eventoTorneo !== null ? (int) ($eventoTorneo['grupo_evento_id'] ?? 0) : 0;
+        $campeonatoParaUrlEv = max($grupoDesdeTorneoEv, (int) (AuthService::delegadoCampeonatoGrupoId() ?? 0));
+        $qTorneoEv = ['torneo_id' => $tidEvDeleg];
+        if ($campeonatoParaUrlEv > 0) {
+            $qTorneoEv['campeonato_id'] = $campeonatoParaUrlEv;
+        }
+        $qTorneoStrEv = '?' . http_build_query($qTorneoEv);
+        $asocEvIdPanel = (int) $asocEv;
+        $qAfiliadosBase = [
+            'action' => 'list',
+            'alcance' => 'asociacion',
+            'asociacion_id' => $asocEvIdPanel,
+        ];
+        $fvdDelegadoUrlInscribirTorneo = fvd_master_module_url('torneo_inscripcion/index.php' . $qTorneoStrEv);
+        $fvdDelegadoUrlAdminInscritos = fvd_master_module_url('inscripcion_torneo/index.php' . $qTorneoStrEv);
+        $fvdDelegadoUrlAfiliadosCarnet = fvd_master_module_url('atletas/index.php?' . http_build_query($qAfiliadosBase + ['marcador' => 'carnet']));
+        $fvdDelegadoUrlAfiliadosTraspaso = fvd_master_module_url('atletas/index.php?' . http_build_query($qAfiliadosBase + ['marcador' => 'traspaso']));
+        $fvdDelegadoUrlAfiliadosAfiliacion = fvd_master_module_url('atletas/index.php?' . http_build_query($qAfiliadosBase + ['marcador' => 'afiliacion']));
+        $fvdDelegadoUrlNuevoAtleta = fvd_master_module_url('atletas/index.php?action=form');
+        $fvdDelegadoDashUrl = url('fvdmasteradmin/delegado_dashboard_new.php');
+        $fvdDelegadoTorneosAlternativas = [];
+        if ($asocEvIdPanel > 0) {
+            $fvdDelegadoTorneosAlternativas = $svc->delegadoListaTorneosParaStrip($asocEvIdPanel, $tidEvDeleg);
+        }
+        $fvdDelegadoFase1Ok = true;
+        $fvdDelegadoFase2Ok = true;
+        $fvdDelegadoMotivoFase1 = '';
+        $fvdDelegadoMotivoFase2 = '';
+        if (DelegadoTorneoVentanasService::aplicaRestriccionDelegado() && $tidEvDeleg > 0 && $asocEvIdPanel > 0) {
+            try {
+                $ventEv = DelegadoTorneoVentanasService::estadoParaTorneo($pdoEv, $tidEvDeleg, $asocEvIdPanel);
+                $fvdDelegadoFase1Ok = !empty($ventEv['fase1_afiliados_carnets_traspasos']);
+                $fvdDelegadoFase2Ok = !empty($ventEv['fase2_inscripciones']);
+                if (!$fvdDelegadoFase1Ok) {
+                    $fvdDelegadoMotivoFase1 = 'Fuera de ventana para afiliaciones, carnets y traspasos. Esta opción se habilita en fase 1 o cuando aplica acceso por convocatoria/invitación.';
+                }
+                if (!$fvdDelegadoFase2Ok) {
+                    $fvdDelegadoMotivoFase2 = 'Inscripciones y administración de inscritos no disponibles en este momento. Esta opción se habilita solo durante la fase 2 del torneo.';
+                }
+            } catch (Throwable $e) {
+                error_log('[admin/torneos evento_delegado ventanas] ' . $e->getMessage());
+            }
+        }
+        $fvdDelegadoCampeonatoOk = $campeonatoParaUrlEv > 0;
+        $fvdDelegadoAvisoCampeonato = !$fvdDelegadoCampeonatoOk && $tidEvDeleg > 0
+            ? 'No se pudo determinar el campeonato (grupo de evento) para este torneo. Si la inscripción masiva exige campeonato_id, la federación debe vincular el torneo a un grupo en torneosact.'
+            : '';
+        AuthService::setDelegadoPanelHomeUrl(fvd_torneo_evento_url(
+            $tidEvDeleg,
+            $grupoDesdeTorneoEv > 0 ? $grupoDesdeTorneoEv : 0
+        ));
         require FVD_MASTER_ROOT . '/includes/layout_header.php';
         include __DIR__ . '/evento_delegado.view.php';
         require FVD_MASTER_ROOT . '/includes/layout_footer.php';
@@ -495,10 +596,27 @@ if ($action === 'relacion_grupo') {
         $fvd_torneo_relacion_err = (string) $_SESSION['fvd_torneo_relacion_err'];
         unset($_SESSION['fvd_torneo_relacion_err']);
     }
-    $relacionGrupoFilas = $svc->torneosRelacionGrupoCandidatosFuturos();
+    $relacionGrupoFiltro = isset($_GET['filtro']) ? strtolower(trim((string) $_GET['filtro'])) : 'activos';
+    $relacionGrupoFiltrosPermitidos = ['activos', 'todos', 'proximos', 'por_realizar', 'en_proceso', 'realizados'];
+    if (!in_array($relacionGrupoFiltro, $relacionGrupoFiltrosPermitidos, true)) {
+        $relacionGrupoFiltro = 'activos';
+    }
+    $relacionGrupoFilas = $svc->torneosRelacionGrupoCandidatosPorFiltro($relacionGrupoFiltro);
     $relacionGrupoColumnaOk = $svc->torneosactGrupoEventoColumnExists();
+    $relacionGrupoUsaEsCampeonato = $svc->torneosactEsCampeonatoColumnExists();
+    $relacionGrupoDiasEnProceso = (int) FvdAdminService::RELACION_GRUPO_EN_PROCESO_MAX_DIAS_ATRAS;
     $fvd_relacion_max_dias_fechas = FvdAdminService::RELACION_GRUPO_MAX_DIAS_ENTRE_FECHAS;
-    $fvd_page_title = 'Relacionar campeonatos (próximos)';
+    if ($relacionGrupoFiltro === 'todos') {
+        $fvd_page_title = 'Relacionar grupos — todos los torneos';
+    } elseif ($relacionGrupoFiltro === 'proximos' || $relacionGrupoFiltro === 'por_realizar') {
+        $fvd_page_title = 'Relacionar grupos (por realizar)';
+    } elseif ($relacionGrupoFiltro === 'en_proceso') {
+        $fvd_page_title = 'Relacionar grupos (en proceso)';
+    } elseif ($relacionGrupoFiltro === 'realizados') {
+        $fvd_page_title = 'Relacionar grupos (realizados)';
+    } else {
+        $fvd_page_title = 'Relacionar grupos (activos: por realizar + en proceso)';
+    }
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/relacion_grupo.view.php';
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';
@@ -521,6 +639,7 @@ if ($action === 'form') {
         $fvdTorneoOrg = AuthService::idAsociacion();
     }
     $fvd_torneo_org_id = (int) ($fvdTorneoOrg ?? 0);
+    $fvdTorneoEsCampeonatoCol = $svc->torneosactEsCampeonatoColumnExists();
     require FVD_MASTER_ROOT . '/includes/layout_header.php';
     include __DIR__ . '/form.view.php';
     require FVD_MASTER_ROOT . '/includes/layout_footer.php';
@@ -529,10 +648,26 @@ if ($action === 'form') {
 
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
-$result = $svc->torneosPaginateList($page, 15, $q);
+$fvdTorneoListAnio = isset($_GET['anio']) ? (int) $_GET['anio'] : 0;
+if ($fvdTorneoListAnio < 1990 || $fvdTorneoListAnio > 2100) {
+    $fvdTorneoListAnio = 0;
+}
+$fvdTorneoDesde = isset($_GET['desde']) ? trim((string) $_GET['desde']) : '';
+$fvdTorneoHasta = isset($_GET['hasta']) ? trim((string) $_GET['hasta']) : '';
+$result = $svc->torneosPaginateList(
+    $page,
+    15,
+    $q,
+    $fvdTorneoListAnio > 0 ? $fvdTorneoListAnio : null,
+    $fvdTorneoDesde !== '' ? $fvdTorneoDesde : null,
+    $fvdTorneoHasta !== '' ? $fvdTorneoHasta : null
+);
 if (AuthService::role() === AuthService::ROLE_FVD_ADMIN) {
     $result['rows'] = $svc->torneosListEnrichDespachoMonitor($result['rows']);
 }
+require_once FVD_PROJECT_ROOT . '/src/Services/TorneoFinalizacionService.php';
+$fvd_torneo_list_puede_finalizar = \FvdPortal\Services\TorneoFinalizacionService::tablaHistoricoExiste(fvd_db())
+    && \FvdPortal\Services\TorneoFinalizacionService::columnaFinalizadoExiste(fvd_db());
 
 require FVD_MASTER_ROOT . '/includes/layout_header.php';
 include __DIR__ . '/list.view.php';

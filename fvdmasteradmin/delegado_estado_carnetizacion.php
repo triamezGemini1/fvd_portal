@@ -32,14 +32,18 @@ require_once __DIR__ . '/config/db.php';
 require_once dirname(__DIR__) . '/src/Services/StatsService.php';
 
 $pdo = fvd_db();
-$rows = \FvdPortal\Services\StatsService::listadoAtletasActivosCarnetPendiente($pdo, (int) $aid, 800);
+$ctxCarn = AuthService::delegadoTorneoContextId();
+$ctxCarnInt = ($ctxCarn !== null && (int) $ctxCarn > 0) ? (int) $ctxCarn : null;
+$rows = \FvdPortal\Services\StatsService::listadoAtletasActivosCarnetPendiente($pdo, (int) $aid, 800, $ctxCarnInt);
 
 $fvd_sidebar_active = 'delegado_carnet';
 $fvd_page_title = 'Estado de carnetización';
 require __DIR__ . '/includes/layout_header.php';
 ?>
 <div class="fvd-dash" style="max-width:56rem">
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <h1>Estado de carnetización</h1>
+    <?php endif; ?>
     <p style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 1rem">Atletas <strong>activos</strong> de su asociación que aún no tienen carnet solicitado (<code>carnet</code> vacío o 0).</p>
     <div class="fvd-mod-table-wrap">
         <table class="fvd-mod-table fvd-mod-table--nowrap" style="font-size:0.8125rem">

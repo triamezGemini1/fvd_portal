@@ -28,13 +28,23 @@ require_once __DIR__ . '/includes/delegado_solicitud_process.php';
 
 $projRoot = dirname(__DIR__);
 require_once $projRoot . '/src/Services/FvdAdminService.php';
+require_once __DIR__ . '/config/db.php';
 
-$svcList = new FvdAdminService();
 $asocDestino = [];
-foreach ($svcList->atletasListAsociacionesForSelect() as $a) {
-    if ((int) ($a['id'] ?? 0) !== (int) $myAs) {
-        $asocDestino[] = $a;
+try {
+    $stAsoc = fvd_db()->prepare('SELECT id, nombre FROM asociaciones WHERE id <> :my ORDER BY nombre ASC');
+    $stAsoc->execute([':my' => (int) $myAs]);
+    $rowsAsoc = $stAsoc->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($rowsAsoc as $a) {
+        $aid = (int) ($a['id'] ?? 0);
+        $nom = trim((string) ($a['nombre'] ?? ''));
+        if ($aid <= 0 || $nom === '') {
+            continue;
+        }
+        $asocDestino[] = ['id' => $aid, 'nombre' => $nom];
     }
+} catch (Throwable $e) {
+    error_log('[solicitud_traspaso asociaciones] ' . $e->getMessage());
 }
 
 AuthService::ensureSession();

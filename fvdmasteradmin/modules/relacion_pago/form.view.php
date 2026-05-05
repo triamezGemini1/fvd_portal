@@ -287,7 +287,9 @@ $fvdBcvEuroJsonUrl = $selfUrl . '?action=bcv_euro&fmt=json';
         <?php endif; ?>
     </div>
     <div class="fvd-deuda-detalle-titulo">
+        <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
         <h1><?= $fvdSoloConsulta ? 'Consulta de pago' : 'Registrar pago' ?></h1>
+        <?php endif; ?>
         <?php if ($fvdSoloConsulta): ?>
             <p style="margin:0.35rem 0 0;font-size:0.88rem;font-weight:600;color:#334155">Solo consulta. Para un movimiento nuevo use <strong>Registrar pago</strong> en el listado.</p>
         <?php endif; ?>

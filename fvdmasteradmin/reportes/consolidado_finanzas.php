@@ -20,6 +20,22 @@ if (!function_exists('url')) {
 
 require_once $projRoot . '/fvdmasteradmin/config/db.php';
 require_once $projRoot . '/src/Services/StatsService.php';
+require_once $projRoot . '/src/Services/FvdAdminService.php';
+
+/**
+ * Los reportes financieros consolidados solo exponen clubes con estatus activo (misma regla que {@see FvdAdminService::asociacionEstatusEsActiva}).
+ */
+function fvd_consolidado_finanzas_asociacion_es_activa(PDO $pdo, int $asociacionId): bool
+{
+    if ($asociacionId <= 0) {
+        return false;
+    }
+    $st = $pdo->prepare('SELECT estatus FROM asociaciones WHERE id = :id LIMIT 1');
+    $st->execute([':id' => $asociacionId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+
+    return is_array($row) && FvdAdminService::asociacionEstatusEsActiva($row);
+}
 
 $pdo = fvd_db();
 $embedded = (isset($_GET['embedded']) && (string) $_GET['embedded'] === '1')
@@ -34,6 +50,10 @@ if ($ajax !== '') {
             echo json_encode(['ok' => false, 'error' => 'asociacion_id']);
             exit;
         }
+        if (!fvd_consolidado_finanzas_asociacion_es_activa($pdo, $aid)) {
+            echo json_encode(['ok' => false, 'error' => 'asociacion_inactiva']);
+            exit;
+        }
         $list = \FvdPortal\Services\StatsService::torneosDeudaPorAsociacion($pdo, $aid);
         echo json_encode(['ok' => true, 'torneos' => $list], JSON_UNESCAPED_UNICODE);
         exit;
@@ -43,6 +63,10 @@ if ($ajax !== '') {
         $tid = max(0, (int) ($_GET['torneo_id'] ?? 0));
         if ($aid <= 0 || $tid <= 0) {
             echo json_encode(['ok' => false, 'error' => 'params']);
+            exit;
+        }
+        if (!fvd_consolidado_finanzas_asociacion_es_activa($pdo, $aid)) {
+            echo json_encode(['ok' => false, 'error' => 'asociacion_inactiva']);
             exit;
         }
         try {
@@ -64,8 +88,11 @@ if ($ajax !== '') {
     exit;
 }
 
-$report = \FvdPortal\Services\StatsService::reporteConsolidadoDeudasPorAsociacion($pdo);
-$rows = $report['rows'] ?? [];
+// Solo asociaciones activas (sin selector: evita listar inactivas en finanzas consolidadas).
+$filtroEstatus = 'activas';
+
+$report = \FvdPortal\Services\StatsService::reporteConsolidadoDeudasPorAsociacion($pdo, $filtroEstatus);
+$allRows = $report['rows'] ?? [];
 $tot = $report['totales'] ?? [];
 $usaEur = (bool) ($report['usa_eur'] ?? false);
 $monedaEt = $usaEur ? 'EUR' : 'Bs';
@@ -77,7 +104,7 @@ if (($_GET['export'] ?? '') === 'csv') {
     if ($out !== false) {
         fwrite($out, "\xEF\xBB\xBF");
         fputcsv($out, ['Asociación', 'Deuda afiliación', 'Deuda inscripciones', 'Deuda traspasos', 'Carnets', 'Anualidad', 'Total deuda', 'Pagos (' . $monedaEt . ')', 'Saldo'], ';');
-        foreach ($rows as $r) {
+        foreach ($allRows as $r) {
             fputcsv($out, [
                 $r['nombre'] ?? '',
                 $r['monto_afiliacion'] ?? 0,
@@ -106,16 +133,52 @@ if (($_GET['export'] ?? '') === 'csv') {
     exit;
 }
 
+$consolTotalRows = count($allRows);
+require_once $projRoot . '/includes/fvd_report_pagination.php';
+$perPage = fvd_report_paginator_per_page();
+if (isset($_GET['per_page'])) {
+    $pp = (int) $_GET['per_page'];
+    if ($pp >= 8 && $pp <= 40) {
+        $perPage = $pp;
+    }
+}
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$totalPages = $consolTotalRows > 0 ? (int) max(1, (int) ceil($consolTotalRows / $perPage)) : 1;
+if ($page > $totalPages) {
+    $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
+$rows = $consolTotalRows > 0 ? array_slice($allRows, $offset, $perPage) : [];
+$consolRowFrom = $consolTotalRows > 0 ? $offset + 1 : 0;
+$consolRowTo = $consolTotalRows > 0 ? min($offset + count($rows), $consolTotalRows) : 0;
+
+if (!function_exists('fvd_return_merge_get_params')) {
+    require_once $projRoot . '/config/fvd_navigation_return.php';
+}
+
+/** Paginador: no usar $_GET crudo (arrays / claves raras rompen http_build_query o el iframe). */
+$fvdConsolPagerUrl = static function (string $baseUrl, int $p, int $pp): string {
+    $ppClamped = max(8, min(40, (int) $pp));
+    $q = fvd_return_merge_get_params([
+        'page' => max(1, $p),
+        'per_page' => $ppClamped,
+    ]);
+    unset($q['export'], $q['ajax'], $q['_fvd_embed_ts']);
+
+    return $baseUrl . '?' . http_build_query($q, '', '&', PHP_QUERY_RFC3986);
+};
+
 $fmt = static function (float $v): string {
     return number_format($v, 2, ',', '.');
 };
 
-$fvdUiCss = url('assets/css/fvd-ui-mistorneos.css');
+$fvdUiCss = url('assets/css/fvd-ui-portal.css');
 $selfUrl = url('fvdmasteradmin/reportes/consolidado_finanzas.php');
 $detalleBase = url('fvdmasteradmin/reportes/asociacion_detalle.php');
 $jsEmbed = $embedded ? ['embedded' => '1', 'fvd_master_embed' => '1'] : [];
-$csvQ = array_merge($_GET, ['export' => 'csv']);
-$csvUrl = $selfUrl . '?' . http_build_query($csvQ);
+$csvQ = fvd_return_merge_get_params(['export' => 'csv']);
+unset($csvQ['page'], $csvQ['per_page'], $csvQ['ajax'], $csvQ['_fvd_embed_ts']);
+$csvUrl = $selfUrl . '?' . http_build_query($csvQ, '', '&', PHP_QUERY_RFC3986);
 
 header('Content-Type: text/html; charset=UTF-8');
 ?>
@@ -132,7 +195,6 @@ header('Content-Type: text/html; charset=UTF-8');
         .fvd-consol-wrap:not(.embedded) { padding: 1rem; }
         .fvd-consol-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin: 0 0 0.75rem; }
         .fvd-consol-head h1 { margin: 0; font-size: 1rem; font-weight: 800; color: #0f172a; }
-        .fvd-consol-meta { font-size: 0.75rem; color: #64748b; max-width: 42rem; line-height: 1.4; }
         .fvd-consol-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
         .fvd-consol-actions a, .fvd-consol-actions button {
             display: inline-flex; align-items: center; gap: 0.35rem;
@@ -141,6 +203,25 @@ header('Content-Type: text/html; charset=UTF-8');
             text-decoration: none; cursor: pointer;
         }
         .fvd-consol-actions a:hover, .fvd-consol-actions button:hover { background: #f1f5f9; }
+        .fvd-consol-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; font-size: 0.75rem; }
+        .fvd-consol-filter label { font-weight: 700; color: #334155; }
+        .fvd-consol-filter select {
+            padding: 0.35rem 0.5rem; font-size: 0.75rem; font-weight: 600; border-radius: 0.375rem;
+            border: 1px solid #cbd5e1; background: #fff; color: #0f172a; min-width: 9rem;
+        }
+        .fvd-consol-pager {
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
+            margin: 0.65rem 0 0; padding: 0.45rem 0.55rem; font-size: 0.75rem; color: #334155;
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 0.5rem;
+        }
+        .fvd-consol-pager__info { font-weight: 600; color: #475569; }
+        .fvd-consol-pager__nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+        .fvd-consol-pager a, .fvd-consol-pager span {
+            display: inline-flex; align-items: center; padding: 0.3rem 0.55rem; border-radius: 0.35rem;
+            font-weight: 700; font-size: 0.7rem; text-decoration: none; border: 1px solid #cbd5e1; background: #fff; color: #0f172a;
+        }
+        .fvd-consol-pager a:hover { background: #f1f5f9; }
+        .fvd-consol-pager span.is-muted { opacity: 0.55; cursor: default; border-style: dashed; }
         .fvd-consol-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; }
         .fvd-consol-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
         .fvd-consol-table th, .fvd-consol-table td { padding: 0.4rem 0.5rem; text-align: right; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
@@ -170,9 +251,26 @@ header('Content-Type: text/html; charset=UTF-8');
         .fvd-btn-reng:hover { background: #f1f5f9; }
         .fvd-acc-placeholder { margin: 0.25rem 0; font-size: 0.75rem; color: #64748b; }
         @media print {
-            .fvd-consol-actions { display: none; }
+            .fvd-consol-actions, .fvd-consol-filter { display: none; }
             .fvd-consol-wrap { background: #fff; }
             .fvd-acc-assoc-panel { display: table-row !important; }
+        }
+        /* Panel embebido ~13" / poca altura útil */
+        @media (max-height: 900px) {
+            .fvd-consol-wrap.embedded { padding: 0.35rem 0.25rem 0.65rem; }
+            .fvd-consol-wrap.embedded .fvd-consol-head h1 { font-size: 0.88rem; }
+            .fvd-consol-wrap.embedded .fvd-consol-table { font-size: 0.72rem; }
+            .fvd-consol-wrap.embedded .fvd-consol-table th, .fvd-consol-wrap.embedded .fvd-consol-table td { padding: 0.3rem 0.4rem; }
+            .fvd-consol-wrap.embedded .fvd-consol-pager { font-size: 0.68rem; margin-top: 0.45rem; padding: 0.35rem 0.45rem; }
+        }
+        /* Scroll dentro del iframe del panel (evita tabla “cortada” sin barra) */
+        html.is-embedded-view,
+        html.is-embedded-view body {
+            height: auto;
+            min-height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
     </style>
 </head>
@@ -189,11 +287,6 @@ header('Content-Type: text/html; charset=UTF-8');
     <div class="fvd-consol-head">
         <div>
             <h1>Reporte consolidado de deudas</h1>
-            <p class="fvd-consol-meta">
-                Agrupado por asociación. Montos desde <code>deuda_asociaciones</code> (suma de torneos):
-                afiliación, inscripciones a torneos, traspasos, carnets y anualidad.
-                Pagos: suma de <code>relacion_pagos.monto_dolares</code> por club. Unidad de totales: <?= htmlspecialchars($monedaEt, ENT_QUOTES, 'UTF-8') ?>.
-            </p>
         </div>
         <div class="fvd-consol-actions">
             <a href="<?= htmlspecialchars($csvUrl, ENT_QUOTES, 'UTF-8') ?>">Exportar Excel (CSV)</a>
@@ -203,6 +296,18 @@ header('Content-Type: text/html; charset=UTF-8');
             <?php endif; ?>
         </div>
     </div>
+
+    <p class="fvd-consol-filter" style="margin:0 0 0.75rem;font-weight:700;color:#334155">
+        Alcance: <span style="font-weight:800;color:#0f172a">solo clubes activos</span>
+        <?php if ($embedded): ?>
+            <span style="font-weight:600;color:#64748b">· embebido en panel maestro</span>
+        <?php endif; ?>
+        <?php if ($consolTotalRows > 0): ?>
+            <span style="margin-left:0.35rem;font-weight:600;color:#64748b">
+                · <?= (int) $consolTotalRows ?> club<?= $consolTotalRows === 1 ? '' : 'es' ?>
+            </span>
+        <?php endif; ?>
+    </p>
 
     <div class="fvd-consol-table-wrap">
         <table class="fvd-consol-table" id="fvd-consol-table">
@@ -244,11 +349,11 @@ header('Content-Type: text/html; charset=UTF-8');
                     </td>
                 </tr>
             <?php endforeach; ?>
-            <?php if ($rows === []): ?>
-                <tr><td colspan="9" style="text-align:center;padding:1.5rem;color:#64748b">Sin filas de deuda registradas. Sincronice estados de cuenta en Finanzas — Deudas.</td></tr>
+            <?php if ($allRows === []): ?>
+                <tr><td colspan="9" style="text-align:center;padding:1.5rem;color:#64748b">No hay asociaciones activas que mostrar. Revise estatus en el módulo de asociaciones.</td></tr>
             <?php endif; ?>
             </tbody>
-            <?php if ($rows !== []): ?>
+            <?php if ($allRows !== []): ?>
             <tfoot>
             <tr>
                 <td>TOTAL</td>
@@ -265,6 +370,32 @@ header('Content-Type: text/html; charset=UTF-8');
             <?php endif; ?>
         </table>
     </div>
+
+    <?php if ($consolTotalRows > 0): ?>
+    <nav class="fvd-consol-pager" aria-label="Paginación del reporte">
+        <span class="fvd-consol-pager__info">
+            Filas <?= (int) $consolRowFrom ?>–<?= (int) $consolRowTo ?> de <?= (int) $consolTotalRows ?>
+            · Página <?= (int) $page ?> / <?= (int) $totalPages ?>
+            · <?= (int) $perPage ?> por página
+        </span>
+        <div class="fvd-consol-pager__nav">
+            <?php if ($page > 1): ?>
+                <a href="<?= htmlspecialchars($fvdConsolPagerUrl($selfUrl, 1, $perPage), ENT_QUOTES, 'UTF-8') ?>">Primera</a>
+                <a href="<?= htmlspecialchars($fvdConsolPagerUrl($selfUrl, $page - 1, $perPage), ENT_QUOTES, 'UTF-8') ?>">Anterior</a>
+            <?php else: ?>
+                <span class="is-muted" aria-disabled="true">Primera</span>
+                <span class="is-muted" aria-disabled="true">Anterior</span>
+            <?php endif; ?>
+            <?php if ($page < $totalPages): ?>
+                <a href="<?= htmlspecialchars($fvdConsolPagerUrl($selfUrl, $page + 1, $perPage), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a>
+                <a href="<?= htmlspecialchars($fvdConsolPagerUrl($selfUrl, $totalPages, $perPage), ENT_QUOTES, 'UTF-8') ?>">Última</a>
+            <?php else: ?>
+                <span class="is-muted" aria-disabled="true">Siguiente</span>
+                <span class="is-muted" aria-disabled="true">Última</span>
+            <?php endif; ?>
+        </div>
+    </nav>
+    <?php endif; ?>
 </div>
 <script>
 (function () {
@@ -341,6 +472,9 @@ header('Content-Type: text/html; charset=UTF-8');
             '<div class="fvd-seg-card"><h4>Afiliados</h4><p>' + a.count + ' · ' + fmt(a.monto) + ' ' + cfg.moneda + '</p><a href="' + hrefAttr(detalleUrl(aid, tid, 'afiliados')) + '">Ver detalles</a></div>' +
             '<div class="fvd-seg-card"><h4>Inscritos</h4><p>' + i.count + ' · ' + fmt(i.monto) + ' ' + cfg.moneda + '</p><a href="' + hrefAttr(detalleUrl(aid, tid, 'inscritos')) + '">Ver detalles</a></div>' +
             '<div class="fvd-seg-card"><h4>Carnets</h4><p>' + c.count + ' · ' + fmt(c.monto) + ' ' + cfg.moneda + '</p><a href="' + hrefAttr(detalleUrl(aid, tid, 'carnets')) + '">Ver detalles</a></div>' +
+            '<div class="fvd-seg-card"><h4>Deuda y saldo</h4><p>Renglones contables y estatus frente a pagos.</p><a href="' + hrefAttr(detalleUrl(aid, tid, 'deuda')) + '">Ver reporte</a></div>' +
+            '<div class="fvd-seg-card"><h4>Pagos</h4><p>Cada recibo en <code>relacion_pagos</code>.</p><a href="' + hrefAttr(detalleUrl(aid, tid, 'pagos')) + '">Ver listado</a></div>' +
+            '<div class="fvd-seg-card"><h4>Proceso inscripción</h4><p>Marcas por persona (inscripción / afiliación / carnet…).</p><a href="' + hrefAttr(detalleUrl(aid, tid, 'inscripciones')) + '">Ver tabla</a></div>' +
             '</div>';
     }
 

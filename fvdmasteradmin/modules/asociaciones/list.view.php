@@ -2,10 +2,13 @@
 /** @var array{total:int,page:int,per_page:int,pages:int,rows:list} $result */
 /** @var string $selfUrl */
 /** @var string $q */
+require_once dirname(__DIR__, 3) . '/src/Services/FvdAdminService.php';
 $fvd_is_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 ?>
 
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1>Asociaciones</h1>
+<?php endif; ?>
 <?php if (!empty($fvd_error ?? '')): ?><p class="fvd-mod-msg"><?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 
 <div class="fvd-mod-toolbar">
@@ -38,7 +41,11 @@ $fvd_is_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
         </thead>
         <tbody>
         <?php foreach ($result['rows'] as $r): ?>
-            <tr>
+            <?php
+            $esActivaRow = FvdAdminService::asociacionEstatusEsActiva($r);
+            $rowInactiveStyle = !$esActivaRow ? ' style="background:#f1f5f9;color:#64748b"' : '';
+            ?>
+            <tr<?= $rowInactiveStyle ?>>
                 <td><?= (int) $r['id'] ?></td>
                 <td><?= htmlspecialchars((string) ($r['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars((string) ($r['delegado'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
@@ -47,9 +54,6 @@ $fvd_is_admin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
                 <td><?= htmlspecialchars((string) ($r['estatus'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                 <td style="white-space:nowrap">
                     <a href="<?= htmlspecialchars($selfUrl . '?action=form&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>">Editar</a>
-                    <?php if ($fvd_is_admin): ?>
-                        &nbsp;|&nbsp;<a href="<?= htmlspecialchars($selfUrl . '?action=delete&id=' . (int) $r['id'], ENT_QUOTES, 'UTF-8') ?>" onclick="return confirm('¿Eliminar esta asociación?');">Eliminar</a>
-                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>

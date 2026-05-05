@@ -92,7 +92,8 @@ final class ReportService
                 $rowOut[] = self::dash(isset($r['asociacion_nombre']) ? (string) $r['asociacion_nombre'] : null);
             }
             $rowOut[] = \FvdAdminService::atletasCategoriaEtiquetaPorCodigo((int) ($r['categ'] ?? 0));
-            $rowOut[] = \FvdAdminService::atletasEstatusEtiqueta((int) ($r['estatus'] ?? 0));
+            $nfE = isset($r['numfvd']) ? (int) $r['numfvd'] : null;
+            $rowOut[] = \FvdAdminService::atletasEstatusEtiqueta((int) ($r['estatus'] ?? 0), $nfE);
             fputcsv($fh, $rowOut, ';');
         }
 
@@ -168,7 +169,8 @@ final class ReportService
                 <td><?= htmlspecialchars(self::dash(isset($r['asociacion_nombre']) ? (string) $r['asociacion_nombre'] : null), ENT_QUOTES, 'UTF-8') ?></td>
                 <?php endif; ?>
                 <td><?= htmlspecialchars(\FvdAdminService::atletasCategoriaEtiquetaPorCodigo((int) ($r['categ'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars(\FvdAdminService::atletasEstatusEtiqueta((int) ($r['estatus'] ?? 0)), ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?php $nfPdf = isset($r['numfvd']) ? (int) $r['numfvd'] : null; ?>
+                    <?= htmlspecialchars(\FvdAdminService::atletasEstatusEtiqueta((int) ($r['estatus'] ?? 0), $nfPdf), ENT_QUOTES, 'UTF-8') ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

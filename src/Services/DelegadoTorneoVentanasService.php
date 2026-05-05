@@ -43,6 +43,52 @@ final class DelegadoTorneoVentanasService
         return \AuthService::isDelegadoAsociacion();
     }
 
+    /**
+     * Omite ventanas por calendario, límite de nómina y asertos de fase para el delegado.
+     *
+     * - Por defecto (sin `FVD_DELEGADO_CALENDARIO_STRICT`): **no hay límites de tiempo** (afiliaciones, carnets,
+     *   traspasos e inscripciones al torneo, p. ej. individual).
+     * - Producción con calendario: `FVD_DELEGADO_CALENDARIO_STRICT=true`
+     * - Compatibilidad: `FVD_DELEGADO_MODO_PRUEBAS=true` fuerza omitir aunque STRICT esté activo.
+     */
+    public static function delegadoOmiteRestriccionVentanas(): bool
+    {
+        if (!self::aplicaRestriccionDelegado()) {
+            return false;
+        }
+        if (!function_exists('env')) {
+            return true;
+        }
+        $modo = strtolower(trim((string) env('FVD_DELEGADO_MODO_PRUEBAS', '')));
+        if (in_array($modo, ['1', 'true', 'yes', 'on'], true)) {
+            return true;
+        }
+        $strict = strtolower(trim((string) env('FVD_DELEGADO_CALENDARIO_STRICT', 'false')));
+        if (in_array($strict, ['1', 'true', 'yes', 'on'], true)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, mixed> $st
+     * @return array<string, mixed>
+     */
+    private static function aplicarOverrideModoPruebas(array $st): array
+    {
+        if (!self::delegadoOmiteRestriccionVentanas()) {
+            return $st;
+        }
+        $st['fase1_afiliados_carnets_traspasos'] = true;
+        $st['fase2_inscripciones'] = true;
+        $st['solo_consulta_y_pagos'] = false;
+        $st['etiqueta_fase'] = 'Restricciones por calendario delegado desactivadas (predeterminado; en producción use FVD_DELEGADO_CALENDARIO_STRICT=true).';
+        $st['gestion_admin_desde_invitacion'] = false;
+
+        return $st;
+    }
+
     private static function timezoneApp(): DateTimeZone
     {
         $tzName = function_exists('env') ? (string) env('APP_TIMEZONE', 'America/Caracas') : 'America/Caracas';
@@ -129,13 +175,13 @@ final class DelegadoTorneoVentanasService
         ];
 
         if ($fechator === null || $fechator === '') {
-            return $base;
+            return self::aplicarOverrideModoPruebas($base);
         }
 
         try {
             $tTor = new DateTimeImmutable($fechator . ' 00:00:00', $tz);
         } catch (\Exception $e) {
-            return $base;
+            return self::aplicarOverrideModoPruebas($base);
         }
 
         $d15 = $tTor->modify('-' . self::DIA_FASE1_INICIO . ' days')->setTime(0, 0, 0);
@@ -182,7 +228,7 @@ final class DelegadoTorneoVentanasService
             $etiqueta = 'Fase 2: inscripciones, retiros y cambios (hasta ' . self::DIA_FASE2_FIN . ' días antes del torneo).';
         }
 
-        return [
+        return self::aplicarOverrideModoPruebas([
             'torneo_id' => $torneoId,
             'fechator' => $fechator,
             'hoy' => $today->format('Y-m-d'),
@@ -191,7 +237,7 @@ final class DelegadoTorneoVentanasService
             'solo_consulta_y_pagos' => $soloConsulta,
             'etiqueta_fase' => $etiqueta,
             'gestion_admin_desde_invitacion' => $gestionInv && $inFase1 && !$inFase1Cal,
-        ];
+        ]);
     }
 
     private static function fechatorTorneo(PDO $pdo, int $torneoId): ?string
@@ -232,6 +278,9 @@ final class DelegadoTorneoVentanasService
         if ($torneoId <= 0) {
             return false;
         }
+        if (self::delegadoOmiteRestriccionVentanas()) {
+            return false;
+        }
         self::ensureFechaLimiteCambiosColumn($pdo);
         try {
             $st = $pdo->prepare('SELECT fecha_limite_cambios FROM torneosact WHERE torneo = :t LIMIT 1');
@@ -265,6 +314,9 @@ final class DelegadoTorneoVentanasService
         if (!self::aplicaRestriccionDelegado()) {
             return;
         }
+        if (self::delegadoOmiteRestriccionVentanas()) {
+            return;
+        }
         $st = self::estadoParaTorneo($pdo, $torneoId, self::delegadoAsociacionParaVentana());
         if (!$st['fase1_afiliados_carnets_traspasos']) {
             throw new RuntimeException(
@@ -278,6 +330,9 @@ final class DelegadoTorneoVentanasService
     public static function assertPuedeInscripcionesRetiros(PDO $pdo, int $torneoId): void
     {
         if (!self::aplicaRestriccionDelegado()) {
+            return;
+        }
+        if (self::delegadoOmiteRestriccionVentanas()) {
             return;
         }
         if (self::fechaLimiteCambiosNominaSuperada($pdo, $torneoId)) {
@@ -309,6 +364,9 @@ final class DelegadoTorneoVentanasService
     public static function assertDelegadoPuedeEditarOBorrarAtleta(PDO $pdo, int $torneoId): void
     {
         if (!self::aplicaRestriccionDelegado()) {
+            return;
+        }
+        if (self::delegadoOmiteRestriccionVentanas()) {
             return;
         }
         $st = self::estadoParaTorneo($pdo, $torneoId, self::delegadoAsociacionParaVentana());

@@ -101,6 +101,16 @@ SQL;
             throw new InvalidArgumentException('El atleta no pertenece a su asociación.');
         }
 
+        $stDup = $pdo->prepare(
+            "SELECT id FROM fvd_solicitudes_delegado
+             WHERE estado = 'pendiente' AND atleta_id = :aid AND asociacion_id = :asoc AND tipo = :tipo
+             LIMIT 1"
+        );
+        $stDup->execute([':aid' => $atletaId, ':asoc' => $asoc, ':tipo' => $tipo]);
+        if ($stDup->fetchColumn() !== false) {
+            throw new InvalidArgumentException('Ya existe una solicitud pendiente de este tipo para este atleta.');
+        }
+
         $delegadoId = \AuthService::isDelegadoAsociacion() ? \AuthService::userId() : null;
 
         $ins = $pdo->prepare(
@@ -132,6 +142,28 @@ SQL;
             if (self::atletaHasColumn($pdo, 'carnet_status')) {
                 $pdo->prepare("UPDATE atletas SET carnet_status = 'SOLICITADO' WHERE id = :id")->execute([':id' => $atletaId]);
             }
+            $asocOrigenNombre = '';
+            try {
+                $stAs = $pdo->prepare('SELECT nombre FROM asociaciones WHERE id = :id LIMIT 1');
+                $stAs->execute([':id' => $asoc]);
+                $asocOrigenNombre = trim((string) ($stAs->fetchColumn() ?: ''));
+            } catch (\Throwable $e) {
+                // ignore
+            }
+            if ($asocOrigenNombre === '') {
+                $asocOrigenNombre = 'Asociación';
+            }
+            $adminId = NotificacionService::resolverAdminGeneralId($pdo);
+            $nombreAtleta = trim((string) ($a['nombre'] ?? ''));
+            if ($nombreAtleta === '') {
+                $nombreAtleta = 'Atleta #' . $atletaId;
+            }
+            NotificacionService::crear(
+                $pdo,
+                $adminId,
+                'SOLICITUD_CARNET',
+                'Solicitud de carnet: ' . $nombreAtleta . ' (' . $asocOrigenNombre . ')'
+            );
         }
 
         if ($tipo === 'traspaso') {
@@ -204,6 +236,88 @@ SQL;
     }
 
     /**
+     * Listado para el panel FVD: pendientes primero, luego historial (aprobada / rechazada).
+     *
+     * @param 'traspaso'|'carnet_afiliacion'|null $soloTipo
+     * @return list<array<string, mixed>>
+     */
+    public static function listarParaPanelAdministracion(PDO $pdo, ?string $soloTipo = null, int $limit = 200): array
+    {
+        self::ensureTable($pdo);
+        $limit = max(1, min(500, $limit));
+        $extra = '';
+        if ($soloTipo === 'traspaso') {
+            $extra = " AND s.tipo = 'traspaso' ";
+        } elseif ($soloTipo === 'carnet_afiliacion') {
+            $extra = " AND s.tipo IN ('carnet','afiliacion') ";
+        }
+        $sql = 'SELECT s.*, at.nombre AS atleta_nombre, at.cedula AS atleta_cedula,
+            ao.nombre AS asoc_origen_nombre, ad.nombre AS asoc_destino_nombre
+            FROM fvd_solicitudes_delegado s
+            INNER JOIN atletas at ON at.id = s.atleta_id
+            LEFT JOIN asociaciones ao ON ao.id = s.asociacion_id
+            LEFT JOIN asociaciones ad ON ad.id = s.asociacion_destino_id
+            WHERE 1=1 ' . $extra . '
+            ORDER BY (s.estado = \'pendiente\') DESC, s.id DESC
+            LIMIT ' . $limit;
+        try {
+            $st = $pdo->query($sql);
+
+            return $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        } catch (PDOException $e) {
+            error_log('[DelegadoSolicitudService::listarParaPanelAdministracion] ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * Histórico y pendientes donde la asociación es origen o contraparte en traspaso (mismo criterio que
+     * {@see listarPendientesParaAsociacion}, sin filtrar por estado).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function listarMovimientosParaAsociacion(PDO $pdo, int $asociacionId, int $limit = 500): array
+    {
+        if ($asociacionId <= 0) {
+            return [];
+        }
+        self::ensureTable($pdo);
+        $limit = max(1, min(500, $limit));
+        $sexSqlSol = '';
+        if (\AuthService::isDelegadoAsociacion()) {
+            $ctxSol = \AuthService::delegadoTorneoContextId();
+            if ($ctxSol !== null && (int) $ctxSol > 0) {
+                require_once __DIR__ . '/FvdAdminService.php';
+                $fvdSol = new \FvdAdminService($pdo);
+                $sexSqlSol = $fvdSol->sqlAtletasFiltroSexoSegunTorneoTipo((int) $ctxSol, 'at');
+            }
+        }
+        $sql = 'SELECT s.*, at.nombre AS atleta_nombre, at.cedula AS atleta_cedula,
+            ao.nombre AS asoc_origen_nombre, ad.nombre AS asoc_destino_nombre
+            FROM fvd_solicitudes_delegado s
+            INNER JOIN atletas at ON at.id = s.atleta_id
+            LEFT JOIN asociaciones ao ON ao.id = s.asociacion_id
+            LEFT JOIN asociaciones ad ON ad.id = s.asociacion_destino_id
+            WHERE (
+                s.asociacion_id = :a
+                OR (s.tipo = \'traspaso\' AND s.asociacion_destino_id = :a2)
+            )' . $sexSqlSol . '
+            ORDER BY s.id DESC
+            LIMIT ' . $limit;
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([':a' => $asociacionId, ':a2' => $asociacionId]);
+
+            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('[DelegadoSolicitudService::listarMovimientosParaAsociacion] ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
      * Solicitudes pendientes donde la asociación del delegado es origen o destino (traspasos).
      *
      * @return list<array<string, mixed>>
@@ -214,6 +328,15 @@ SQL;
             return [];
         }
         self::ensureTable($pdo);
+        $sexSqlSol = '';
+        if (\AuthService::isDelegadoAsociacion()) {
+            $ctxSol = \AuthService::delegadoTorneoContextId();
+            if ($ctxSol !== null && (int) $ctxSol > 0) {
+                require_once __DIR__ . '/FvdAdminService.php';
+                $fvdSol = new \FvdAdminService($pdo);
+                $sexSqlSol = $fvdSol->sqlAtletasFiltroSexoSegunTorneoTipo((int) $ctxSol, 'at');
+            }
+        }
         $sql = 'SELECT s.*, at.nombre AS atleta_nombre, at.cedula AS atleta_cedula,
             ao.nombre AS asoc_origen_nombre, ad.nombre AS asoc_destino_nombre
             FROM fvd_solicitudes_delegado s
@@ -224,7 +347,7 @@ SQL;
             AND (
                 s.asociacion_id = :a
                 OR (s.tipo = \'traspaso\' AND s.asociacion_destino_id = :a2)
-            )
+            )' . $sexSqlSol . '
             ORDER BY s.id ASC';
         try {
             $st = $pdo->prepare($sql);

@@ -32,12 +32,20 @@ final class FvdAccessManager
         $prep = (bool) ($ventana['fase1_afiliados_carnets_traspasos'] ?? false);
         $ejec = (bool) ($ventana['fase2_inscripciones'] ?? false);
 
+        if (DelegadoTorneoVentanasService::delegadoOmiteRestriccionVentanas()) {
+            $limSup = false;
+            $prep = true;
+            $ejec = true;
+        }
+
         if ($limSup) {
             $ejec = false;
         }
 
         $etiqueta = (string) ($ventana['etiqueta_fase'] ?? '');
-        if ($limSup) {
+        if (DelegadoTorneoVentanasService::delegadoOmiteRestriccionVentanas()) {
+            $etiqueta = 'Calendario delegado no restrictivo (predeterminado; FVD_DELEGADO_CALENDARIO_STRICT=true para activar ventanas).';
+        } elseif ($limSup) {
             $etiqueta = 'Límite de cambios de nómina alcanzado: inscripciones y cambios de plantilla en solo consulta. '
                 . 'Afiliaciones y traspasos siguen las ventanas habituales si aplican.';
         }

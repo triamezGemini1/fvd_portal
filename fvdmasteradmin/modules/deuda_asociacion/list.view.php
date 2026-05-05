@@ -27,7 +27,9 @@ $fmtInt = static function ($value): string {
 };
 ?>
 
+<?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
 <h1>Finanzas — Estados de cuenta por torneo y asociación</h1>
+<?php endif; ?>
 <p>Relación de <code>deuda_asociaciones</code>: una fila por torneo + asociación, con totales de conceptos (sincronización desde <code>inscripcion_torneo</code> si existe la tabla; si no, desde <code>atletas</code>) y pagos acumulados.</p>
 <p style="font-size:0.8125rem;margin:8px 0 12px;line-height:1.45">
     <a href="<?= htmlspecialchars(fvd_return_append_to_url($selfUrl . '?action=estadisticas_inscripcion'), ENT_QUOTES, 'UTF-8') ?>">Estadísticas por torneo</a>
@@ -171,15 +173,17 @@ $fmtInt = static function ($value): string {
 <?php
 $p = (int) $result['page'];
 $pages = (int) $result['pages'];
-$deudaRetArg = '';
-if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
-    $deudaRetArg = '&ret=' . rawurlencode($_GET['ret']);
-} elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
-    $deudaRetArg = '&return=' . rawurlencode($_GET['return']);
-}
+$deudaPagerUrl = static function (int $pageNum) use ($selfUrl): string {
+    if (!function_exists('fvd_return_merge_get_params')) {
+        require_once dirname(__DIR__, 3) . '/config/fvd_navigation_return.php';
+    }
+    $q = fvd_return_merge_get_params(['page' => max(1, $pageNum)]);
+
+    return $selfUrl . '?' . http_build_query($q);
+};
 ?>
 <nav class="fvd-mod-pager">
     <span><?= (int) $result['total'] ?> reg. · pág. <?= $p ?>/<?= $pages ?></span>
-    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p - 1) . $deudaRetArg, ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
-    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($selfUrl . '?page=' . ($p + 1) . $deudaRetArg, ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
+    <?php if ($p > 1): ?><a href="<?= htmlspecialchars($deudaPagerUrl($p - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a><?php endif; ?>
+    <?php if ($p < $pages): ?><a href="<?= htmlspecialchars($deudaPagerUrl($p + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a><?php endif; ?>
 </nav>

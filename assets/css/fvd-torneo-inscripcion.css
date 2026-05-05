@@ -1,0 +1,727 @@
+/**
+ * Inscripción al torneo (admin/modules/torneo_inscripcion) — identidad FVD y detalle por modalidad.
+ * Ámbito: .fvd-torneo-insc (envoltorio en inscribir.view.php)
+ */
+
+.fvd-torneo-insc {
+  --fvd-ti-azul: var(--fvd-azul, #2e3092);
+  --fvd-ti-azul-soft: var(--fvd-shade-azul-lg, rgba(46, 48, 146, 0.18));
+  --fvd-ti-amarillo: var(--fvd-amarillo, #fff200);
+  --fvd-ti-card: #ffffff;
+  --fvd-ti-card-edge: rgba(46, 48, 146, 0.18);
+  --fvd-ti-text: #0a0a0a;
+  --fvd-ti-muted: #0a0a0a;
+  max-width: 72rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: var(--fvd-main-font, Inter, system-ui, sans-serif);
+  font-weight: 700;
+  color: var(--fvd-ti-text);
+  padding: 0.85rem 0.75rem 1.75rem;
+  border-radius: 14px;
+  background: linear-gradient(
+    165deg,
+    var(--fvd-mt-primary-50, #e8e9f4) 0%,
+    #ffffff 42%,
+    rgba(255, 242, 0, 0.14) 100%
+  );
+  box-shadow: inset 0 0 0 1px rgba(46, 48, 146, 0.08);
+}
+
+.fvd-shell .fvd-torneo-insc {
+  margin-top: 0.25rem;
+}
+
+/* Encabezado: tarjeta clara + tipografía negra negrita (máxima legibilidad) */
+.fvd-torneo-insc__hero {
+  position: relative;
+  margin: 0 0 1rem;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  border: 2px solid rgba(46, 48, 146, 0.32);
+  box-shadow: 0 2px 12px rgba(46, 48, 146, 0.1);
+}
+
+.fvd-torneo-insc__hero::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--fvd-ti-amarillo), #fde047, var(--fvd-ti-amarillo));
+}
+
+.fvd-torneo-insc__hero-inner {
+  padding: 1rem 1.15rem 1.1rem;
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc__kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #2e3092;
+}
+
+.fvd-torneo-insc__title {
+  margin: 0 0 0.55rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc__hero--individual .fvd-torneo-insc__title--libre {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: normal;
+  text-transform: none;
+  word-break: break-word;
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc__subhint--plain {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0a0a0a;
+  margin: 0 0 0.65rem;
+  line-height: 1.45;
+  max-width: 48rem;
+}
+
+.fvd-torneo-insc__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 0.45rem;
+}
+
+.fvd-torneo-insc__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: #e2e8f0;
+  border: 1px solid rgba(46, 48, 146, 0.35);
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc__chip--mod {
+  background: var(--fvd-ti-amarillo);
+  color: #0a0a0a;
+  border-color: rgba(46, 48, 146, 0.45);
+  font-weight: 800;
+}
+
+.fvd-torneo-insc__chip--muted {
+  background: #f1f5f9;
+  font-weight: 700;
+  font-size: 0.68rem;
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc__ventana {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #0a0a0a;
+  border-left: 4px solid var(--fvd-ti-amarillo);
+  padding-left: 0.5rem;
+}
+
+.fvd-torneo-insc__subhint {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+
+/* Cupo */
+.fvd-torneo-insc__cupo {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(255, 242, 0, 0.28);
+  border: 1px solid rgba(46, 48, 146, 0.22);
+}
+
+.fvd-torneo-insc__cupo-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc__cupo-label {
+  font-weight: 800;
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc__cupo-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc__cupo-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(46, 48, 146, 0.15);
+  overflow: hidden;
+}
+
+.fvd-torneo-insc__cupo-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--fvd-ti-amarillo), #fde047);
+  transition: width 0.25s ease;
+}
+
+.fvd-torneo-insc__cupo-free {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+
+/* Panel inscripción en sitio — sustituye verde genérico por cromática FVD */
+.fvd-torneo-insc .fvd-insc-sitio {
+  border: 1px solid var(--fvd-ti-card-edge);
+  background: linear-gradient(180deg, var(--fvd-ti-azul-soft), rgba(255, 255, 255, 0.96));
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__body {
+  padding-top: 0.95rem;
+}
+
+/* Modalidad (parejas / equipos / individual): ribete */
+.fvd-torneo-insc--modalidad-parejas .fvd-torneo-insc__hero {
+  box-shadow: 0 4px 16px rgba(46, 48, 146, 0.22), inset 0 -1px 0 rgba(255, 242, 0, 0.15);
+}
+
+.fvd-torneo-insc--modalidad-equipos .fvd-torneo-insc__hero {
+  box-shadow: 0 4px 16px rgba(46, 48, 146, 0.25), inset 0 -1px 0 rgba(255, 242, 0, 0.2);
+}
+
+/* Tarjetas Disponibles / Inscritos */
+.fvd-torneo-insc .fvd-insc-sitio__card {
+  border-color: var(--fvd-ti-card-edge);
+  background: var(--fvd-ti-card);
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__card-h {
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__card-h--disp {
+  background: linear-gradient(90deg, #fff7cc, #fff200);
+  border-bottom: 2px solid #2e3092;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__card-h--insc {
+  background: linear-gradient(90deg, #e8e9f4, #dce0f7);
+  border-bottom: 2px solid #2e3092;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__table th {
+  background: rgba(46, 48, 146, 0.1);
+  color: #0a0a0a;
+  font-weight: 800;
+  font-size: 0.72rem;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__table td {
+  color: #0a0a0a;
+  font-weight: 700;
+  border-bottom-color: rgba(46, 48, 146, 0.1);
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__table tbody tr:hover {
+  background: rgba(46, 48, 146, 0.06);
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__hint,
+.fvd-torneo-insc .fvd-insc-sitio__campo label {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__btn--ok {
+  background: var(--fvd-ti-azul);
+  color: var(--fvd-ti-amarillo);
+  font-weight: 800;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__btn--ok:hover {
+  filter: brightness(1.08);
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__btn--sec {
+  background: #f1f5f9;
+  color: #0a0a0a;
+  font-weight: 800;
+  border: 1px solid rgba(46, 48, 146, 0.25);
+}
+
+/* Bloque búsqueda / nómina (fvd-inscripciones-13) */
+.fvd-torneo-insc .fvd-insc-wrap {
+  max-width: 100%;
+  padding: 0.85rem 1rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--fvd-ti-card-edge);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.fvd-torneo-insc .fvd-insc-hint {
+  color: #0a0a0a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.fvd-torneo-insc .fvd-insc-hint strong {
+  color: #0a0a0a;
+  font-weight: 900;
+}
+
+.fvd-torneo-insc .fvd-insc-cupo {
+  background: var(--fvd-ti-azul-soft);
+  border-color: rgba(46, 48, 146, 0.22);
+}
+
+.fvd-torneo-insc .fvd-insc-cupo__badge {
+  background: rgba(46, 48, 146, 0.12);
+  color: var(--fvd-ti-azul);
+  border: 1px solid rgba(255, 242, 0, 0.45);
+}
+
+.fvd-torneo-insc .fvd-insc-results {
+  background: #fff;
+  border-color: var(--fvd-ti-card-edge);
+}
+
+.fvd-torneo-insc .fvd-insc-results__row {
+  border-bottom-color: rgba(46, 48, 146, 0.08);
+}
+
+.fvd-torneo-insc .fvd-insc-results__meta {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-card {
+  background: #f8fafc;
+  border-color: var(--fvd-ti-card-edge);
+}
+
+.fvd-torneo-insc .fvd-insc-card__name {
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.fvd-torneo-insc .fvd-insc-pager {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-btn--inscribir {
+  background: var(--fvd-ti-azul);
+  color: var(--fvd-ti-amarillo);
+  border-color: rgba(46, 48, 146, 0.55);
+  font-weight: 800;
+}
+
+.fvd-torneo-insc .fvd-insc-btn--inscribir:hover {
+  filter: brightness(1.06);
+}
+
+.fvd-torneo-insc .fvd-insc-btn--pendiente {
+  background: rgba(255, 242, 0, 0.35);
+  color: #0a0a0a;
+  font-weight: 800;
+  border-color: rgba(46, 48, 146, 0.28);
+}
+
+.fvd-torneo-insc .fvd-insc-btn--comprobante {
+  background: #fff;
+  color: #0a0a0a;
+  font-weight: 800;
+  border: 1px solid rgba(46, 48, 146, 0.35);
+}
+
+.fvd-torneo-insc .fvd-insc-btn--comprobante:hover {
+  border-color: var(--fvd-ti-amarillo);
+  box-shadow: 0 0 0 1px rgba(255, 242, 0, 0.4);
+}
+
+/* Selector de categoría (delegado) */
+.fvd-torneo-insc__cat-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(46, 48, 146, 0.28);
+  background: #f1f5f9;
+  color: #0a0a0a;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  font-weight: 800;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.fvd-torneo-insc__cat-btn:hover {
+  border-color: rgba(46, 48, 146, 0.45);
+  box-shadow: 0 1px 4px rgba(46, 48, 146, 0.12);
+}
+
+.fvd-torneo-insc__cat-btn--on {
+  border-color: var(--fvd-ti-azul) !important;
+  background: rgba(255, 242, 0, 0.35) !important;
+  color: #0a0a0a !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 0 1px rgba(255, 242, 0, 0.55);
+}
+
+/* Balance invitación: acorde con tabla módulo */
+.fvd-torneo-insc-balance.fvd-card {
+  border: 2px solid rgba(46, 48, 146, 0.25);
+  border-top: 4px solid var(--fvd-ti-amarillo);
+  background: #ffffff;
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc-balance.fvd-card h2 {
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.fvd-torneo-insc-balance.fvd-card p,
+.fvd-torneo-insc-balance.fvd-card > div > span {
+  color: #0a0a0a !important;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc-balance.fvd-card code {
+  background: #f1f5f9;
+  color: #0a0a0a;
+  font-weight: 700;
+  padding: 0.05rem 0.2rem;
+  border-radius: 3px;
+}
+
+.fvd-torneo-insc-balance.fvd-card .fvd-mod-table th {
+  background: rgba(46, 48, 146, 0.12);
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.fvd-torneo-insc-balance.fvd-card .fvd-mod-table td {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+/* Selector categoría (encima del bloque principal) */
+.fvd-torneo-insc__camp-lbl {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--fvd-ti-azul);
+  display: block;
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+.fvd-insc-camp-switch__bg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Formulario parejas / equipos (tarjeta + filas fijas, panel FVD) */
+.fvd-torneo-insc .fvd-insc-teamform.fvd-insc-eq-card {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--fvd-ti-card-edge);
+  background: linear-gradient(180deg, rgba(46, 48, 146, 0.04), #fff);
+}
+
+.fvd-torneo-insc .fvd-insc-eq-dos-filas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-fila-1,
+.fvd-torneo-insc .fvd-insc-eq-fila-2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-campo-club,
+.fvd-torneo-insc .fvd-insc-eq-campo-nombre {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-lbl {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0a0a0a;
+  margin-bottom: 0.2rem;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-readonly {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(46, 48, 146, 0.2);
+  background: #e9ecef;
+  color: #0a0a0a;
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-campo-nombre .fvd-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-codigo-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-codigo-wrap.is-hidden {
+  visibility: hidden;
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-codigo-lbl {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #006064;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-codigo-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: #6c757d;
+  color: #fff;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-btn-guardar,
+.fvd-torneo-insc .fvd-insc-eq-btn-nueva {
+  flex-shrink: 0;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-hr {
+  margin: 0.5rem 0;
+  border: 0;
+  border-top: 1px solid rgba(46, 48, 146, 0.15);
+}
+
+.fvd-torneo-insc .fvd-insc-jugadores-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-fila-jugador {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.2rem 0;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-col-pos {
+  width: 1.5rem;
+  flex: 0 0 1.5rem;
+  text-align: center;
+  font-weight: 800;
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-capitan {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.2rem;
+  border-radius: 4px;
+  background: #ffc107;
+  color: #212529;
+  line-height: 1;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-col-inputs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-inp-id,
+.fvd-torneo-insc .fvd-insc-eq-inp-ced,
+.fvd-torneo-insc .fvd-insc-eq-inp-nom {
+  box-sizing: border-box;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+
+/* Una fila: Nº FVD | cédula | nombre */
+.fvd-torneo-insc .fvd-insc-eq-inp-id {
+  flex: 0 0 4.5rem;
+  width: 4.5rem;
+  max-width: 5.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-inp-ced {
+  flex: 0 1 7.5rem;
+  width: 7.5rem;
+  max-width: 10rem;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-inp-nom {
+  flex: 1 1 6rem;
+  width: auto;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-inp-id,
+.fvd-torneo-insc .fvd-insc-eq-inp-ced,
+.fvd-torneo-insc .fvd-insc-eq-inp-nom[readonly] {
+  background: #e9ecef;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-inp-ced[readonly] {
+  background: #f1f1f1;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-btn-quitar {
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-eq-btn-quitar:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.fvd-torneo-insc .fvd-insc-eq-sep {
+  height: 0;
+  margin: 0.15rem 0 0.25rem;
+  border: 0;
+  border-top: 1px dashed rgba(46, 48, 146, 0.18);
+}
+
+/* Tipografía densa: negro + negrita en el resto del flujo inscripción */
+.fvd-torneo-insc .fvd-insc-nomina-title {
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.fvd-torneo-insc .fvd-insc-card {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-card__ph {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__torneo-nav-chip__text {
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__no-ind {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__msg {
+  font-weight: 700;
+  color: #0a0a0a;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__finish .fvd-insc-sitio__hint {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__campo .fvd-input,
+.fvd-torneo-insc .fvd-insc-sitio__campo select.fvd-input {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-wrap .fvd-input,
+.fvd-torneo-insc .fvd-insc-wrap input[type='search'] {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-wrap label {
+  color: #0a0a0a !important;
+  font-weight: 800 !important;
+}
+
+.fvd-torneo-insc .fvd-insc-cupo__badge {
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.fvd-torneo-insc .fvd-insc-cupo {
+  color: #0a0a0a;
+  font-weight: 700;
+}
+
+.fvd-torneo-insc .fvd-insc-sitio__badge {
+  color: #0a0a0a;
+  font-weight: 800;
+  background: rgba(46, 48, 146, 0.12);
+}

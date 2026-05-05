@@ -1,9 +1,226 @@
-/* Flujo tipo MisTorneos «inscripción en sitio» (torneo_inscripcion) */
+/* Selector de torneos de la invitación (hasta 3 columnas) */
+.fvd-insc-sitio__torneo-nav {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(46, 48, 146, 0.28);
+  background: linear-gradient(180deg, rgba(255, 242, 0, 0.12), #ffffff);
+  box-shadow: 0 1px 3px rgba(46, 48, 146, 0.08);
+}
+/* Búsqueda / nómina / equipo: franja de ancho completo encima de Disponibles | Inscritos */
+.fvd-insc-sitio__nomina-strip-outer {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.85rem;
+  padding: 0;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-wrap,
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-wrap--sitio {
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-toolbar {
+  max-width: none;
+}
+
+/* Barra 13": búsqueda + Buscar + acciones en una sola fila */
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-sitio-compact-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+  margin-bottom: 0.45rem;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-toolbar--sitio-row {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+  margin-bottom: 0;
+  flex-wrap: nowrap;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-search--sitio-inline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  gap: 0.35rem 0.45rem;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-search--sitio-inline .fvd-mtf-form-label {
+  flex: 0 0 auto;
+  margin: 0;
+  white-space: nowrap;
+  line-height: 1.15;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-q-input {
+  flex: 1 1 5rem;
+  min-width: 4.5rem;
+  width: auto !important;
+  max-width: none;
+  box-sizing: border-box;
+  padding: 4px 6px !important;
+  font-size: 0.75rem !important;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-toolbar--sitio-row .fvd-insc-btn--comprobante {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-actions--sitio-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-actions--sitio-bar .fvd-insc-btn {
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* Título nómina + vacío en una línea (vista 13") */
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-resumen-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin: 0.2rem 0 0.35rem;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-resumen-heading .fvd-insc-nomina-title {
+  margin: 0;
+  font-size: 0.78rem;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-resumen-heading .fvd-insc-hint {
+  margin: 0;
+  font-size: 0.7rem;
+}
+
+/* Equipo / parejas: dos bloques del formulario en una fila cuando cabe */
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-eq-dos-filas--sitio-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.45rem 0.75rem;
+}
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-eq-dos-filas--sitio-row .fvd-insc-eq-fila-1,
+.fvd-insc-sitio__nomina-strip-outer .fvd-insc-eq-dos-filas--sitio-row .fvd-insc-eq-fila-2 {
+  flex: 1 1 12rem;
+  min-width: min(100%, 11rem);
+}
+
+@media (max-width: 1100px) {
+  .fvd-insc-sitio__nomina-strip-outer .fvd-insc-sitio-compact-bar {
+    flex-wrap: wrap;
+  }
+  .fvd-insc-sitio__nomina-strip-outer .fvd-insc-toolbar--sitio-row {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .fvd-insc-sitio__nomina-strip-outer .fvd-insc-actions--sitio-bar {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* Franja antes de Disponibles / Inscritos: todo el ancho útil del contenedor, chips centrados */
+.fvd-insc-sitio__torneo-nav-outer {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.85rem;
+  padding: 0;
+}
+.fvd-insc-sitio__torneo-nav--strip {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: min(100%, 72rem);
+}
+.fvd-insc-sitio__torneo-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.fvd-insc-sitio__torneo-nav-grid.fvd-insc-sitio__torneo-nav-grid--center {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
+}
+@media (max-width: 720px) {
+  .fvd-insc-sitio__torneo-nav-grid:not(.fvd-insc-sitio__torneo-nav-grid--center) {
+    grid-template-columns: 1fr;
+  }
+}
+.fvd-insc-sitio__torneo-nav-chip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.5rem;
+}
+.fvd-insc-sitio__dlg {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.fvd-insc-sitio__dlg-c {
+  max-width: 22rem;
+  width: 100%;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid rgba(46, 48, 146, 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 0.75rem 1rem;
+}
+.fvd-insc-sitio__dlg-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.fvd-insc-sitio__btn--sm {
+  font-size: 0.72rem !important;
+  padding: 2px 8px !important;
+}
+.fvd-insc-sitio__torneo-nav-chip__text {
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.25;
+  word-break: break-word;
+  color: #0a0a0a;
+}
+
+.fvd-insc-sitio__modalidad-block {
+  margin: 0 0 1rem;
+}
+
+/* Inscripción en sitio — torneo_inscripcion (portal FVD) */
 .fvd-insc-sitio {
   margin: 0 0 1.25rem;
   border-radius: 12px;
-  border: 1px solid rgba(34, 197, 94, 0.45);
-  background: linear-gradient(180deg, rgba(22, 101, 52, 0.12), rgba(15, 23, 42, 0.06));
+  border: 1px solid rgba(46, 48, 146, 0.28);
+  background: linear-gradient(180deg, rgba(46, 48, 146, 0.08), rgba(255, 255, 255, 0.92));
   overflow: hidden;
   max-width: 72rem;
   margin-left: auto;
@@ -16,7 +233,7 @@ body.is-embedded .fvd-insc-sitio {
   margin-left: 0;
   margin-right: 0;
 }
-body.is-embedded .fvd-insc-sitio__grid {
+body.is-embedded .fvd-insc-sitio__main {
   min-width: 0;
 }
 body.is-embedded .fvd-insc-sitio__table-wrap {
@@ -41,10 +258,11 @@ body.is-embedded .fvd-insc-sitio__table th {
   align-items: center;
   gap: 0.5rem 0.75rem;
   padding: 0.65rem 1rem;
-  background: rgba(22, 163, 74, 0.92);
+  background: linear-gradient(90deg, #2e3092, #3a3eb5);
   color: #fff;
   font-weight: 700;
   font-size: 0.95rem;
+  border-bottom: 3px solid #fff200;
 }
 
 .fvd-insc-sitio__head small {
@@ -127,8 +345,8 @@ body.is-embedded .fvd-insc-sitio__table th {
 }
 
 .fvd-insc-sitio__btn--ok {
-  background: #16a34a;
-  color: #fff;
+  background: #2e3092;
+  color: #fff200;
 }
 
 .fvd-insc-sitio__btn--ok:hover {
@@ -178,16 +396,47 @@ body.is-embedded .fvd-insc-sitio__table th {
   margin: 0 0 0.5rem;
 }
 
-.fvd-insc-sitio__grid {
+/* Nómina + Disponibles (izq.) | Inscritos (dcha., misma altura de fila) */
+.fvd-insc-sitio__main {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem;
   margin-top: 0.65rem;
+  align-items: stretch;
+}
+
+.fvd-insc-sitio__main-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.fvd-insc-sitio__main-right {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fvd-insc-sitio__main-right > .fvd-insc-sitio__card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fvd-insc-sitio__main-right .fvd-insc-sitio__table-wrap--insc {
+  flex: 1;
+  min-height: 12rem;
+  max-height: min(72vh, 640px);
 }
 
 @media (max-width: 768px) {
-  .fvd-insc-sitio__grid {
+  .fvd-insc-sitio__main {
     grid-template-columns: 1fr;
+  }
+  .fvd-insc-sitio__main-right .fvd-insc-sitio__table-wrap--insc {
+    max-height: 280px;
   }
 }
 
@@ -273,4 +522,10 @@ body.is-embedded .fvd-insc-sitio__table th {
 .fvd-insc-modalidad-details[open] > summary {
   margin-bottom: 0.5rem;
   border-bottom: 1px solid var(--fvd-border, rgba(255, 255, 255, 0.1));
+}
+
+/* Anclas menú: scroll bajo cabecera fija del master */
+#fvd-insc-sitio-inscribir,
+#fvd-insc-sitio-admin {
+  scroll-margin-top: 4.5rem;
 }

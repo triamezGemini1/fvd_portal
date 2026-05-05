@@ -8,7 +8,7 @@ require_once __DIR__ . '/public_header.php';
  */
 function fvd_public_header(string $title, string $active = ''): void
 {
-    $fvdUiCss = function_exists('url') ? url('assets/css/fvd-ui-mistorneos.css') : '/assets/css/fvd-ui-mistorneos.css';
+    $fvdUiCss = function_exists('url') ? url('assets/css/fvd-ui-portal.css') : '/assets/css/fvd-ui-portal.css';
     $home = url('index.php');
     $nav = [
         'inicio'        => ['label' => 'Inicio', 'href' => $home],
@@ -109,7 +109,7 @@ function fvd_public_footer(): void
 function fvd_public_torneo_tipo_label($tipo): string
 {
     $ti = (int) $tipo;
-    $m = [1 => 'Torneo', 2 => 'Campeonato', 3 => 'Mixto (hist.)'];
+    $m = [1 => 'Masculino', 2 => 'Femenino', 3 => 'Mixto'];
 
     return $m[$ti] ?? '—';
 }

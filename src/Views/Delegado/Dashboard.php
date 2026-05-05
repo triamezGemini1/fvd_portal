@@ -22,11 +22,24 @@ final class Dashboard
         string $adminPortalCambiarAsocUrl = '',
         array $invitacionesAgrupadas = [],
         int $invitacionesPendientes = 0,
-        string $invitacionesAppBase = ''
+        string $invitacionesAppBase = '',
+        array $delegadoListaTorneos = [],
+        int $delegadoTorneoActivoId = 0,
+        string $delegadoTorneoPickUrl = '',
+        bool $vistaOperativaSimple = false,
+        int $novedadesDelegadosUnread = 0,
+        string $delegadoNotifPollUrl = '',
+        bool $suppressMasterShellChrome = false,
+        array $afiliadosAfiliacionPorGenero = []
     ): void
     {
+        $vistaOperativaSimple = $vistaOperativaSimple && !$adminPortalDelegado;
+        $afiliadosAfiliacionPorGenero += ['M' => 0, 'F' => 0, 'O' => 0];
+        $nAfM = (int) ($afiliadosAfiliacionPorGenero['M'] ?? 0);
+        $nAfF = (int) ($afiliadosAfiliacionPorGenero['F'] ?? 0);
+        $nAfO = (int) ($afiliadosAfiliacionPorGenero['O'] ?? 0);
+        $urlAfiliadosCab = trim((string) ($actionUrls['detalle_atletas_afiliados'] ?? ''));
         $cards = [
-            ['key' => 'atletas_afiliados', 'title' => 'Atletas afiliados', 'icon' => 'fa-users', 'tone' => 'text-blue-700', 'detailKey' => 'detalle_atletas_afiliados'],
             ['key' => 'afiliaciones', 'title' => 'Afiliaciones', 'icon' => 'fa-id-badge', 'tone' => 'text-indigo-700', 'detailKey' => 'detalle_afiliaciones'],
             ['key' => 'carnets', 'title' => 'Carnets', 'icon' => 'fa-address-card', 'tone' => 'text-violet-700', 'detailKey' => 'detalle_carnets'],
             ['key' => 'anualidades', 'title' => 'Anualidades', 'icon' => 'fa-calendar-check', 'tone' => 'text-amber-700', 'detailKey' => 'detalle_anualidades'],
@@ -34,6 +47,9 @@ final class Dashboard
             ['key' => 'inscritos', 'title' => 'Inscritos', 'icon' => 'fa-trophy', 'tone' => 'text-emerald-700', 'detailKey' => 'detalle_inscritos'],
         ];
         $showTorneoBreakdown = count($torneoStats) >= 2;
+        $kpiAlcanceLabel = $delegadoTorneoActivoId > 0
+            ? 'Torneo y rama seleccionados'
+            : 'Totales del club (sin torneo en contexto)';
 
         header('Content-Type: text/html; charset=UTF-8');
         ?>
@@ -77,8 +93,40 @@ final class Dashboard
         .fvd-topbar__brand { justify-self: start; display: flex; align-items: center; gap: .6rem; min-width: 0; text-decoration: none; color: inherit; }
         .fvd-topbar__fvd-logo { height: 38px; width: auto; object-fit: contain; }
         .fvd-topbar__page-title { font-size: .95rem; font-weight: 700; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .fvd-topbar__center { justify-self: center; }
+        .fvd-topbar__center { justify-self: center; min-width: 0; }
+        .fvd-topbar__center--with-afiliados {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .32rem;
+            max-width: min(100%, 34rem);
+        }
         .fvd-topbar__asoc-name { font-size: .78rem; color: #1e1b4b; background: rgba(255, 242, 0, .92); padding: .22rem .55rem; border: 1px solid rgba(46, 48, 146, .35); border-radius: 999px; font-weight: 700; }
+        .fvd-topbar__afiliados-sexo {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .28rem;
+            align-items: center;
+            justify-content: center;
+        }
+        .fvd-topbar__afiliados-pill {
+            font-size: .65rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            color: #1e1b4b;
+            background: rgba(255, 255, 255, .94);
+            border: 1px solid rgba(46, 48, 146, .38);
+            border-radius: 999px;
+            padding: .12rem .42rem;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: background .15s ease, border-color .15s ease;
+        }
+        .fvd-topbar__afiliados-pill:hover {
+            background: #fff;
+            border-color: var(--fvd-amarillo);
+        }
+        .fvd-topbar__afiliados-pill span { font-weight: 900; color: #0f172a; margin-left: .12rem; }
         .fvd-topbar__actions { justify-self: end; display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
         .fvd-topbar__user { font-size: .78rem; color: #fff; background: rgba(255, 255, 255, .14); border: 1px solid var(--fvd-border); border-radius: 999px; padding: .28rem .55rem; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .fvd-topbar__link { text-decoration: none; color: #fff; border: 1px solid var(--fvd-border); border-radius: 8px; padding: .32rem .65rem; font-size: .76rem; font-weight: 600; transition: background .15s ease, border-color .15s ease, color .15s ease; }
@@ -114,7 +162,12 @@ final class Dashboard
             border-radius: var(--dd-radius);
             padding: 14px;
         }
-        .fvd-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+        /* Cinco KPI en una sola fila; en pantallas estrechas scroll horizontal */
+        .fvd-dd-kpis .fvd-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+        }
         .fvd-kpi-card {
             position: relative;
             border-radius: 14px;
@@ -136,12 +189,11 @@ final class Dashboard
             border-radius: 0 0 6px 6px;
             background: var(--kpi-accent, #2e3092);
         }
-        .fvd-kpi-grid .fvd-kpi-card:nth-child(1) { --kpi-accent: #2e3092; }
-        .fvd-kpi-grid .fvd-kpi-card:nth-child(2) { --kpi-accent: #3a3eb5; }
-        .fvd-kpi-grid .fvd-kpi-card:nth-child(3) { --kpi-accent: #4c52d4; }
-        .fvd-kpi-grid .fvd-kpi-card:nth-child(4) { --kpi-accent: #c9a227; }
-        .fvd-kpi-grid .fvd-kpi-card:nth-child(5) { --kpi-accent: #be123c; }
-        .fvd-kpi-grid .fvd-kpi-card:nth-child(6) { --kpi-accent: #252f7a; }
+        .fvd-kpi-grid .fvd-kpi-card:nth-child(1) { --kpi-accent: #3a3eb5; }
+        .fvd-kpi-grid .fvd-kpi-card:nth-child(2) { --kpi-accent: #4c52d4; }
+        .fvd-kpi-grid .fvd-kpi-card:nth-child(3) { --kpi-accent: #c9a227; }
+        .fvd-kpi-grid .fvd-kpi-card:nth-child(4) { --kpi-accent: #be123c; }
+        .fvd-kpi-grid .fvd-kpi-card:nth-child(5) { --kpi-accent: #252f7a; }
         .fvd-kpi-card--link { text-decoration: none; color: inherit; cursor: pointer; }
         .fvd-kpi-card--link:hover {
             transform: translateY(-2px);
@@ -239,6 +291,15 @@ final class Dashboard
         .fvd-dd-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(15, 23, 42, .22); filter: brightness(1.06); }
         .fvd-dd-btn:active { transform: translateY(0); filter: brightness(.98); }
         .fvd-dd-btn:focus-visible { outline: 3px solid var(--fvd-amarillo, #fff200); outline-offset: 3px; }
+        .fvd-dd-btn--disabled,
+        .fvd-dd-btn--disabled:hover,
+        .fvd-dd-btn--disabled:active {
+            opacity: .55;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+            box-shadow: none;
+        }
 
         .fvd-dd-btn--gestion {
             min-height: 4.35rem;
@@ -272,14 +333,13 @@ final class Dashboard
         }
         .fvd-dd-btn--fin-pagos:hover { box-shadow: 0 12px 28px rgba(133, 77, 14, .34); }
 
-        @media (max-width: 1366px) {
-            .fvd-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        }
-        @media (max-width: 820px) {
-            .fvd-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        @media (max-width: 520px) {
-            .fvd-kpi-grid { grid-template-columns: 1fr; }
+        @media (max-width: 1100px) {
+            .fvd-dd-kpis .fvd-kpi-grid {
+                grid-template-columns: repeat(5, minmax(118px, 1fr));
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 4px;
+            }
         }
         .fvd-dd-admin-portal-banner {
             background: #fef3c7;
@@ -297,25 +357,146 @@ final class Dashboard
             font-weight: 800;
             margin-left: .35rem;
         }
-        .fvd-dd-torneo-aviso {
-            margin: 0 0 1.1rem;
-            padding: .75rem 1rem;
+        .fvd-dd-torneos-strip {
+            margin: 0 0 1.25rem;
+            padding: 1rem 1.1rem 1.05rem;
+            border-radius: var(--dd-radius);
+            border: 1px solid rgba(46, 48, 146, .22);
+            background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+            box-shadow: 0 4px 16px rgba(15, 23, 42, .06);
+            text-align: center;
+        }
+        .fvd-dd-torneos-strip__head {
+            margin-bottom: .65rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .fvd-dd-torneos-strip__title {
+            display: block;
+            font-size: .72rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: #2e3092;
+            margin-bottom: .2rem;
+        }
+        .fvd-dd-torneos-strip__hint {
+            margin: 0;
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--dd-ink-soft);
+            line-height: 1.45;
+        }
+        .fvd-dd-torneos-strip__list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+            align-items: stretch;
+            justify-content: center;
+            max-height: 11rem;
+            overflow-y: auto;
+            padding-top: .15rem;
+        }
+        .fvd-dd-torneo-chip {
+            flex: 0 1 auto;
+            min-width: 0;
+            max-width: 100%;
+            text-decoration: none;
+            text-align: left;
+            padding: .55rem .75rem .5rem;
             border-radius: 12px;
-            border: 1px solid #f59e0b;
-            background: #fffbeb;
-            color: #78350f;
-            font-size: .875rem;
+            border: 2px solid #e2e8f0;
+            background: #fff;
+            color: var(--dd-ink);
+            font-size: .8125rem;
             font-weight: 700;
-            line-height: 1.5;
-            box-shadow: 0 4px 14px rgba(245, 158, 11, .12);
+            line-height: 1.3;
+            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+        .fvd-dd-torneo-chip:hover {
+            border-color: rgba(46, 48, 146, .45);
+            box-shadow: 0 4px 12px rgba(46, 48, 146, .12);
+        }
+        .fvd-dd-torneo-chip--activo {
+            border-color: var(--fvd-amarillo);
+            background: linear-gradient(135deg, #2e3092 0%, #3a3eb5 100%);
+            color: #fff;
+            box-shadow: 0 6px 18px rgba(46, 48, 146, .28);
+        }
+        .fvd-dd-torneo-chip--activo:hover {
+            border-color: #fde047;
+            color: #fff;
+        }
+        .fvd-dd-torneo-chip__id {
+            display: block;
+            font-size: .62rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #64748b;
+            margin-bottom: .15rem;
+        }
+        .fvd-dd-torneo-chip--activo .fvd-dd-torneo-chip__id { color: rgba(255, 242, 0, .9); }
+        .fvd-dd-torneo-chip__name { word-break: break-word; }
+        .fvd-dd-torneo-chip__meta {
+            display: block;
+            margin-top: .25rem;
+            font-size: .65rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .fvd-dd-torneo-chip--activo .fvd-dd-torneo-chip__meta { color: rgba(248, 250, 252, .85); }
+        .fvd-dd-torneo-chip__genero {
+            display: inline-block;
+            margin-top: .22rem;
+            font-size: .62rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            color: #2e3092;
+            border: 1px solid rgba(46, 48, 146, .28);
+            border-radius: 6px;
+            padding: .1rem .32rem;
+            background: #eef2ff;
+        }
+        .fvd-dd-torneo-chip--activo .fvd-dd-torneo-chip__genero {
+            color: #fef9c3;
+            border-color: rgba(255, 255, 255, .45);
+            background: rgba(255, 255, 255, .12);
+        }
+        .fvd-dd-torneos-strip--empty {
+            margin: 0;
+            font-size: .8125rem;
+            font-weight: 600;
+            color: #94a3b8;
+            line-height: 1.45;
+        }
+        .fvd-topbar__link--notif { position: relative; padding-right: .85rem !important; }
+        .fvd-topbar__notif-dot {
+            position: absolute;
+            top: .12rem;
+            right: .2rem;
+            width: .45rem;
+            height: .45rem;
+            border-radius: 999px;
+            background: #f43f5e;
+            box-shadow: 0 0 0 2px rgba(15, 23, 42, .35);
+            animation: fvd-dd-notif-pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes fvd-dd-notif-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .75; transform: scale(1.15); }
         }
     </style>
     <?php if ($viteTags !== ''): ?>
     <?= $viteTags ?>
     <?php endif; ?>
 </head>
-<body class="antialiased fvd-dd-body" style="-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
+<body class="antialiased fvd-dd-body<?= $suppressMasterShellChrome ? ' fvd-dd-body--embed-master' : '' ?>" style="-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
 <div class="fvd-dd-page">
+    <?php if (!$suppressMasterShellChrome): ?>
     <header class="fvd-topbar">
         <div class="fvd-topbar__inner">
             <a class="fvd-topbar__brand" href="<?= htmlspecialchars($panelUrl, ENT_QUOTES, 'UTF-8') ?>" title="Ir al panel">
@@ -324,16 +505,57 @@ final class Dashboard
                 <?php endif; ?>
                 <span class="fvd-topbar__page-title">FVD Master Admin</span>
             </a>
-            <div class="fvd-topbar__center">
+            <div class="fvd-topbar__center fvd-topbar__center--with-afiliados">
                 <span class="fvd-topbar__asoc-name"><?= htmlspecialchars($asociacionLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                <?php if ($urlAfiliadosCab !== ''): ?>
+                <div class="fvd-topbar__afiliados-sexo" role="group" aria-label="Afiliados por género (club)">
+                    <a class="fvd-topbar__afiliados-pill" href="<?= htmlspecialchars($urlAfiliadosCab, ENT_QUOTES, 'UTF-8') ?>" title="Listado de atletas — masculino">M<span><?= $nAfM ?></span></a>
+                    <a class="fvd-topbar__afiliados-pill" href="<?= htmlspecialchars($urlAfiliadosCab, ENT_QUOTES, 'UTF-8') ?>" title="Listado de atletas — femenino">F<span><?= $nAfF ?></span></a>
+                    <?php if ($nAfO > 0): ?>
+                    <a class="fvd-topbar__afiliados-pill" href="<?= htmlspecialchars($urlAfiliadosCab, ENT_QUOTES, 'UTF-8') ?>" title="Listado de atletas — otro / sin género">O<span><?= $nAfO ?></span></a>
+                    <?php endif; ?>
+                </div>
+                <?php elseif ($nAfM > 0 || $nAfF > 0 || $nAfO > 0): ?>
+                <div class="fvd-topbar__afiliados-sexo" role="group" aria-label="Afiliados por género (club)">
+                    <span class="fvd-topbar__afiliados-pill" style="cursor:default">M<span><?= $nAfM ?></span></span>
+                    <span class="fvd-topbar__afiliados-pill" style="cursor:default">F<span><?= $nAfF ?></span></span>
+                    <?php if ($nAfO > 0): ?>
+                    <span class="fvd-topbar__afiliados-pill" style="cursor:default">O<span><?= $nAfO ?></span></span>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="fvd-topbar__actions">
                 <span class="fvd-topbar__user"><?= htmlspecialchars($userDisplayName, ENT_QUOTES, 'UTF-8') ?></span>
+                <?php
+                $invPendTop = (int) $invitacionesPendientes;
+                $invHayListaTop = is_array($invitacionesAgrupadas) && $invitacionesAgrupadas !== [];
+                $delegInvitEntrarUltima = rtrim((string) $invitacionesAppBase, '/') . '/fvdmasteradmin/delegado_entrar_torneo.php?ultima=1';
+                $novedTop = max(0, (int) $novedadesDelegadosUnread);
+                $ackBase = trim((string) $delegadoTorneoPickUrl);
+                $ackNovedUrl = htmlspecialchars(
+                    $ackBase !== '' ? ($ackBase . (str_contains($ackBase, '?') ? '&' : '?') . 'ack_novedades=1') : '',
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
+                ?>
+                <?php if ($invHayListaTop): ?>
+                    <a class="fvd-topbar__link<?= ($invPendTop > 0 || $novedTop > 0) ? ' fvd-topbar__link--notif' : '' ?>"
+                       href="<?= htmlspecialchars($delegInvitEntrarUltima, ENT_QUOTES, 'UTF-8') ?>"
+                       title="<?= $invPendTop > 0 ? 'Abrir el panel maestro en el contexto de la invitación pendiente (torneo y grupo si aplica)' : 'Entrar al panel por invitación' ?>">Invitaciones<?php if ($invPendTop > 0 || $novedTop > 0): ?><span class="fvd-topbar__notif-dot" id="fvd-dd-invites-dot" aria-hidden="true"></span><?php endif; ?></a>
+                <?php endif; ?>
+                <?php if ($novedTop > 0 && !$adminPortalDelegado && $ackNovedUrl !== ''): ?>
+                    <a class="fvd-topbar__link fvd-topbar__link--notif" href="<?= $ackNovedUrl ?>"
+                       title="Marcar como leídos los avisos de nuevos torneos">Novedades<span class="fvd-topbar__notif-dot" id="fvd-dd-novedades-dot" aria-hidden="true"></span></a>
+                <?php elseif (!$adminPortalDelegado && $delegadoNotifPollUrl !== ''): ?>
+                    <span class="fvd-topbar__link" style="opacity:.65;cursor:default;border-style:dashed" title="Sin novedades sin leer">Novedades<span class="fvd-topbar__notif-dot" id="fvd-dd-novedades-dot" style="display:none" aria-hidden="true"></span></span>
+                <?php endif; ?>
                 <a class="fvd-topbar__link" href="<?= htmlspecialchars($perfilUrl, ENT_QUOTES, 'UTF-8') ?>">Mi perfil</a>
                 <a class="fvd-topbar__link" href="<?= htmlspecialchars($logoutUrl, ENT_QUOTES, 'UTF-8') ?>">Cerrar sesión</a>
             </div>
         </div>
     </header>
+    <?php endif; ?>
         <?php if ($adminPortalDelegado): ?>
         <div class="fvd-dd-admin-portal-banner" role="status">
             Está viendo este panel como administrador general, con los datos de la asociación indicada.
@@ -343,60 +565,74 @@ final class Dashboard
         </div>
     <?php endif; ?>
     <main class="fvd-dd-main">
+        <?php if ($suppressMasterShellChrome && ($urlAfiliadosCab !== '' || $nAfM > 0 || $nAfF > 0 || $nAfO > 0)): ?>
+        <p class="fvd-dd-embed-afiliados-hint" style="margin:0 0 .75rem;font-size:.72rem;font-weight:700;color:#334155;text-align:center">
+            Afiliados (club):
+            <?php if ($urlAfiliadosCab !== ''): ?>
+                <a href="<?= htmlspecialchars($urlAfiliadosCab, ENT_QUOTES, 'UTF-8') ?>" style="color:#2e3092;font-weight:800">M <?= $nAfM ?></a>
+                · <a href="<?= htmlspecialchars($urlAfiliadosCab, ENT_QUOTES, 'UTF-8') ?>" style="color:#2e3092;font-weight:800">F <?= $nAfF ?></a><?php if ($nAfO > 0): ?>
+                · <a href="<?= htmlspecialchars($urlAfiliadosCab, ENT_QUOTES, 'UTF-8') ?>" style="color:#2e3092;font-weight:800">O <?= $nAfO ?></a><?php endif; ?>
+            <?php else: ?>
+                M <?= $nAfM ?> · F <?= $nAfF ?><?= $nAfO > 0 ? ' · O ' . $nAfO : '' ?>
+            <?php endif; ?>
+        </p>
+        <?php endif; ?>
         <?php
-        $appBaseInv = rtrim($invitacionesAppBase, '/');
+        $delegPickBase = trim((string) $delegadoTorneoPickUrl);
+        $delegTorneoActivo = max(0, $delegadoTorneoActivoId);
+        $delegListaTor = is_array($delegadoListaTorneos) ? $delegadoListaTorneos : [];
+        $tieneTorneosRelacionados = $delegListaTor !== [];
         ?>
-        <?php if (!$adminPortalDelegado && $appBaseInv !== '' && is_array($invitacionesAgrupadas) && $invitacionesAgrupadas !== []): ?>
-        <section class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Invitaciones a torneos" id="fvd-deleg-invites-dash">
-            <h2 class="mb-1 text-sm font-extrabold uppercase tracking-wide text-slate-800">Invitaciones a torneos
-                <?php if ($invitacionesPendientes > 0): ?>
-                    <span class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-950"><?= (int) $invitacionesPendientes ?> pendiente(s)</span>
-                <?php endif; ?>
-            </h2>
-            <p class="mb-3 text-xs font-medium text-slate-600">Si los campeonatos están <strong>asociados</strong> (mismo código de grupo), verá <strong>una sola</strong> invitación; el contexto del torneo y del campeonato se carga al entrar para usar inscripciones, administración de inscritos y finanzas.</p>
-            <ul class="m-0 list-none space-y-2 p-0">
-                <?php foreach ($invitacionesAgrupadas as $nf): ?>
+        <?php if ($delegPickBase !== ''): ?>
+        <section class="fvd-dd-torneos-strip" aria-label="Torneos asociados a su club">
+            <div class="fvd-dd-torneos-strip__head">
+                <span class="fvd-dd-torneos-strip__title"><?= $tieneTorneosRelacionados ? 'Torneos asociados' : 'Torneos' ?></span>
+            </div>
+            <?php if ($tieneTorneosRelacionados): ?>
+            <div class="fvd-dd-torneos-strip__list">
+                <?php foreach ($delegListaTor as $filaTor): ?>
                     <?php
-                    $nid = (int) ($nf['id'] ?? 0);
-                    $esGrupo = !empty($nf['es_grupo_agrupado']);
-                    $nEnGrupo = (int) ($nf['n_en_grupo'] ?? 0);
-                    $tn = htmlspecialchars((string) ($nf['torneo_nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
-                    $ramaSub = trim((string) ($nf['rama_subtitulo'] ?? ''));
-                    $fd = htmlspecialchars(substr((string) ($nf['fechator'] ?? ''), 0, 10), ENT_QUOTES, 'UTF-8');
-                    $sinAbrir = empty($nf['visto_en']);
-                    $entrar = $appBaseInv . '/fvdmasteradmin/delegado_entrar_torneo.php?notif_id=' . $nid;
-                    $pdf = $appBaseInv . '/fvdmasteradmin/delegado_invitacion_pdf.php?notif_id=' . $nid;
+                    $tidChip = (int) ($filaTor['torneo_id'] ?? 0);
+                    if ($tidChip <= 0) {
+                        continue;
+                    }
+                    $nomChip = trim((string) ($filaTor['torneo_nombre'] ?? ''));
+                    if ($nomChip === '') {
+                        $nomChip = 'Torneo #' . $tidChip;
+                    }
+                    $gChip = (int) ($filaTor['grupo_evento_id'] ?? 0);
+                    $tipoChip = (int) ($filaTor['tipo'] ?? 0);
+                    $genChip = '';
+                    if ($tipoChip === 1) {
+                        $genChip = 'M';
+                    } elseif ($tipoChip === 2) {
+                        $genChip = 'F';
+                    } elseif ($tipoChip === 3) {
+                        $genChip = 'Mixto';
+                    }
+                    $hrefPick = \fvd_torneo_evento_url($tidChip, $gChip > 0 ? $gChip : 0);
+                    $esActivo = $delegTorneoActivo > 0 && $tidChip === $delegTorneoActivo;
                     ?>
-                    <li class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
-                        <div class="min-w-0 flex-1">
-                            <span class="font-bold text-slate-900"><?= $tn ?></span>
-                            <?php if ($esGrupo && $nEnGrupo > 1): ?>
-                                <span class="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-[0.65rem] font-bold text-indigo-950">Grupo · <?= $nEnGrupo ?> categorías</span>
-                            <?php endif; ?>
-                            <?php if ($ramaSub !== ''): ?>
-                                <span class="mt-0.5 block text-xs text-slate-600"><?= htmlspecialchars($ramaSub, ENT_QUOTES, 'UTF-8') ?></span>
-                            <?php endif; ?>
-                            <span class="mt-0.5 block text-xs text-slate-500"><?= $fd ?></span>
-                            <?php if ($sinAbrir): ?><span class="mt-1 inline-block rounded bg-amber-200 px-1.5 py-0.5 text-[0.7rem] font-bold text-amber-950">Sin abrir</span><?php endif; ?>
-                        </div>
-                        <div class="flex shrink-0 flex-wrap gap-2">
-                            <?php if (!empty($nf['invitacion_archivo'])): ?>
-                                <a class="inline-flex min-h-[2.5rem] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800" href="<?= htmlspecialchars($pdf, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">PDF</a>
-                            <?php endif; ?>
-                            <a class="inline-flex min-h-[2.5rem] items-center justify-center rounded-lg bg-[#2e3092] px-3 text-xs font-bold text-white" href="<?= htmlspecialchars($entrar, ENT_QUOTES, 'UTF-8') ?>">Panel del torneo</a>
-                        </div>
-                    </li>
+                    <a class="fvd-dd-torneo-chip<?= $esActivo ? ' fvd-dd-torneo-chip--activo' : '' ?>"
+                       href="<?= htmlspecialchars($hrefPick, ENT_QUOTES, 'UTF-8') ?>"
+                       title="<?= $esActivo ? 'Torneo activo: panel del evento' : 'Abrir panel del torneo (vista evento)' ?>">
+                        <span class="fvd-dd-torneo-chip__id">Torneo #<?= $tidChip ?></span>
+                        <span class="fvd-dd-torneo-chip__name"><?= htmlspecialchars($nomChip, ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php if ($genChip !== ''): ?>
+                            <span class="fvd-dd-torneo-chip__genero" title="Género del torneo (filtro de ramas asociadas)"><?= htmlspecialchars($genChip, ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
+                        <?php if ($gChip > 0): ?>
+                            <span class="fvd-dd-torneo-chip__meta">Grupo de evento #<?= $gChip ?></span>
+                        <?php endif; ?>
+                    </a>
                 <?php endforeach; ?>
-            </ul>
+            </div>
+            <?php else: ?>
+            <p class="fvd-dd-torneos-strip--empty">No hay torneos con convocatoria invitada para su asociación. Cuando la federación le envíe una invitación, verá ese torneo y, si es campeonato con grupo de evento, otros del mismo grupo solo si comparten la misma fecha de realización.</p>
+            <?php endif; ?>
         </section>
         <?php endif; ?>
-        <?php
-        $avisoTorneoPanel = trim((string) ($inscripcionesCtx['aviso_torneo_panel'] ?? ''));
-        if ($avisoTorneoPanel !== ''): ?>
-            <div class="fvd-dd-torneo-aviso" role="alert">
-                <?= htmlspecialchars($avisoTorneoPanel, ENT_QUOTES, 'UTF-8') ?>
-            </div>
-        <?php endif; ?>
+        <?php if (!$vistaOperativaSimple): ?>
         <section class="fvd-kpi-strip fvd-dd-kpis fvd-dd-kpis-wrap">
             <div class="fvd-kpi-grid">
                 <?php foreach ($cards as $card): ?>
@@ -409,13 +645,13 @@ final class Dashboard
                     $hasDetail = $detailUrl !== '' && $detailUrl !== '#';
                     $cardTag = $hasDetail ? 'a' : 'article';
                     ?>
-                    <<?= $cardTag ?> class="fvd-kpi-card<?= $hasDetail ? ' fvd-kpi-card--link hover:bg-slate-50 transition-all' : '' ?>"<?= $hasDetail ? ' href="' . htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                    <<?= $cardTag ?> class="fvd-kpi-card<?= $hasDetail ? ' fvd-kpi-card--link' : '' ?>"<?= $hasDetail ? ' href="' . htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                         <div class="fvd-kpi-title">
                             <i class="fas <?= htmlspecialchars((string) $card['icon'], ENT_QUOTES, 'UTF-8') ?>" aria-hidden="true"></i>
                             <span><?= htmlspecialchars((string) $card['title'], ENT_QUOTES, 'UTF-8') ?></span>
                         </div>
                         <p class="fvd-kpi-value"><?= htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') ?></p>
-                        <p class="fvd-kpi-sub">Total general</p>
+                        <p class="fvd-kpi-sub"><?= htmlspecialchars($kpiAlcanceLabel, ENT_QUOTES, 'UTF-8') ?></p>
                         <?php if ($showTorneoBreakdown): ?>
                             <div class="fvd-kpi-tournament-list">
                                 <?php foreach ($torneoStats as $ts): ?>
@@ -432,7 +668,45 @@ final class Dashboard
                 <?php endforeach; ?>
             </div>
         </section>
+        <?php endif; ?>
 
+        <?php
+        $fase1Habilitada = (bool) ($inscripcionesCtx['fase1_habilitada'] ?? true);
+        $fase2Habilitada = (bool) ($inscripcionesCtx['fase2_habilitada'] ?? true);
+        $motivoFase1Bloqueo = trim((string) ($inscripcionesCtx['motivo_fase1_bloqueo'] ?? 'Esta opción está temporalmente inhabilitada.'));
+        $motivoFase2Bloqueo = trim((string) ($inscripcionesCtx['motivo_fase2_bloqueo'] ?? 'Esta opción está temporalmente inhabilitada.'));
+        $urlPanelCompleto = $delegadoTorneoPickUrl;
+        if (str_contains($urlPanelCompleto, 'vista=operativo')) {
+            $urlPanelCompleto = str_replace(['?vista=operativo&', '&vista=operativo', '?vista=operativo'], ['?', '', ''], $urlPanelCompleto);
+            $urlPanelCompleto = rtrim($urlPanelCompleto, '?&');
+        }
+        ?>
+        <?php if ($vistaOperativaSimple): ?>
+        <section class="fvd-dd-operativo-simple" aria-label="Operaciones delegado" style="margin-bottom:1.75rem">
+            <h2 style="margin:0 0 10px;font-size:1.05rem;font-weight:900;color:#0f172a">Operaciones</h2>
+            <div class="fvd-dd-actions-col" style="max-width:26rem;display:flex;flex-direction:column;gap:10px">
+                <?php if ($fase1Habilitada): ?>
+                    <a class="fvd-dd-btn fvd-dd-btn--gestion" href="<?= htmlspecialchars((string) ($actionUrls['afiliar_atleta'] ?? ($actionUrls['afiliaciones'] ?? '#')), ENT_QUOTES, 'UTF-8') ?>">Afiliar atleta</a>
+                    <a class="fvd-dd-btn fvd-dd-btn--gestion" href="<?= htmlspecialchars((string) ($actionUrls['carnets'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>">Solicitar carnet</a>
+                    <a class="fvd-dd-btn fvd-dd-btn--gestion" href="<?= htmlspecialchars((string) ($actionUrls['traspasos'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>">Solicitar traspaso</a>
+                <?php else: ?>
+                    <span class="fvd-dd-btn fvd-dd-btn--gestion fvd-dd-btn--disabled" title="<?= htmlspecialchars($motivoFase1Bloqueo, ENT_QUOTES, 'UTF-8') ?>">Afiliar atleta / carnet / traspaso no disponibles</span>
+                <?php endif; ?>
+                <?php
+                $inscDestOp = trim((string) ($inscripcionesCtx['url_destino'] ?? ''));
+                $inscHrefOp = $inscDestOp !== '' ? ($inscDestOp . (str_contains($inscDestOp, '#') ? '' : '#fvd-insc-sitio-inscribir')) : '';
+                ?>
+                <?php if ($inscHrefOp !== '' && $fase2Habilitada): ?>
+                    <a class="fvd-dd-btn fvd-dd-btn--inscripciones" href="<?= htmlspecialchars($inscHrefOp, ENT_QUOTES, 'UTF-8') ?>">Inscribir en torneo</a>
+                <?php else: ?>
+                    <span class="fvd-dd-btn fvd-dd-btn--inscripciones fvd-dd-btn--disabled" title="<?= !$fase2Habilitada ? htmlspecialchars($motivoFase2Bloqueo, ENT_QUOTES, 'UTF-8') : 'Defina torneo en contexto.' ?>">Inscribir en torneo</span>
+                <?php endif; ?>
+            </div>
+            <?php if ($urlPanelCompleto !== ''): ?>
+                <p style="margin:14px 0 0;font-size:.78rem"><a href="<?= htmlspecialchars($urlPanelCompleto, ENT_QUOTES, 'UTF-8') ?>" style="color:#2563eb;font-weight:700">Abrir panel completo</a> (finanzas, indicadores e invitaciones)</p>
+            <?php endif; ?>
+        </section>
+        <?php else: ?>
         <section class="fvd-dd-actions-grid">
             <article class="fvd-dd-card fvd-dd-card--gestion">
                 <div class="fvd-dd-card__head">
@@ -440,11 +714,18 @@ final class Dashboard
                     <h3>Gestión administrativa</h3>
                 </div>
                 <div class="fvd-dd-card__body">
-                    <a class="fvd-dd-btn fvd-dd-btn--gestion"
-                       href="<?= htmlspecialchars((string) ($actionUrls['afiliaciones'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>"
-                       title="Listado de atletas: afiliación, solicitud de carnets y transferencias">
-                        Afiliación, solicitud de carnets y transferencias
-                    </a>
+                    <?php if ($fase1Habilitada): ?>
+                        <a class="fvd-dd-btn fvd-dd-btn--gestion"
+                           href="<?= htmlspecialchars((string) ($actionUrls['afiliaciones'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>"
+                           title="Listado de atletas: afiliación, solicitud de carnets y transferencias">
+                            Afiliación, solicitud de carnets y transferencias
+                        </a>
+                    <?php else: ?>
+                        <span class="fvd-dd-btn fvd-dd-btn--gestion fvd-dd-btn--disabled"
+                              title="<?= htmlspecialchars($motivoFase1Bloqueo, ENT_QUOTES, 'UTF-8') ?>">
+                            Afiliación, solicitud de carnets y transferencias
+                        </span>
+                    <?php endif; ?>
                 </div>
             </article>
 
@@ -457,7 +738,7 @@ final class Dashboard
                     <?php
                     $tnAct = trim((string) ($inscripcionesCtx['torneo_nombre'] ?? ''));
                     if ($tnAct === '') {
-                        $tnAct = isset($torneoStats[0]['torneo_nombre']) ? (string) $torneoStats[0]['torneo_nombre'] : 'Sin torneo activo';
+                        $tnAct = 'Sin torneo activo';
                     }
                     ?>
                     <div class="fvd-dd-torneo">
@@ -466,32 +747,43 @@ final class Dashboard
                     </div>
                     <?php
                     $inscDest = trim((string) ($inscripcionesCtx['url_destino'] ?? ''));
-                    $inscTid = (int) ($inscripcionesCtx['torneo_id'] ?? 0);
-                    $inscCamp = (int) ($inscripcionesCtx['campeonato_en_url'] ?? 0);
                     $inscHref = '';
-                    if ($inscDest !== '' && $inscTid > 0 && $inscCamp > 0) {
-                        $inscHref = $inscDest . (str_contains($inscDest, '#') ? '' : '#fvd-insc-sitio-panel');
+                    if ($inscDest !== '') {
+                        $inscHref = $inscDest . (str_contains($inscDest, '#') ? '' : '#fvd-insc-sitio-inscribir');
                     }
+                    $adminInscHref = trim((string) ($actionUrls['administrar_inscripciones'] ?? ''));
+                    $adminInscOk = $adminInscHref !== '';
+                    $adminInscDuplicado = $adminInscOk && $inscHref !== '' && $adminInscHref === $inscHref;
                     ?>
                     <div class="fvd-dd-actions-col">
-                        <?php if ($inscHref !== ''): ?>
+                        <?php if ($inscHref !== '' && $fase2Habilitada): ?>
                             <a
                                 class="fvd-dd-btn fvd-dd-btn--inscripciones"
                                 href="<?= htmlspecialchars($inscHref, ENT_QUOTES, 'UTF-8') ?>"
-                                title="Abre el formulario de inscripción al torneo (línea de cédula y tablas Disponibles / Inscritos, como en el sitio Mis Torneos)"
+                                title="Abre el formulario de inscripción al torneo (línea de cédula y tablas Disponibles / Inscritos en el portal FVD)"
                             >Inscripciones</a>
                         <?php else: ?>
                             <span
-                                class="fvd-dd-btn fvd-dd-btn--inscripciones"
-                                style="opacity:0.55;cursor:not-allowed"
-                                title="<?= $inscTid <= 0
-                                    ? 'Sin torneo activo: vea el aviso superior.'
-                                    : 'Falta campeonato en contexto: vea el aviso superior.' ?>"
+                                class="fvd-dd-btn fvd-dd-btn--inscripciones fvd-dd-btn--disabled"
+                                title="<?= !$fase2Habilitada
+                                    ? htmlspecialchars($motivoFase2Bloqueo, ENT_QUOTES, 'UTF-8')
+                                    : 'Acceso no disponible en este momento.' ?>"
                             >Inscripciones</span>
                         <?php endif; ?>
-                        <a class="fvd-dd-btn fvd-dd-btn--admin-insc" href="<?= htmlspecialchars((string) ($actionUrls['administrar_inscripciones'] ?? '#'), ENT_QUOTES, 'UTF-8') ?>">
-                            Administración de inscritos
-                        </a>
+                        <?php if (!$adminInscDuplicado): ?>
+                            <?php if ($fase2Habilitada && $adminInscOk): ?>
+                            <a class="fvd-dd-btn fvd-dd-btn--admin-insc" href="<?= htmlspecialchars($adminInscHref, ENT_QUOTES, 'UTF-8') ?>">
+                                Administración de inscritos
+                            </a>
+                            <?php else: ?>
+                            <span class="fvd-dd-btn fvd-dd-btn--admin-insc fvd-dd-btn--disabled"
+                                  title="<?= !$fase2Habilitada
+                                      ? htmlspecialchars($motivoFase2Bloqueo, ENT_QUOTES, 'UTF-8')
+                                      : 'Acceso no disponible en este momento.' ?>">
+                                Administración de inscritos
+                            </span>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
             </article>
@@ -514,10 +806,36 @@ final class Dashboard
                 </div>
             </article>
         </section>
+        <?php endif; ?>
     </main>
 </div>
+<?php if ($delegadoNotifPollUrl !== '' && !$adminPortalDelegado): ?>
+<script>
+(function () {
+  var pollUrl = <?= json_encode($delegadoNotifPollUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+  if (!pollUrl) return;
+  function tick() {
+    fetch(pollUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) return;
+        var n = parseInt(d.novedades_unread, 10) || 0;
+        var el = document.getElementById('fvd-dd-novedades-dot');
+        if (!el) return;
+        el.style.display = n > 0 ? 'inline-block' : 'none';
+        var row = el.closest('a.fvd-topbar__link, span.fvd-topbar__link');
+        if (row && n > 0) {
+          row.classList.add('fvd-topbar__link--notif');
+        }
+      })
+      .catch(function () {});
+  }
+  setInterval(tick, 42000);
+  tick();
+})();
+</script>
+<?php endif; ?>
 </body>
-</html>
-        <?php
+</html><?php
     }
 }

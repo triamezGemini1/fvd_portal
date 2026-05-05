@@ -40,7 +40,9 @@ $fvd_page_title = 'Bandeja de traspasos';
 require __DIR__ . '/includes/layout_header.php';
 ?>
 <div class="fvd-dash" style="max-width:56rem">
+    <?php if (function_exists('fvd_delegado_inner_heading_visible') && fvd_delegado_inner_heading_visible()): ?>
     <h1>Bandeja de traspasos</h1>
+    <?php endif; ?>
     <p style="font-size:0.8125rem;color:var(--fvd-muted);margin:0 0 1rem">Solicitudes pendientes donde su asociación es origen o destino (solo lectura).</p>
     <div class="fvd-mod-table-wrap">
         <table class="fvd-mod-table fvd-mod-table--nowrap" style="font-size:0.8125rem">

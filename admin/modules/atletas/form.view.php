@@ -8,7 +8,9 @@ declare(strict_types=1);
 $fvd_form_embed = $fvd_form_embed ?? false;
 
 $r = $row ?? [];
-$isEdit = $row !== null;
+/** Edición solo si hay fila persistida con id > 0 (el repoblar tras error de alta no trae id). */
+$idForm = isset($r['id']) ? (int) $r['id'] : 0;
+$isEdit = $idForm > 0;
 $isFvdAdmin = AuthService::role() === AuthService::ROLE_FVD_ADMIN;
 $fvdEsDelegadoFormToolbar = AuthService::role() === AuthService::ROLE_DELEGADO_ASOC;
 $asocHiddenVal = 0;
@@ -357,7 +359,57 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 .fvd-cedula-msg { font-size: 0.8125rem; margin: 0.35rem 0 0; min-height: 1.25em; }
 .fvd-cedula-msg--ok { color: #7dffb0; font-weight: 600; }
 .fvd-cedula-msg--err { color: #ff8a8a; }
-.fvd-cedula-hint { font-size: 0.75rem; color: var(--fvd-muted); margin: 0.2rem 0 0; line-height: 1.35; }
+.fvd-cedula-hint { font-size: 0.75rem; color: var(--fvd-muted); margin: 0.35rem 0 0; line-height: 1.35; }
+/* Registro existente para la misma cédula: mismo lenguaje visual que el formulario (sin paso extra ni enlaces). */
+.fvd-atleta-form__ced-existe-wrap {
+    margin: 0 0 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid rgba(250, 204, 21, 0.65);
+    background: rgba(255, 255, 255, 0.08);
+    box-sizing: border-box;
+}
+.fvd-atleta-form__ced-existe-wrap[hidden] { display: none !important; }
+.fvd-atleta-form__ced-existe__lead {
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: var(--fvd-amarillo, #facc15);
+    line-height: 1.35;
+}
+.fvd-atleta-form__ced-existe__grid {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, auto) 1fr;
+    gap: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
+    align-items: baseline;
+}
+.fvd-atleta-form__ced-existe__grid dt {
+    margin: 0;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.88);
+}
+.fvd-atleta-form__ced-existe__grid dd {
+    margin: 0;
+    font-weight: 700;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.28rem 0.45rem;
+    line-height: 1.35;
+}
+.fvd-atleta-form__ced-existe__grid dd.fvd-atleta-form__ced-existe__est {
+    background: #fef9c3;
+    border-color: #eab308;
+    font-weight: 800;
+}
+.fvd-atleta-form__ced-existe__scope {
+    margin: 0.45rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.92);
+}
 /* Contraste alto para el formulario de afiliación */
 .fvd-atleta-form-page .fvd-atleta-form.fvd-atleta-form--framed {
     background: #003366;
@@ -459,17 +511,31 @@ $fvdCedulaLookupBase = $selfUrl . '?action=lookup_cedula';
 if (!function_exists('fvd_return_preserve_query_params')) {
     require_once FVD_PROJECT_ROOT . '/config/paths.php';
 }
-$fvdFormAction = $selfUrl . '?action=form' . ($isEdit ? '&id=' . (int) $r['id'] : '');
+$fvdFormAction = $selfUrl . '?action=form' . ($isEdit ? '&id=' . $idForm : '');
 if ($fvd_form_embed) {
     $fvdFormAction .= '&embed=1';
 }
 $fvdFormAction = fvd_return_preserve_query_params($fvdFormAction);
-$fvdBackUrl = fvd_return_preserve_query_params($selfUrl . '?action=list');
-if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
-    $fvdBackUrl = (string) $_GET['ret'];
-} elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
-    $fvdBackUrl = (string) $_GET['return'];
+$fvdListQuery = ['action' => 'list'];
+if (AuthService::isDelegadoAsociacion()) {
+    $fvdListMineAsoc = (int) (AuthService::idAsociacion() ?? 0);
+    if ($fvdListMineAsoc > 0) {
+        $fvdListQuery['alcance'] = 'asociacion';
+        $fvdListQuery['asociacion_id'] = $fvdListMineAsoc;
+    }
 }
+$fvdBackUrl = fvd_return_preserve_query_params($selfUrl . '?' . http_build_query($fvdListQuery));
+if ($isEdit) {
+    if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
+        $fvdBackUrl = (string) $_GET['ret'];
+    } elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null) {
+        $fvdBackUrl = (string) $_GET['return'];
+    }
+}
+$fvdFormTopBackLabel = $isEdit
+    ? ($isFvdAdmin ? '← Volver al listado' : ($fvdEsDelegadoFormToolbar ? '← Volver al panel' : '← Volver al listado'))
+    : '← Cancelar';
+$fvdFormBottomBackLabel = $isEdit ? 'Volver al listado' : 'Cancelar';
 $fvdFormRetornoUrl = '';
 if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null) {
     $fvdFormRetornoUrl = (string) $_GET['ret'];
@@ -478,22 +544,84 @@ if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET[
 } elseif ($fvdEsDelegadoFormToolbar) {
     $fvdFormRetornoUrl = AuthService::homeUrl();
 }
-$fvdToolbarTipo = isset($_GET['tipo']) && is_string($_GET['tipo']) ? trim($_GET['tipo']) : 'normal';
-if (!in_array($fvdToolbarTipo, ['normal', 'ultimos', 'no_activos', 'bajas'], true)) {
-    $fvdToolbarTipo = 'normal';
-}
 $fvdToolbarCedula = isset($_GET['cedula']) && is_string($_GET['cedula']) ? trim($_GET['cedula']) : '';
 $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
+$fvdToolbarAsocId = 0;
+$lfToolbar = null;
+if ($isFvdAdmin) {
+    if (!function_exists('fvd_atletas_resolve_list_filters')) {
+        require_once __DIR__ . '/list_filters.inc.php';
+    }
+    $lfToolbar = fvd_atletas_resolve_list_filters($_GET);
+    $fvdToolbarAsocId = (int) ($lfToolbar['asociacion_id'] ?? 0);
+}
+$fvdToolbarTipo = isset($_GET['tipo']) && is_string($_GET['tipo']) ? trim((string) $_GET['tipo']) : '';
+if (!in_array($fvdToolbarTipo, ['normal', 'ultimos', 'no_activos', 'bajas'], true)) {
+    $fvdToolbarTipo = ($isFvdAdmin && is_array($lfToolbar))
+        ? (string) ($lfToolbar['tipo'] ?? 'ultimos')
+        : 'normal';
+}
 ?>
 <div class="fvd-atleta-form-page<?= !empty($fvd_form_embed) ? ' fvd-atleta-form-page--embed' : '' ?>">
 <?php if (!$fvd_form_embed): ?>
-<a class="fvd-form-back-link btn-link text-slate-600" href="<?= htmlspecialchars($fvdBackUrl, ENT_QUOTES, 'UTF-8') ?>"><?= $isFvdAdmin ? '← Volver al listado' : ($fvdEsDelegadoFormToolbar ? '← Volver al panel' : '← Volver al listado') ?></a>
+<a class="fvd-form-back-link btn-link text-slate-600" href="<?= htmlspecialchars($fvdBackUrl, ENT_QUOTES, 'UTF-8') ?>"<?= !$isEdit ? ' title="Regresar al listado de afiliaciones sin guardar"' : '' ?>><?= htmlspecialchars($fvdFormTopBackLabel, ENT_QUOTES, 'UTF-8') ?></a>
 <?php endif; ?>
+<?php if (!empty($fvd_form_embed) && !$isEdit): ?>
+<div class="fvd-atleta-form-embed-cancel no-print" style="margin:0 0 10px">
+    <a class="fvd-form-back-link btn-link text-slate-600" href="<?= htmlspecialchars($fvdBackUrl, ENT_QUOTES, 'UTF-8') ?>" title="Regresar al listado de afiliaciones sin guardar"><?= htmlspecialchars($fvdFormTopBackLabel, ENT_QUOTES, 'UTF-8') ?></a>
+</div>
+<?php endif; ?>
+<?php
+$fvdMasterEmbedUi = function_exists('fvd_master_embed_active') && fvd_master_embed_active();
+$fvdHideFormPageTitle = $fvdMasterEmbedUi
+    || (function_exists('fvd_delegado_inner_heading_visible') && !fvd_delegado_inner_heading_visible());
+?>
+<?php if (!empty($fvd_error ?? '')): ?>
+<div class="fvd-mod-msg fvd-atleta-form__flash-err" role="alert" style="margin:0 0 12px;padding:12px 14px;border-radius:10px;border:1px solid #b45309;background:rgba(254,215,170,.25);font-size:.875rem;line-height:1.45;color:#0f172a">
+    <?= htmlspecialchars((string) $fvd_error, ENT_QUOTES, 'UTF-8') ?>
+</div>
+<?php endif; ?>
+<?php if (!$fvdHideFormPageTitle): ?>
 <h1 class="fvd-atleta-form-page__title"><?= $isEdit ? 'Editar atleta' : 'Nuevo atleta' ?></h1>
-<?php if (!$fvd_form_embed && !$isFvdAdmin && $isEdit): ?>
-<div class="fvd-mod-toolbar no-print" style="flex-wrap:wrap;align-items:flex-end;gap:10px;padding:12px 14px;border-radius:12px;border:1px solid #64748b;background:#f8fafc;box-shadow:0 8px 18px rgba(15,23,42,.12);margin:0 0 12px">
-    <form method="get" action="" class="no-print" id="fvd-atletas-filter-form-formpage" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:10px;border-radius:10px;border:1px solid #94a3b8;background:#ffffff">
+<?php endif; ?>
+<?php if (!$fvd_form_embed && $isEdit): ?>
+<div class="fvd-mod-toolbar fvd-atletas-toolbar-unified no-print" style="flex-wrap:wrap;align-items:flex-end;gap:10px;padding:12px 14px;border-radius:12px;border:1px solid rgba(46,48,146,.28);border-top:3px solid #fff200;background:#f8fafc;box-shadow:0 8px 18px rgba(15,23,42,.12);margin:0 0 12px">
+    <form method="get" action="" class="no-print" id="fvd-atletas-filter-form-formpage" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:10px;border-radius:10px;border:1px solid rgba(46,48,146,.22);background:#ffffff">
         <input type="hidden" name="action" value="list">
+        <?php if (function_exists('fvd_master_panel_render_context_hiddens')) {
+            fvd_master_panel_render_context_hiddens();
+        } ?>
+        <?php
+        $fvdFormToolbarIncluirEmbed = (\AuthService::role() === \AuthService::ROLE_FVD_ADMIN)
+            || (function_exists('fvd_master_embed_active') && fvd_master_embed_active());
+        if ($fvdFormToolbarIncluirEmbed) : ?>
+        <input type="hidden" name="embedded" value="1">
+        <input type="hidden" name="fvd_master_embed" value="1">
+        <?php endif; ?>
+        <?php if (isset($_GET['torneo_id']) && (int) $_GET['torneo_id'] > 0) : ?>
+        <input type="hidden" name="torneo_id" value="<?= (int) $_GET['torneo_id'] ?>">
+        <?php endif; ?>
+        <?php if (isset($_GET['campeonato_id']) && (int) $_GET['campeonato_id'] > 0) : ?>
+        <input type="hidden" name="campeonato_id" value="<?= (int) $_GET['campeonato_id'] ?>">
+        <?php endif; ?>
+        <?php if ($isFvdAdmin): ?>
+        <input type="hidden" name="tipo" value="<?= htmlspecialchars($fvdToolbarTipo, ENT_QUOTES, 'UTF-8') ?>">
+        <div>
+            <label style="font-size:.8125rem;color:#000;display:block;font-weight:700">Asociación</label>
+            <select id="fvd-atletas-asoc-id-formtoolbar" class="fvd-input" name="asociacion_id" style="min-width:min(11rem,32vw);max-width:15rem" aria-label="Asociación o FVD — todas">
+                <option value="0"<?= $fvdToolbarAsocId <= 0 ? ' selected' : '' ?>>FVD — todas</option>
+                <?php foreach ($asociaciones as $aso): ?>
+                    <?php
+                    $aidOpt = (int) ($aso['id'] ?? 0);
+                    if ($aidOpt <= 0) {
+                        continue;
+                    }
+                    ?>
+                    <option value="<?= $aidOpt ?>"<?= $fvdToolbarAsocId === $aidOpt ? ' selected' : '' ?> title="<?= htmlspecialchars((string) ($aso['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($aso['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php else: ?>
         <input type="hidden" name="alcance" value="todos">
         <div>
             <label style="font-size:.8125rem;color:#000;display:block;font-weight:700">Tipo de listado</label>
@@ -504,6 +632,7 @@ $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']
                 <option value="bajas"<?= $fvdToolbarTipo === 'bajas' ? ' selected' : '' ?>>Dados de baja</option>
             </select>
         </div>
+        <?php endif; ?>
         <div>
             <label style="font-size:.8125rem;color:#000;display:block;font-weight:700">Cédula</label>
             <input id="fvd-atleta-cedula-form" class="fvd-input" type="search" name="cedula" value="<?= htmlspecialchars($fvdToolbarCedula, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. 30399011" style="max-width:11rem" autocomplete="off">
@@ -513,7 +642,7 @@ $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']
             <input id="fvd-atleta-q-form" class="fvd-input" type="search" name="q" value="<?= htmlspecialchars($fvdToolbarNombre, ENT_QUOTES, 'UTF-8') ?>" placeholder="Contiene…" style="max-width:12rem">
         </div>
         <button type="submit" class="fvd-input" style="width:auto;padding:6px 12px">Buscar</button>
-        <a href="<?= htmlspecialchars($selfUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
+        <a href="<?= htmlspecialchars(function_exists('fvd_return_preserve_query_params') ? fvd_return_preserve_query_params($selfUrl . '?action=list') : ($selfUrl . '?action=list'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Limpiar</a>
     </form>
     <?php if ($fvdFormRetornoUrl !== ''): ?>
     <a href="<?= htmlspecialchars($fvdFormRetornoUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-input no-print" style="width:auto;padding:8px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box;border-color:#000;background:#fff;color:#000;font-weight:800">
@@ -523,21 +652,24 @@ $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']
     <div class="fvd-atletas-export no-print" role="group" aria-label="Exportar listado">
         <span class="fvd-atletas-export__label" style="font-size:.75rem;color:#000;display:block;margin-bottom:4px;font-weight:700">Exportar</span>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-            <a href="<?= htmlspecialchars($selfUrl . '?action=list&format=csv', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Excel (CSV)</a>
-            <a href="<?= htmlspecialchars($selfUrl . '?action=list&format=pdf', ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">PDF</a>
+            <a href="<?= htmlspecialchars(function_exists('fvd_return_preserve_query_params') ? fvd_return_preserve_query_params($selfUrl . '?action=list&format=csv') : ($selfUrl . '?action=list&format=csv'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">Excel (CSV)</a>
+            <a href="<?= htmlspecialchars(function_exists('fvd_return_preserve_query_params') ? fvd_return_preserve_query_params($selfUrl . '?action=list&format=pdf') : ($selfUrl . '?action=list&format=pdf'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-input" style="width:auto;padding:6px 12px;display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box">PDF</a>
         </div>
     </div>
-    <a href="<?= htmlspecialchars($selfUrl . '?action=form', ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary no-print" style="text-decoration:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center">Nuevo atleta</a>
+    <a href="<?= htmlspecialchars(function_exists('fvd_return_append_to_url') ? fvd_return_append_to_url($selfUrl . '?action=form') : ($selfUrl . '?action=form'), ENT_QUOTES, 'UTF-8') ?>" class="fvd-btn-primary no-print" style="text-decoration:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center">Nuevo atleta</a>
 </div>
 <?php endif; ?>
 <form class="fvd-atleta-form fvd-atleta-form--framed" method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($fvdFormAction, ENT_QUOTES, 'UTF-8') ?>"<?= $fvd_form_embed ? ' target="_parent"' : '' ?>>
     <input type="hidden" name="_action" value="save">
-    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int) $r['id'] ?>"><?php endif; ?>
+    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= $idForm ?>"><?php endif; ?>
     <?php if (isset($_GET['ret']) && is_string($_GET['ret']) && fvd_return_sanitize($_GET['ret']) !== null): ?>
     <input type="hidden" name="ret" value="<?= htmlspecialchars($_GET['ret'], ENT_QUOTES, 'UTF-8') ?>">
     <?php elseif (isset($_GET['return']) && is_string($_GET['return']) && fvd_return_sanitize($_GET['return']) !== null): ?>
     <input type="hidden" name="return" value="<?= htmlspecialchars($_GET['return'], ENT_QUOTES, 'UTF-8') ?>">
     <?php endif; ?>
+    <?php if (function_exists('fvd_master_panel_render_context_hiddens')) {
+        fvd_master_panel_render_context_hiddens();
+    } ?>
 
     <div class="fvd-atleta-form__top-grid<?= $isFvdAdmin ? '' : ' fvd-atleta-form__top-grid--scoped-asoc' ?>">
         <div class="fvd-atleta-form__asoc fvd-atleta-form__asoc--grid-full">
@@ -566,7 +698,6 @@ $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']
                     <input class="fvd-input" id="cedula" name="cedula" required value="<?= htmlspecialchars((string) ($r['cedula'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" autocomplete="off">
                     <?php if (!$isEdit): ?>
                     <p id="fvd_cedula_lookup_msg" class="fvd-cedula-msg" role="status" aria-live="polite"></p>
-                    <p class="fvd-cedula-hint">Si la cédula ya existe en el sistema, verá un aviso y se abrirá la ficha completa del atleta (como en consulta / edición).</p>
                     <?php endif; ?>
                 </div>
                 <div class="fvd-atleta-form__nom">
@@ -574,6 +705,9 @@ $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']
                     <input class="fvd-input" id="nombre" name="nombre" required value="<?= htmlspecialchars((string) ($r['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                 </div>
             </div>
+            <?php if (!$isEdit): ?>
+            <div id="fvd_cedula_existe_wrap" class="fvd-atleta-form__ced-existe-wrap" hidden></div>
+            <?php endif; ?>
 
             <div class="fvd-atleta-form__row fvd-atleta-form__row--3">
                 <div>
@@ -609,7 +743,7 @@ $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']
                 </div>
                 <div>
                     <?php
-                    $estatusEtiqueta = FvdAdminService::atletasEstatusEtiqueta($estatusVal);
+                    $estatusEtiqueta = FvdAdminService::atletasEstatusEtiqueta($estatusVal, isset($r['numfvd']) ? (int) $r['numfvd'] : null);
                     $estatusOpciones = [
                         FvdAdminService::ATLETA_ESTATUS_PENDIENTE => 'Pendiente',
                         FvdAdminService::ATLETA_ESTATUS_ACTIVO  => 'Activo',
@@ -743,7 +877,7 @@ $fvdToolbarNombre = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']
 
     <div class="fvd-mod-actions fvd-atleta-form__actions">
         <button type="submit">Guardar</button>
-        <a href="<?= htmlspecialchars($selfUrl . '?action=list', ENT_QUOTES, 'UTF-8') ?>">Volver al listado</a>
+        <a href="<?= htmlspecialchars($fvdBackUrl, ENT_QUOTES, 'UTF-8') ?>"<?= !$isEdit ? ' title="Regresar al listado de afiliaciones sin guardar"' : '' ?>><?= htmlspecialchars($fvdFormBottomBackLabel, ENT_QUOTES, 'UTF-8') ?></a>
     </div>
 </form>
 </div>
@@ -785,49 +919,96 @@ if (fechnacEl && hintTxt) {
 (function () {
     var ced = document.getElementById('cedula');
     var msg = document.getElementById('fvd_cedula_lookup_msg');
+    var wrap = document.getElementById('fvd_cedula_existe_wrap');
     var lookupBase = <?= json_encode($fvdCedulaLookupBase, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    if (!ced || !msg || !lookupBase) return;
+    if (!ced || !lookupBase) return;
     var debounce = null;
-    var lastRedirect = false;
-    function clearMsg() {
-        msg.textContent = '';
-        msg.className = 'fvd-cedula-msg';
+    function clearUi() {
+        if (msg) {
+            msg.textContent = '';
+            msg.className = 'fvd-cedula-msg';
+        }
+        if (wrap) {
+            wrap.innerHTML = '';
+            wrap.setAttribute('hidden', 'hidden');
+        }
+    }
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
     }
     function runLookup() {
-        if (lastRedirect) return;
         var v = String(ced.value || '').trim();
-        clearMsg();
+        clearUi();
         if (v.length < 3) return;
-        msg.textContent = 'Buscando…';
+        if (msg) {
+            msg.textContent = 'Comprobando cédula…';
+        }
         fetch(lookupBase + '&cedula=' + encodeURIComponent(v), {
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json' }
         })
             .then(function (r) { return r.json(); })
             .then(function (data) {
+                if (msg) {
+                    msg.textContent = '';
+                    msg.className = 'fvd-cedula-msg';
+                }
                 if (!data || !data.found) {
-                    clearMsg();
                     return;
                 }
-                var nom = data.nombre ? String(data.nombre) : '';
-                msg.textContent = 'Atleta encontrado' + (nom ? ': ' + nom : '') + '. Abriendo ficha…';
-                msg.className = 'fvd-cedula-msg fvd-cedula-msg--ok';
-                lastRedirect = true;
-                if (data.redirect) {
-                    window.location.href = data.redirect;
+                var nom = data.nombre ? String(data.nombre) : '—';
+                var cedR = data.cedula ? String(data.cedula) : v;
+                var nf = data.numfvd != null && parseInt(data.numfvd, 10) > 0 ? String(parseInt(data.numfvd, 10)) : '— (pendiente)';
+                var est = data.estatus_etiqueta ? String(data.estatus_etiqueta) : '—';
+                var asoc = data.asociacion_nombre ? String(data.asociacion_nombre) : '—';
+                var scopeNote = data.scope_notice ? String(data.scope_notice) : '';
+                var sol = data.solicitud_pendiente;
+                var solTipo = '';
+                if (sol && sol.tipo) {
+                    var tm = { afiliacion: 'Afiliación', carnet: 'Carnet / afiliación', traspaso: 'Traspaso' };
+                    solTipo = tm[sol.tipo] || String(sol.tipo);
+                }
+                var solExtra = '';
+                if (sol && sol.id) {
+                    solExtra = '<dt>Solicitud delegado (pend.)</dt><dd>#' + esc(String(sol.id)) + (solTipo ? ' — ' + esc(solTipo) : '');
+                    if (sol.creado_en) { solExtra += ' <span class="fvd-atleta-form__ced-existe__meta">(' + esc(String(sol.creado_en)) + ')</span>'; }
+                    solExtra += '</dd>';
+                    if (sol.nota) { solExtra += '<dt>Nota solicitud</dt><dd>' + esc(String(sol.nota)) + '</dd>'; }
+                }
+                if (data.alta_desde_delegado && parseInt(data.alta_desde_delegado, 10) === 1 && !sol) {
+                    solExtra += '<dt>Alta delegado</dt><dd>Marcada como alta desde delegado (pendiente de validación).</dd>';
+                }
+                if (wrap) {
+                    wrap.innerHTML = '<p class="fvd-atleta-form__ced-existe__lead">Registro existente para esta cédula</p>'
+                        + '<dl class="fvd-atleta-form__ced-existe__grid" role="group" aria-label="Datos del atleta ya registrado">'
+                        + '<dt>Cédula en sistema</dt><dd>' + esc(cedR) + '</dd>'
+                        + '<dt>Nombre</dt><dd>' + esc(nom) + '</dd>'
+                        + '<dt>Estatus</dt><dd class="fvd-atleta-form__ced-existe__est">' + esc(est) + '</dd>'
+                        + '<dt>Nº FVD</dt><dd>' + esc(nf) + '</dd>'
+                        + '<dt>Asociación</dt><dd>' + esc(asoc) + '</dd>'
+                        + solExtra
+                        + '</dl>'
+                        + (scopeNote ? '<p class="fvd-atleta-form__ced-existe__scope">' + esc(scopeNote) + '</p>' : '');
+                    wrap.removeAttribute('hidden');
                 }
             })
             .catch(function () {
-                msg.textContent = 'No se pudo comprobar la cédula. Intente de nuevo.';
-                msg.className = 'fvd-cedula-msg fvd-cedula-msg--err';
+                if (msg) {
+                    msg.textContent = 'No se pudo comprobar la cédula. Intente de nuevo.';
+                    msg.className = 'fvd-cedula-msg fvd-cedula-msg--err';
+                }
             });
     }
     ced.addEventListener('blur', runLookup);
     ced.addEventListener('input', function () {
-        lastRedirect = false;
         clearTimeout(debounce);
-        debounce = setTimeout(runLookup, 700);
+        debounce = setTimeout(runLookup, 450);
     });
+    if (String(ced.value || '').trim().length >= 3) {
+        runLookup();
+    }
 })();
 <?php endif; ?>
 </script>

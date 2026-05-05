@@ -17,15 +17,15 @@ Aplicación **independiente** de la carpeta `crudmysql`: landing pública, FVD M
 
 | Ruta | Uso |
 |------|-----|
-| `index.php` | Landing (regla cromática 80/15/5, estilo MisTorneos) |
+| `index.php` | Landing (regla cromática 80/15/5, UI portal FVD) |
 | `fvdmasteradmin/` | Panel y login (`fvd_usuarios`) |
-| `assets/css/fvd-ui-mistorneos.css` | Estilos compartidos |
+| `assets/css/fvd-ui-portal.css` | Estilos compartidos |
 | `config/paths.php`, `config/env.php` | Rutas y variables de entorno |
 | `models/` | Modelos PHP copiados del proyecto origen (referencia / futuros usos) |
 
 ## Estética
 
-No se modificaron las clases ni variables CSS de la landing ni del dashboard: se conservan **`fvd-ui-mistorneos.css`**, **`ui_settings.php`** y el layout público (`includes/public_header.php`).
+No se modificaron las clases ni variables CSS de la landing ni del dashboard: se conservan **`fvd-ui-portal.css`**, **`ui_settings.php`** y el layout público (`includes/public_header.php`).
 
 ## Migración desde `crudmysql`
 

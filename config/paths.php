@@ -144,6 +144,92 @@ function fvd_crud_self_url(string $module): string {
 }
 
 /**
+ * URL del panel de delegado con contexto de torneo (`torneo_id`) y, si aplica, campeonato (`campeonato_id` = grupo de evento).
+ *
+ * @param int|null $campeonatoGrupoId null = usar grupo en sesión del delegado si existe; int (p. ej. 0) = solo ese valor (0 no añade parámetro).
+ */
+function fvd_delegado_dashboard_torneo_url(int $torneoId, ?int $campeonatoGrupoId = null): string
+{
+    $base = url('fvdmasteradmin/delegado_dashboard_new.php');
+    if ($torneoId <= 0) {
+        return $base;
+    }
+    $q = ['torneo_id' => $torneoId];
+    $cg = 0;
+    if ($campeonatoGrupoId !== null) {
+        $cg = max(0, $campeonatoGrupoId);
+    } elseif (class_exists('AuthService', false)) {
+        \AuthService::ensureSession();
+        $sessG = \AuthService::delegadoCampeonatoGrupoId();
+        $cg = ($sessG !== null && (int) $sessG > 0) ? (int) $sessG : 0;
+    }
+    if ($cg > 0) {
+        $q['campeonato_id'] = $cg;
+    }
+
+    return $base . (str_contains($base, '?') ? '&' : '?') . http_build_query($q);
+}
+
+/**
+ * Indica si la sesión corresponde a la vista de panel de delegado (delegado o admin en portal-asociación).
+ */
+function fvd_delegado_vista_activa(): bool
+{
+    if (!class_exists('AuthService', false)) {
+        $p = dirname(__DIR__) . '/fvdmasteradmin/services/AuthService.php';
+        if (is_readable($p)) {
+            require_once $p;
+        }
+    }
+    if (!class_exists('AuthService', false)) {
+        return false;
+    }
+    \AuthService::ensureSession();
+    if (\AuthService::isDelegadoAsociacion()) {
+        return true;
+    }
+    if (!\AuthService::isSuperAdmin()) {
+        return false;
+    }
+    $pAsoc = (int) (\AuthService::adminPortalDelegadoAsociacionId() ?? 0);
+
+    return $pAsoc > 0;
+}
+
+/**
+ * Enlace al panel de evento de un torneo (`action=evento&id=`).
+ *
+ * - En vista de panel delegado, siempre se devuelve {@see fvd_delegado_dashboard_torneo_url} (no el CRUD
+ *   `modules/torneos/index.php?action=evento`).
+ * - Si la petición actual es ya el módulo torneos (admin, /modules/ o proxy fvdmasteradmin), se reutiliza
+ *   esa misma ruta de script para que los saltos entre torneos no cambien de «árbol» de URL.
+ * - En cualquier otra página, se usa la base canónica `/modules/torneos/index.php`
+ *   alineada con atletas e inscripción bajo `/modules/`, evitando mezclar `/admin/modules/` con `/modules/`.
+ */
+function fvd_torneo_evento_url(int $torneoId, ?int $campeonatoGrupoDelegado = null): string
+{
+    if ($torneoId <= 0) {
+        return '#';
+    }
+    if (fvd_delegado_vista_activa()) {
+        return fvd_delegado_dashboard_torneo_url($torneoId, $campeonatoGrupoDelegado);
+    }
+    $sn = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($sn !== '' && (
+        str_contains($sn, '/modules/torneos/')
+        || str_contains($sn, '/fvdmasteradmin/modules/torneos/')
+        || str_contains($sn, '/admin/modules/torneos/')
+    )) {
+        $base = $sn;
+    } else {
+        $base = fvd_master_module_url('torneos/index.php');
+    }
+    $sep = str_contains($base, '?') ? '&' : '?';
+
+    return $base . $sep . http_build_query(['action' => 'evento', 'id' => $torneoId]);
+}
+
+/**
  * Generar URL completa con dominio
  */
 function full_url($path = '') {

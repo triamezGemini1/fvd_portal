@@ -16,16 +16,20 @@
 /** @var list<array<string,mixed>> $inscritosBandera */
 /** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int}> $fvdSitioDisponibles */
 /** @var list<array{atleta_id:int,nombre:string,cedula:string,numfvd:int}> $fvdSitioInscritos */
+/** @var list<array<string,mixed>> $fvdSitioInscritosGrupos */
+/** @var int $fvd_sitio_clase */
 /** @var string $fvdSitioNuevoAtletaUrl */
 /** @var list<array<string,mixed>> $fvdDelegadoGrupoTorneos */
 /** @var string $fvd_error_campeonato */
 /** @var int $fvd_campeonato_grupo */
 /** @var string $fvd_campeonato_q query &campeonato_id=… para enlaces del delegado */
-/** @var array<string,mixed>|null $fvd_balance_invitacion */
+/** @var string $fvd_url_admin_inscripciones_tabla URL módulo tabla inscripcion_torneo (vacío si no aplica) */
 $fvd_inscripcion_bandera_modo = !empty($fvd_inscripcion_bandera_modo);
-$fvd_balance_invitacion = $fvd_balance_invitacion ?? null;
+$fvd_url_admin_inscripciones_tabla = isset($fvd_url_admin_inscripciones_tabla) ? (string) $fvd_url_admin_inscripciones_tabla : '';
 $fvdSitioDisponibles = $fvdSitioDisponibles ?? [];
 $fvdSitioInscritos = $fvdSitioInscritos ?? [];
+$fvdSitioInscritosGrupos = $fvdSitioInscritosGrupos ?? [];
+$fvd_sitio_clase = isset($fvd_sitio_clase) ? (int) $fvd_sitio_clase : 0;
 $fvdSitioNuevoAtletaUrl = $fvdSitioNuevoAtletaUrl ?? (rtrim((string) (function_exists('env') ? env('APP_BASE_PATH', '') : ''), '/') . '/modules/atletas/index.php?action=form');
 $fvdDelegadoGrupoTorneos = $fvdDelegadoGrupoTorneos ?? [];
 $fvd_error_campeonato = $fvd_error_campeonato ?? '';
@@ -59,6 +63,27 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
 
 <?php if ($esFvd): ?>
     <form method="get" action="<?= htmlspecialchars($selfUrl, ENT_QUOTES, 'UTF-8') ?>" class="fvd-mod-toolbar" style="flex-wrap:wrap;align-items:flex-end;gap:10px;margin-bottom:1rem">
+        <?php
+        if (function_exists('fvd_master_embed_active') && fvd_master_embed_active()) {
+            echo '<input type="hidden" name="embedded" value="1">' . "\n";
+            echo '<input type="hidden" name="fvd_master_embed" value="1">' . "\n";
+            $tidEmb = isset($_GET['torneo_id']) ? (int) $_GET['torneo_id'] : 0;
+            if ($tidEmb > 0) {
+                echo '<input type="hidden" name="torneo_id" value="' . $tidEmb . '">' . "\n";
+            }
+            $ctxEmb = isset($_GET['ctx_torneo']) ? (int) $_GET['ctx_torneo'] : 0;
+            if ($ctxEmb > 0) {
+                echo '<input type="hidden" name="ctx_torneo" value="' . $ctxEmb . '">' . "\n";
+            }
+            $campEmb = isset($_GET['campeonato_id']) ? (int) $_GET['campeonato_id'] : 0;
+            if ($campEmb > 0) {
+                echo '<input type="hidden" name="campeonato_id" value="' . $campEmb . '">' . "\n";
+            }
+            if (function_exists('fvd_master_panel_render_context_hiddens')) {
+                fvd_master_panel_render_context_hiddens();
+            }
+        }
+        ?>
         <div>
             <label style="font-size:.8125rem;color:var(--fvd-muted);display:block">Actuar como asociación</label>
             <select class="fvd-input" name="asociacion_id" style="max-width:22rem" onchange="this.form.submit()">
@@ -82,145 +107,46 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
 <?php if ($asocId > 0): ?>
     <?php if ($fvd_inscripcion_bandera_modo && $fvd_error_campeonato !== ''): ?>
         <p class="fvd-mod-msg"><?= htmlspecialchars($fvd_error_campeonato, ENT_QUOTES, 'UTF-8') ?></p>
-    <?php elseif ($torneosAbiertos === [] && !($fvd_inscripcion_bandera_modo && $fvdDelegadoGrupoTorneos !== [])): ?>
+    <?php elseif ($torneoSel <= 0 && $torneosAbiertos === [] && !($fvd_inscripcion_bandera_modo && $fvdDelegadoGrupoTorneos !== [])): ?>
         <p class="fvd-atl-muted" style="font-size:0.875rem">Sin eventos disponibles.</p>
     <?php elseif ($torneoSel > 0): ?>
 
         <?php if ($torneoMeta === null): ?>
             <p class="fvd-mod-msg">No se encontró el torneo o no está disponible.</p>
         <?php else: ?>
-            <?php if ($fvd_inscripcion_bandera_modo && $fvdDelegadoGrupoTorneos !== []): ?>
-            <div class="fvd-insc-camp-switch" role="group" aria-label="Torneo del campeonato" style="margin:0 0 1rem">
-                <span style="font-size:.75rem;color:var(--fvd-muted);display:block;margin-bottom:6px">Categoría</span>
-                <div class="fvd-insc-camp-switch__bg" style="display:inline-flex;flex-wrap:wrap;gap:6px">
-                    <?php foreach ($fvdDelegadoGrupoTorneos as $tg): ?>
-                        <?php
-                        $tgId = (int) ($tg['torneo'] ?? 0);
-                        if ($tgId <= 0) {
-                            continue;
-                        }
-                        $short = (string) ($tg['nombre_corta'] ?? $tg['nombre'] ?? '');
-                        $isActive = $torneoSel === $tgId;
-                        ?>
-                        <button type="button" class="fvd-insc-camp-switch__btn<?= $isActive ? ' fvd-insc-camp-switch__btn--on' : '' ?>"
-                            data-torneo-id="<?= $tgId ?>"
-                            data-campeonato-id="<?= (int) $fvd_campeonato_grupo ?>"
-                            style="padding:6px 12px;border-radius:6px;border:1px solid rgba(148,163,184,.45);background:<?= $isActive ? 'rgba(255,242,0,.18)' : 'rgba(15,23,42,.35)' ?>;color:var(--fvd-text);font-size:.8125rem;cursor:pointer;font-weight:<?= $isActive ? '700' : '500' ?>">
-                            <?= htmlspecialchars($short, ENT_QUOTES, 'UTF-8') ?>
-                        </button>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <style>
-            .fvd-insc-camp-switch__btn:hover { filter: brightness(1.08); }
-            .fvd-insc-camp-switch__btn--on { border-color: var(--fvd-amarillo, #fff200) !important; }
-            </style>
-            <?php endif; ?>
             <?php
-            if ($fvd_inscripcion_bandera_modo && is_array($fvd_balance_invitacion) && $fvd_error_campeonato === ''):
-                $fvdTot = $fvd_balance_invitacion['totales'] ?? [];
-                $fvdPor = $fvd_balance_invitacion['por_categoria'] ?? [];
-                $fvdFmtN = static fn (float $v): string => number_format($v, 2, ',', '.');
-                $fvdEurTot = $fvdTot['monto_total_eur'] ?? null;
-                $fvdPagTot = (float) ($fvdTot['pagado_eur'] ?? 0);
-                $fvdSaldoTot = $fvdTot['saldo_eur'] ?? null;
-                ?>
-            <section class="fvd-card" style="padding:12px;margin-bottom:1rem" aria-label="Balance global de invitación">
-                <h2 style="margin:0 0 8px;font-size:1rem">Balance global de invitación</h2>
-                <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--fvd-muted)">Suma de los torneos de este campeonato para <strong><?= htmlspecialchars((string) ($fvd_balance_invitacion['asoc_nombre'] ?? 'su asociación'), ENT_QUOTES, 'UTF-8') ?></strong> (deudas y pagos centralizados por <code>asociacion_id</code>).</p>
-                <div style="display:flex;flex-wrap:wrap;gap:12px 24px;margin-bottom:12px;font-size:0.875rem">
-                    <span>Deuda ref. Bs: <strong><?= $fvdFmtN((float) ($fvdTot['monto_total_bs'] ?? 0)) ?></strong></span>
-                    <?php if ($fvdEurTot !== null && (float) $fvdEurTot > 0): ?>
-                        <span>Total deuda EUR: <strong><?= $fvdFmtN((float) $fvdEurTot) ?> €</strong></span>
-                        <span>Pagado (EUR): <strong><?= $fvdFmtN($fvdPagTot) ?> €</strong></span>
-                        <span>Saldo (EUR): <strong><?= $fvdSaldoTot !== null ? $fvdFmtN((float) $fvdSaldoTot) . ' €' : '—' ?></strong></span>
-                    <?php else: ?>
-                        <span style="color:var(--fvd-muted)">Sin montos EUR en deuda para este grupo (o use Pagos para el detalle).</span>
-                    <?php endif; ?>
-                    <span>Inscripciones (suma categorías): <strong><?= (int) ($fvdTot['n_inscritos'] ?? 0) ?></strong></span>
-                </div>
-                <?php if ($fvdPor !== []): ?>
-                <div class="fvd-mod-table-wrap" style="max-height:16rem;overflow:auto">
-                    <table class="fvd-mod-table" style="font-size:0.78rem">
-                        <thead>
-                        <tr>
-                            <th>Categoría</th>
-                            <th style="text-align:right">Insc.</th>
-                            <th style="text-align:right">Deuda Bs</th>
-                            <th style="text-align:right">Pagado €</th>
-                            <th style="text-align:right">Saldo €</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($fvdPor as $fila): ?>
-                            <tr>
-                                <td><?= htmlspecialchars((string) ($fila['etiqueta'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                                <td style="text-align:right"><?= (int) ($fila['n_inscritos'] ?? 0) ?></td>
-                                <td style="text-align:right"><?= $fvdFmtN((float) ($fila['monto_total_bs'] ?? 0)) ?></td>
-                                <td style="text-align:right"><?= $fvdFmtN((float) ($fila['pagado_eur'] ?? 0)) ?> €</td>
-                                <td style="text-align:right"><?= isset($fila['saldo_eur']) && $fila['saldo_eur'] !== null ? $fvdFmtN((float) $fila['saldo_eur']) . ' €' : '—' ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php endif; ?>
-            </section>
+            $fvdModoSlug = preg_replace('/[^a-z0-9_-]/', '', strtolower((string) ($torneoMeta['modo'] ?? 'individual')));
+            if ($fvdModoSlug === '') {
+                $fvdModoSlug = 'individual';
+            }
+            ?>
+            <link rel="stylesheet" href="<?= htmlspecialchars(url('assets/css/fvd-torneo-inscripcion.css'), ENT_QUOTES, 'UTF-8') ?>">
+            <link rel="stylesheet" href="<?= htmlspecialchars(url('assets/css/fvd-inscripciones-13.css'), ENT_QUOTES, 'UTF-8') ?>">
+            <link rel="stylesheet" href="<?= htmlspecialchars(url('assets/css/fvd-insc-forms-panel.css'), ENT_QUOTES, 'UTF-8') ?>">
+            <div class="fvd-torneo-insc fvd-torneo-insc--modalidad-<?= htmlspecialchars($fvdModoSlug, ENT_QUOTES, 'UTF-8') ?>" id="fvd-torneo-insc-root">
+            <?php if ($fvd_url_admin_inscripciones_tabla !== ''): ?>
+                <nav class="fvd-mod-toolbar" style="margin:0 0 12px;padding:10px 12px;font-size:.8125rem;align-items:center;gap:10px" aria-label="Cambiar vista de inscripciones">
+                    <span style="font-weight:800;color:#0f172a">Inscripción en sitio</span>
+                    <span style="color:#94a3b8">|</span>
+                    <a href="<?= htmlspecialchars($fvd_url_admin_inscripciones_tabla, ENT_QUOTES, 'UTF-8') ?>"
+                       style="font-weight:700;color:#2e3092;text-decoration:underline;text-underline-offset:2px">
+                        Administrador de inscripciones (tabla <code style="font-size:.72rem">inscripcion_torneo</code>)
+                    </a>
+                </nav>
             <?php endif; ?>
             <?php
             require FVD_PROJECT_ROOT . '/templates/inscripciones/inscribir_sitio_panel.php';
-            $fvdInscDetOpen = (int) ($torneoMeta['clase'] ?? 1) !== 1;
-            ?>
-            <details class="fvd-insc-modalidad-details"<?= $fvdInscDetOpen ? ' open' : '' ?>>
-                <summary>Parejas, equipos o búsqueda por nombre</summary>
-            <link rel="stylesheet" href="<?= htmlspecialchars(url('assets/css/fvd-inscripciones-13.css'), ENT_QUOTES, 'UTF-8') ?>">
-
-            <div class="fvd-insc-wrap" id="fvd-insc-root">
-                <?php
-                $clInsc = (int) ($torneoMeta['clase'] ?? 1);
-                $fvd_insc_integrantes_equipo = (int) ($torneoMeta['integrantes_equipo'] ?? 4);
-                if ($clInsc === 2) {
-                    require FVD_PROJECT_ROOT . '/templates/inscripciones/tipo_parejas.php';
-                } elseif ($clInsc === 3) {
-                    require FVD_PROJECT_ROOT . '/templates/inscripciones/tipo_equipos.php';
-                } else {
-                    require FVD_PROJECT_ROOT . '/templates/inscripciones/tipo_individual.php';
-                }
-                ?>
-
-                <div class="fvd-insc-toolbar">
-                    <div class="fvd-insc-search">
-                        <label style="font-size:.65rem;color:var(--fvd-muted);display:block">Buscar atleta (nombre o cédula)</label>
-                        <input type="search" class="fvd-input" id="fvd-insc-q" placeholder="Mín. 2 caracteres" style="width:100%;padding:6px 8px;font-size:0.8125rem" autocomplete="off">
-                    </div>
-                    <button type="button" class="fvd-insc-btn fvd-insc-btn--comprobante" id="fvd-insc-buscar" style="margin-top:14px">Buscar</button>
-                </div>
-                <div class="fvd-insc-pager" id="fvd-insc-pager" hidden></div>
-                <div class="fvd-insc-results" id="fvd-insc-results" hidden></div>
-                <p class="fvd-insc-hint" id="fvd-insc-msg" aria-live="polite"></p>
-
-                <?php
-                $fvd_resumen_inscripcion = [];
-                $fvd_resumen_titulo = null;
-                require FVD_PROJECT_ROOT . '/templates/components/resumen_inscripcion.php';
-                ?>
-
-                <div class="fvd-insc-actions">
-                    <button type="button" class="fvd-insc-btn fvd-insc-btn--inscribir" id="fvd-insc-submit">Inscribir</button>
-                    <button type="button" class="fvd-insc-btn fvd-insc-btn--pendiente" id="fvd-insc-clear" type="button">Vaciar nómina</button>
-                    <a class="fvd-insc-btn fvd-insc-btn--comprobante" id="fvd-insc-ver-listado" href="<?= htmlspecialchars($selfUrl . '?torneo_id=' . $torneoSel . ($fvd_campeonato_q !== '' ? $fvd_campeonato_q : '') . ($esFvd ? '&asociacion_id=' . $asocId : ''), ENT_QUOTES, 'UTF-8') ?>">Actualizar página</a>
-                </div>
-
-            </div>
-
-            <?php
+            $clInsc = (int) ($torneoMeta['clase'] ?? 1);
+            $fvd_insc_integrantes_equipo = (int) ($torneoMeta['integrantes_equipo'] ?? 4);
             $vdVenInscDet = $torneoMeta['ventana_delegado'] ?? null;
             $fvdDelegadoInscripcionCerradaDet = !empty($fvd_inscripcion_bandera_modo)
                 && is_array($vdVenInscDet)
                 && !($vdVenInscDet['fase2_inscripciones'] ?? false);
-            ?>
-            <script>
-            window.FVD_INSC = <?= json_encode([
+            $fvdInscJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+            if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+                $fvdInscJsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+            }
+            $fvdInscJson = json_encode([
                 'api' => $inscripcionApiUrl,
                 'torneoId' => $torneoSel,
                 'asociacionId' => $asocId,
@@ -231,7 +157,14 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
                 'maxNomina' => $clInsc === 2 ? 2 : ($clInsc === 3 ? (int) ($torneoMeta['integrantes_equipo'] ?? 4) : 80),
                 'banderaMode' => $fvd_inscripcion_bandera_modo,
                 'delegadoInscripcionCerrada' => $fvdDelegadoInscripcionCerradaDet,
-            ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                'reemplazarEquipoId' => 0,
+            ], $fvdInscJsonFlags);
+            if ($fvdInscJson === false) {
+                $fvdInscJson = '{"api":"","torneoId":0,"asociacionId":0,"esFvd":false,"uploadsBase":"/","modo":"individual","clase":1,"maxNomina":80,"banderaMode":false,"delegadoInscripcionCerrada":false,"reemplazarEquipoId":0}';
+            }
+            ?>
+            <script>
+            window.FVD_INSC = <?= $fvdInscJson ?>;
             </script>
             <script>
             (function () {
@@ -254,9 +187,37 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
                 var emptyHint = document.getElementById('fvd-insc-resumen-empty');
                 var btnSub = document.getElementById('fvd-insc-submit');
                 var btnClear = document.getElementById('fvd-insc-clear');
+                var btnGuardarEq = document.getElementById('fvd-insc-eq-btn-guardar');
+                var btnNuevaEq = document.getElementById('fvd-insc-eq-btn-nueva');
+                var teamNameEl = document.getElementById('fvd-insc-nombre-equipo');
                 var page = 1;
                 var perPage = 8;
                 var nomina = [];
+
+                function liveTorneoId() {
+                    var t = (window.FVD_INSC && window.FVD_INSC.torneoId) ? (window.FVD_INSC.torneoId | 0) : 0;
+                    return t > 0 ? t : torneoId;
+                }
+
+                function getClInsc() {
+                    return (window.FVD_INSC && window.FVD_INSC.clase != null) ? (window.FVD_INSC.clase | 0) : (cfg.clase | 0);
+                }
+
+                function getMaxNomina() {
+                    var h = document.getElementById('fvd-insc-max-nomina');
+                    if (h && h.value) {
+                        var v = parseInt(h.value, 10);
+                        if (v > 0) return v;
+                    }
+                    var m = (window.FVD_INSC && window.FVD_INSC.maxNomina != null) ? (window.FVD_INSC.maxNomina | 0) : 0;
+                    if (m > 0) return m;
+                    return Math.max(1, maxNomina);
+                }
+
+                function usesSlots() {
+                    var c = getClInsc();
+                    return c === 2 || c === 3;
+                }
 
                 function apiQs(extra) {
                     var s = api.indexOf('?') >= 0 ? '&' : '?';
@@ -274,7 +235,62 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
                     return uploadsBase + fn.split('/').map(encodeURIComponent).join('/');
                 }
 
-                function renderNomina() {
+                function syncEquipoJugadoresUI() {
+                    var cap = getMaxNomina();
+                    var p;
+                    for (p = 1; p <= cap; p++) {
+                        var idx = p - 1;
+                        var r = nomina[idx];
+                        var vis = document.getElementById('fvd-eq-jug-id-vis-' + p);
+                        var hid = document.getElementById('fvd-eq-jug-aid-' + p);
+                        var ced = document.getElementById('fvd-eq-jug-ced-' + p);
+                        var nom = document.getElementById('fvd-eq-jug-nom-' + p);
+                        var btn = document.getElementById('fvd-eq-jug-clear-' + p);
+                        if (!vis || !hid || !ced || !nom) continue;
+                        if (r) {
+                            var nf = r.numfvd | 0;
+                            vis.value = nf > 0 ? String(nf) : String(r.id);
+                            hid.value = String(r.id);
+                            ced.value = String(r.cedula != null ? r.cedula : '');
+                            nom.value = String(r.nombre || '');
+                            if (btn) {
+                                btn.style.display = '';
+                                btn.disabled = false;
+                            }
+                        } else {
+                            vis.value = '';
+                            hid.value = '';
+                            ced.value = '';
+                            nom.value = '';
+                            if (btn) {
+                                btn.style.display = 'none';
+                                btn.disabled = true;
+                            }
+                        }
+                    }
+                    if (emptyHint) emptyHint.hidden = true;
+                    if (grid) grid.hidden = true;
+                }
+
+                function bindEquipoRowClearButtons() {
+                    var pi;
+                    for (pi = 1; pi <= 16; pi++) {
+                        (function (pos) {
+                            var b = document.getElementById('fvd-eq-jug-clear-' + pos);
+                            if (!b) return;
+                            b.addEventListener('click', function () {
+                                var i = pos - 1;
+                                if (i >= 0 && i < nomina.length) {
+                                    nomina.splice(i, 1);
+                                    renderNomina();
+                                }
+                            });
+                        })(pi);
+                    }
+                }
+                bindEquipoRowClearButtons();
+
+                function renderNominaGrid() {
                     if (!grid) return;
                     grid.innerHTML = '';
                     if (nomina.length === 0) {
@@ -325,28 +341,63 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
                     });
                 }
 
+                function renderNomina() {
+                    if (usesSlots()) {
+                        syncEquipoJugadoresUI();
+                    } else {
+                        renderNominaGrid();
+                    }
+                }
+
                 function addToNomina(row) {
                     var id = parseInt(row.id, 10);
-                    if (!id) return;
+                    if (!id) return false;
                     if (nomina.some(function (x) { return x.id === id; })) {
                         if (msg) msg.textContent = 'Ya está en la nómina.';
-                        return;
+                        return false;
                     }
-                    if (nomina.length >= maxNomina) {
-                        if (msg) msg.textContent = 'Nómina completa (' + maxNomina + ').';
-                        return;
+                    var cap = getMaxNomina();
+                    if (nomina.length >= cap) {
+                        if (msg) msg.textContent = 'Nómina completa (' + cap + ').';
+                        return false;
                     }
                     var fu = row.foto ? fotoUrl(row.foto) : '';
+                    var nf = row.numfvd;
+                    var numfvd = nf != null && nf !== '' ? (parseInt(nf, 10) || 0) : 0;
                     nomina.push({
                         id: id,
                         nombre: row.nombre || '',
-                        cedula: row.cedula || '',
+                        cedula: row.cedula != null ? String(row.cedula) : '',
+                        numfvd: numfvd,
                         club: row.asociacion_nombre || '',
                         foto_url: fu
                     });
                     if (msg) msg.textContent = '';
                     renderNomina();
+                    return true;
                 }
+
+                window.fvdCargarEdicionEquipo = function (equipoNum, nombreEq, integrantes) {
+                    var n = (nombreEq != null) ? String(nombreEq).trim() : '';
+                    vaciarNominaEquipo();
+                    if (window.FVD_INSC) {
+                        window.FVD_INSC.reemplazarEquipoId = equipoNum | 0;
+                    }
+                    if (teamNameEl) teamNameEl.value = n;
+                    (integrantes || []).forEach(function (m) {
+                        addToNomina({
+                            id: m.id,
+                            nombre: m.nombre || '',
+                            cedula: m.cedula != null ? String(m.cedula) : '',
+                            numfvd: m.numfvd,
+                            foto: '',
+                            asociacion_nombre: ''
+                        });
+                    });
+                    if (msg) {
+                        msg.textContent = 'Nómina cargada. Ajuste integrantes o el nombre y pulse Guardar equipo.';
+                    }
+                };
 
                 function renderRows(rows) {
                     if (!results) return;
@@ -412,8 +463,11 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
                     }
                     if (msg) msg.textContent = 'Buscando…';
                     var buscarQs = 'action=buscar&q=' + encodeURIComponent(q) + '&page=' + page + '&per_page=' + perPage;
-                    if (banderaMode && torneoId) {
-                        buscarQs += '&torneo_id=' + encodeURIComponent(String(torneoId));
+                    if (banderaMode) {
+                        var tidB = liveTorneoId();
+                        if (tidB) {
+                            buscarQs += '&torneo_id=' + encodeURIComponent(String(tidB));
+                        }
                     }
                     var u = api + apiQs(buscarQs);
                     fetch(u, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
@@ -435,12 +489,21 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
                     if (e.key === 'Enter') { e.preventDefault(); page = 1; buscar(); }
                 });
 
-                if (btnClear) btnClear.addEventListener('click', function () {
+                function vaciarNominaEquipo() {
                     nomina = [];
+                    if (teamNameEl) teamNameEl.value = '';
                     renderNomina();
-                });
+                }
 
-                if (btnSub) btnSub.addEventListener('click', function () {
+                if (btnClear) btnClear.addEventListener('click', vaciarNominaEquipo);
+                if (btnNuevaEq) btnNuevaEq.addEventListener('click', vaciarNominaEquipo);
+
+                function setSubmitInscripcionBusy(busy) {
+                    if (btnSub) btnSub.disabled = busy;
+                    if (btnGuardarEq) btnGuardarEq.disabled = busy;
+                }
+
+                function ejecutarInscripcion() {
                     if (banderaMode && delegadoInscripcionCerrada) {
                         if (msg) msg.textContent = 'Periodo de inscripción cerrado según calendario del torneo.';
                         return;
@@ -449,147 +512,88 @@ $fvd_campeonato_q = $fvd_campeonato_q ?? '';
                         if (msg) msg.textContent = 'Añada atletas a la nómina.';
                         return;
                     }
+                    var cl = getClInsc();
+                    var cap = getMaxNomina();
+                    if ((cl === 2 || cl === 3) && nomina.length !== cap) {
+                        if (msg) msg.textContent = 'Complete los ' + cap + ' integrantes antes de inscribir.';
+                        return;
+                    }
+                    var neq = teamNameEl && teamNameEl.value ? teamNameEl.value.trim() : '';
+                    if ((cl === 2 || cl === 3) && !neq) {
+                        if (msg) msg.textContent = 'Indique el nombre del equipo.';
+                        return;
+                    }
                     var ids = nomina.map(function (x) { return x.id; });
-                    var tipo = modo === 'parejas' ? 'pareja' : (modo === 'equipos' ? 'equipo' : 'individual');
-                    var body = {
-                        action: (tipo === 'individual' && ids.length > 1) ? 'inscribir_lote' : 'inscribir',
-                        torneo_id: torneoId,
-                        tipo: tipo,
-                        atleta_ids: ids
-                    };
+                    var mLive = (window.FVD_INSC && window.FVD_INSC.modo) ? String(window.FVD_INSC.modo) : modo;
+                    var tipo = mLive === 'parejas' ? 'pareja' : (mLive === 'equipos' ? 'equipo' : 'individual');
+                    var repl = (window.FVD_INSC && (window.FVD_INSC.reemplazarEquipoId | 0) > 0) ? (window.FVD_INSC.reemplazarEquipoId | 0) : 0;
+                    var body;
+                    if (repl > 0 && (cl === 2 || cl === 3) && (tipo === 'pareja' || tipo === 'equipo')) {
+                        body = {
+                            action: 'actualizar_equipo',
+                            torneo_id: liveTorneoId(),
+                            equipo: repl,
+                            atleta_ids: ids,
+                            nombre_equipo: neq
+                        };
+                    } else {
+                        body = {
+                            action: (tipo === 'individual' && ids.length > 1) ? 'inscribir_lote' : 'inscribir',
+                            torneo_id: liveTorneoId(),
+                            tipo: tipo,
+                            atleta_ids: ids
+                        };
+                        if ((cl === 2 || cl === 3) && neq) body.nombre_equipo = neq;
+                    }
                     if (esFvd) body.asociacion_id = asocId;
                     if (msg) msg.textContent = 'Enviando…';
-                    btnSub.disabled = true;
+                    setSubmitInscripcionBusy(true);
                     fetch(api, {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify(body)
                     }).then(function (r) { return r.json(); }).then(function (d) {
-                        btnSub.disabled = false;
+                        setSubmitInscripcionBusy(false);
                         if (d && d.ok) {
+                            if (window.FVD_INSC) window.FVD_INSC.reemplazarEquipoId = 0;
                             if (banderaMode) {
                                 window.location.reload();
                                 return;
                             }
                             if (msg) msg.textContent = 'Listo.';
                             nomina = [];
+                            if (teamNameEl) teamNameEl.value = '';
                             renderNomina();
                         } else {
                             if (msg) msg.textContent = (d && d.error) ? d.error : 'Error.';
                         }
                     }).catch(function () {
-                        btnSub.disabled = false;
+                        setSubmitInscripcionBusy(false);
                         if (msg) msg.textContent = 'Error de red.';
                     });
-                });
+                }
 
-                if (banderaMode && delegadoInscripcionCerrada && btnSub) {
-                    btnSub.disabled = true;
-                    btnSub.style.opacity = '0.45';
+                if (btnSub) btnSub.addEventListener('click', ejecutarInscripcion);
+                if (btnGuardarEq) btnGuardarEq.addEventListener('click', ejecutarInscripcion);
+
+                if (banderaMode && delegadoInscripcionCerrada) {
+                    if (btnSub) {
+                        btnSub.disabled = true;
+                        btnSub.style.opacity = '0.45';
+                    }
+                    if (btnGuardarEq) {
+                        btnGuardarEq.disabled = true;
+                        btnGuardarEq.style.opacity = '0.45';
+                    }
+                }
+                if (window.FVD_INSC && typeof window.FVD_INSC === 'object') {
+                    window.FVD_INSC.addToNomina = addToNomina;
                 }
                 renderNomina();
             })();
             </script>
-            <?php if ($fvd_inscripcion_bandera_modo && $fvd_campeonato_grupo > 0): ?>
-            <script>
-            (function () {
-                var root = document.querySelector('.fvd-insc-camp-switch');
-                if (!root) return;
-                var api = <?= json_encode($inscripcionApiUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-                var campeonatoId = <?= (int) $fvd_campeonato_grupo ?>;
-                var selfBase = <?= json_encode($selfUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-                var campeonatoQ = <?= json_encode($fvd_campeonato_q, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-
-                function esc(s) {
-                    var d = document.createElement('div');
-                    d.textContent = s == null ? '' : String(s);
-                    return d.innerHTML;
-                }
-
-                function fillDisp(rows) {
-                    var tb = document.getElementById('fvd-sitio-tbody-disp');
-                    if (!tb) return;
-                    tb.innerHTML = '';
-                    (rows || []).forEach(function (row) {
-                        var tr = document.createElement('tr');
-                        tr.setAttribute('data-aid', String(row.atleta_id || 0));
-                        tr.setAttribute('data-nombre', String(row.nombre || ''));
-                        tr.setAttribute('data-cedula-num', String(row.cedula_num || 0));
-                        tr.innerHTML = '<td><strong>' + esc(row.nombre) + '</strong></td><td>' + esc(row.numfvd) + '</td><td>' + esc(row.cedula) + '</td>';
-                        tb.appendChild(tr);
-                    });
-                    var nd = document.getElementById('fvd-sitio-n-disp');
-                    if (nd) nd.textContent = String((rows || []).length);
-                }
-
-                function fillInsc(rows) {
-                    var tb = document.getElementById('fvd-sitio-tbody-insc');
-                    if (!tb) return;
-                    tb.innerHTML = '';
-                    (rows || []).forEach(function (row) {
-                        var tr = document.createElement('tr');
-                        var rm = row.retirar_mode != null ? String(row.retirar_mode) : '0';
-                        tr.setAttribute('data-aid', String(row.atleta_id || 0));
-                        tr.setAttribute('data-nombre', String(row.nombre || ''));
-                        tr.setAttribute('data-cedula-num', String(row.cedula_num || 0));
-                        tr.setAttribute('data-retirar', rm);
-                        tr.innerHTML = '<td><strong>' + esc(row.nombre) + '</strong></td><td>' + esc(row.numfvd) + '</td><td>' + esc(row.cedula) + '</td>';
-                        tb.appendChild(tr);
-                    });
-                    var ni = document.getElementById('fvd-sitio-n-insc');
-                    if (ni) ni.textContent = String((rows || []).length);
-                }
-
-                root.querySelectorAll('.fvd-insc-camp-switch__btn').forEach(function (btn) {
-                    btn.addEventListener('click', function () {
-                        var tid = parseInt(btn.getAttribute('data-torneo-id'), 10);
-                        if (!tid || !campeonatoId) return;
-                        var sep = api.indexOf('?') >= 0 ? '&' : '?';
-                        var u = api + sep + 'action=delegado_inscripcion_panel&torneo_id=' + encodeURIComponent(String(tid)) + '&campeonato_id=' + encodeURIComponent(String(campeonatoId));
-                        fetch(u, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
-                            .then(function (r) { return r.json(); })
-                            .then(function (d) {
-                                if (!d || !d.ok) {
-                                    window.alert((d && d.error) ? d.error : 'No se pudo cambiar de torneo.');
-                                    return;
-                                }
-                                var prevClase = window.FVD_INSC && window.FVD_INSC.clase ? (window.FVD_INSC.clase | 0) : 1;
-                                var newClase = d.fvd_insc && d.fvd_insc.clase != null ? (d.fvd_insc.clase | 0) : 1;
-                                if (newClase !== prevClase) {
-                                    window.location.href = selfBase + '?torneo_id=' + tid + (campeonatoQ || '');
-                                    return;
-                                }
-                                root.querySelectorAll('.fvd-insc-camp-switch__btn').forEach(function (b) {
-                                    var on = (parseInt(b.getAttribute('data-torneo-id'), 10) === tid);
-                                    b.classList.toggle('fvd-insc-camp-switch__btn--on', on);
-                                    b.style.fontWeight = on ? '700' : '500';
-                                    b.style.background = on ? 'rgba(255,242,0,.18)' : 'rgba(15,23,42,.35)';
-                                });
-                                if (window.FVD_INSC && d.fvd_insc) {
-                                    window.FVD_INSC.torneoId = tid;
-                                    window.FVD_INSC.modo = d.fvd_insc.modo || 'individual';
-                                    window.FVD_INSC.clase = newClase;
-                                    window.FVD_INSC.maxNomina = Math.max(1, (d.fvd_insc.maxNomina | 0) || 1);
-                                    if (typeof d.fvd_insc.delegadoInscripcionCerrada === 'boolean') {
-                                        window.FVD_INSC.delegadoInscripcionCerrada = d.fvd_insc.delegadoInscripcionCerrada;
-                                    }
-                                }
-                                fillDisp(d.fvdSitioDisponibles);
-                                fillInsc(d.fvdSitioInscritos);
-                                var listA = document.getElementById('fvd-insc-ver-listado');
-                                if (listA) listA.href = selfBase + '?torneo_id=' + tid + (campeonatoQ || '');
-                                try {
-                                    history.replaceState(null, '', selfBase + '?torneo_id=' + tid + (campeonatoQ || ''));
-                                } catch (e) { /* ignore */ }
-                            })
-                            .catch(function () { window.alert('Error de red.'); });
-                    });
-                });
-            })();
-            </script>
-            <?php endif; ?>
-            </details>
+            </div>
         <?php endif; ?>
     <?php endif; ?>
 <?php endif; ?>
