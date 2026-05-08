@@ -1,0 +1,48 @@
+{
+  "module": "atletas_migrated",
+  "version": 1,
+  "status": "in_progress",
+  "source_to_target": [
+    {
+      "source": "admin/modules/atletas/index.php",
+      "target": "modules/atletas_migrated/public/index.php",
+      "type": "entrypoint"
+    },
+    {
+      "source": "admin/modules/atletas/controller/AtletasController.php",
+      "target": "modules/atletas_migrated/src/Controller/AtletasController.php",
+      "type": "controller"
+    },
+    {
+      "source": "admin/modules/atletas/service/AtletasModuleService.php",
+      "target": "modules/atletas_migrated/src/Service/AtletasModuleService.php",
+      "type": "service"
+    },
+    {
+      "source": "admin/modules/atletas/list.view.php",
+      "target": "modules/atletas_migrated/views/list.view.php",
+      "type": "view"
+    },
+    {
+      "source": "assets/js/admin-atletas-list.js",
+      "target": "modules/atletas_migrated/assets/js/admin-atletas-list.js",
+      "type": "frontend_js"
+    },
+    {
+      "source": "templates/components/atleta_table_row.php",
+      "target": "modules/atletas_migrated/templates/components/atleta_table_row.php",
+      "type": "template_component"
+    }
+  ],
+  "auxiliary_endpoints": [
+    "search_api.php",
+    "export.php",
+    "carnet_foto_api.php",
+    "carnet_marcar_api.php",
+    "delegado_solicitud_una_api.php"
+  ],
+  "notes": [
+    "Se mantiene compatibilidad temporal mediante shims en rutas antiguas.",
+    "El dominio principal continúa apoyándose en FvdAdminService en esta etapa."
+  ]
+}
